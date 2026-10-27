@@ -2,8 +2,8 @@ class_name Hud
 extends CanvasLayer
 
 ## Clock, subtitles (Gordeev's voice-over and what he reads), the interact
-## prompt, his notebook, fades and title cards. Drawn at 960×720 over the
-## 320×240 world so the text stays readable.
+## prompt, his notebook, fades and title cards. Drawn at 1920×1080 over the
+## 480×270 world so the text stays readable.
 
 const INK := Color(0.85, 0.88, 0.75)
 const PAPER := Color(0.89, 0.87, 0.8)
@@ -28,30 +28,30 @@ func _ready() -> void:
 	fade = ColorRect.new()
 	fade.color = Color(0, 0, 0, 0)
 	fade.position = Vector2.ZERO
-	fade.size = Vector2(960, 720)
+	fade.size = Vector2(1920, 1080)
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(fade)
-	clock = _label(Vector2(700, 18), Vector2(244, 30), 22, HORIZONTAL_ALIGNMENT_RIGHT, INK)
-	prompt = _label(Vector2(60, 548), Vector2(840, 30), 20, HORIZONTAL_ALIGNMENT_CENTER, PAPER)
-	subtitle = _label(Vector2(60, 590), Vector2(840, 120), 22, HORIZONTAL_ALIGNMENT_CENTER, INK)
+	clock = _label(Vector2(1560, 28), Vector2(330, 44), 32, HORIZONTAL_ALIGNMENT_RIGHT, INK)
+	prompt = _label(Vector2(260, 830), Vector2(1400, 44), 30, HORIZONTAL_ALIGNMENT_CENTER, PAPER)
+	subtitle = _label(Vector2(260, 890), Vector2(1400, 170), 32, HORIZONTAL_ALIGNMENT_CENTER, INK)
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	title = _label(Vector2(0, 200), Vector2(960, 80), 44, HORIZONTAL_ALIGNMENT_CENTER, PAPER)
-	title_sub = _label(Vector2(100, 300), Vector2(760, 380), 21, HORIZONTAL_ALIGNMENT_CENTER, INK)
+	title = _label(Vector2(0, 300), Vector2(1920, 110), 64, HORIZONTAL_ALIGNMENT_CENTER, PAPER)
+	title_sub = _label(Vector2(360, 440), Vector2(1200, 560), 30, HORIZONTAL_ALIGNMENT_CENTER, INK)
 	title_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title_sub.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 
 	notebook = ColorRect.new()
 	notebook.color = Color(0.89, 0.87, 0.8, 0.97)
-	notebook.position = Vector2(150, 70)
-	notebook.size = Vector2(660, 580)
+	notebook.position = Vector2(510, 90)
+	notebook.size = Vector2(900, 900)
 	notebook.visible = false
 	add_child(notebook)
 	notebook_text = Label.new()
-	notebook_text.position = Vector2(30, 24)
-	notebook_text.size = Vector2(600, 530)
+	notebook_text.position = Vector2(44, 36)
+	notebook_text.size = Vector2(812, 830)
 	notebook_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	notebook_text.add_theme_font_size_override("font_size", 19)
+	notebook_text.add_theme_font_size_override("font_size", 27)
 	notebook_text.add_theme_color_override("font_color", Color(0.14, 0.13, 0.11))
 	notebook.add_child(notebook_text)
 
@@ -64,7 +64,7 @@ func _label(pos: Vector2, size: Vector2, font_size: int, align: HorizontalAlignm
 	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	l.add_theme_constant_override("outline_size", 6)
+	l.add_theme_constant_override("outline_size", 8)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(l)
 	return l

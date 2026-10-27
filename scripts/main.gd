@@ -1,7 +1,7 @@
 extends Node
 
 ## Vertical slice: one shortened night shift in universam «Кировский»,
-## 14 October 1988. Builds the 320×240 world viewport with the PS1 post
+## 14 October 1988. Builds the 480×270 world viewport with the PS1 post
 ## pass, the store, Gordeev, the killer and the HUD, then runs the shift
 ## from 22:45 to 06:00 (about ten real minutes).
 
@@ -10,6 +10,10 @@ const KILLER_MIN := 23.0 * 60.0 + 10.0
 const END_MIN := 30.0 * 60.0          # 06:00 next morning
 const EARLY_RATE := 0.15              # game minutes per second while the rows go dark
 const LATE_RATE := 1.0
+
+## The world renders this small and is scaled ×4 to Full HD with hard pixels.
+const RENDER_W := 480
+const RENDER_H := 270
 
 const FOG_LIT := Color("6f7671")
 const FOG_DARK := Color("0d0f0e")
@@ -36,7 +40,6 @@ var view: SubViewport
 var store: Store
 var player: Player
 var killer: Killer
-var cam: CameraRig
 var hud: Hud
 var env: Environment
 var post: ShaderMaterial
@@ -76,7 +79,7 @@ func _ready() -> void:
 	hud.fade.color.a = 1.0
 	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ",
 		"Свердловск, октябрь 1988\n\nНочь первая\n\n\n" +
-		"W / S — идти вперёд и назад      A / D — поворот\n" +
+		"Мышь — смотреть      W / A / S / D — идти\n" +
 		"Shift — бег (шумно)      F (держать) — фонарик-«жучок» (шумно)\n" +
 		"E — осмотреть      Tab — блокнот\n\nНажмите E, чтобы начать смену")
 
@@ -86,8 +89,12 @@ func _ready() -> void:
 func _setup_input() -> void:
 	_bind("move_forward", [KEY_W, KEY_UP], [JOY_BUTTON_DPAD_UP], [[JOY_AXIS_LEFT_Y, -1.0]])
 	_bind("move_back", [KEY_S, KEY_DOWN], [JOY_BUTTON_DPAD_DOWN], [[JOY_AXIS_LEFT_Y, 1.0]])
-	_bind("turn_left", [KEY_A, KEY_LEFT], [JOY_BUTTON_DPAD_LEFT], [[JOY_AXIS_LEFT_X, -1.0]])
-	_bind("turn_right", [KEY_D, KEY_RIGHT], [JOY_BUTTON_DPAD_RIGHT], [[JOY_AXIS_LEFT_X, 1.0]])
+	_bind("strafe_left", [KEY_A], [JOY_BUTTON_DPAD_LEFT], [[JOY_AXIS_LEFT_X, -1.0]])
+	_bind("strafe_right", [KEY_D], [JOY_BUTTON_DPAD_RIGHT], [[JOY_AXIS_LEFT_X, 1.0]])
+	_bind("look_left", [KEY_LEFT], [], [[JOY_AXIS_RIGHT_X, -1.0]])
+	_bind("look_right", [KEY_RIGHT], [], [[JOY_AXIS_RIGHT_X, 1.0]])
+	_bind("look_up", [], [], [[JOY_AXIS_RIGHT_Y, -1.0]])
+	_bind("look_down", [], [], [[JOY_AXIS_RIGHT_Y, 1.0]])
 	_bind("run", [KEY_SHIFT], [JOY_BUTTON_B], [])
 	_bind("flashlight", [KEY_F], [JOY_BUTTON_RIGHT_SHOULDER], [[JOY_AXIS_TRIGGER_RIGHT, 1.0]])
 	_bind("interact", [KEY_E, KEY_SPACE, KEY_ENTER], [JOY_BUTTON_A], [])
@@ -123,7 +130,7 @@ func _build_view() -> void:
 	layer.layer = 0
 	add_child(layer)
 	view = SubViewport.new()
-	view.size = Vector2i(320, 240)
+	view.size = Vector2i(RENDER_W, RENDER_H)
 	view.msaa_3d = Viewport.MSAA_DISABLED
 	view.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	view.audio_listener_enable_3d = true
@@ -134,7 +141,7 @@ func _build_view() -> void:
 	var screen := TextureRect.new()
 	screen.texture = view.get_texture()
 	screen.position = Vector2.ZERO
-	screen.size = Vector2(960, 720)
+	screen.size = Vector2(1920, 1080)
 	screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	screen.stretch_mode = TextureRect.STRETCH_SCALE
 	screen.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -181,11 +188,7 @@ func _build_world() -> void:
 	killer.spotted.connect(_on_spotted)
 	killer.lost.connect(_on_lost)
 	killer.caught_player.connect(_on_caught)
-	cam = CameraRig.new()
-	world.add_child(cam)
-	cam.target = player
-	cam.zones = store.camera_zones
-	cam.current = true
+	player.camera.current = true
 
 	_phone = AudioStreamPlayer3D.new()
 	_phone.stream = Sfx.get_stream("phone")
@@ -281,12 +284,19 @@ func _update_interaction() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		player.look((event as InputEventMouseMotion).relative)
+	elif event is InputEventMouseButton and event.pressed and phase == Phase.PLAY and not hud.notebook.visible:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	elif event.is_action_pressed("ui_cancel"):
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if phase == Phase.TITLE and event.is_action_pressed("interact"):
 		_start()
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook"):
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
 		get_tree().paused = open
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if open else Input.MOUSE_MODE_CAPTURED
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("restart"):
 		get_tree().paused = false
 		get_tree().reload_current_scene()
@@ -297,6 +307,7 @@ func _start() -> void:
 	hud.fade.color.a = 1.0
 	hud.fade_to(0.0, 2.0)
 	hud.hide_title()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 ## Starts the shift at once (also used by the dev screenshot run).
@@ -457,9 +468,12 @@ func _on_caught() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.notebook.visible = false
-	var p := player.global_position
-	var side := (p - killer.global_position).cross(Vector3.UP).normalized()
-	cam.override_pos = p + side * 1.6 + Vector3(0, 0.6, 0) + (p - killer.global_position).normalized() * 1.2
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	# Gordeev turns to face him: the blows land in full view.
+	var to := killer.global_position - player.global_position
+	var tw := create_tween().set_parallel()
+	tw.tween_property(player, "rotation:y", player.rotation.y + angle_difference(player.rotation.y, atan2(-to.x, -to.z)), 0.25)
+	tw.tween_property(player.head, "rotation:x", deg_to_rad(8.0), 0.25)
 	killer.play_attack(_on_hit)
 
 
@@ -468,10 +482,9 @@ func _on_hit(i: int) -> void:
 	Sfx.play_3d(view, "stab", p + Vector3(0, 1.2, 0), 2.0, randf_range(0.85, 1.05))
 	_flash = 1.0
 	store.spawn_blood(p + Vector3(randf_range(-0.6, 0.6), 0, randf_range(-0.6, 0.6)), 0.3 + i * 0.15)
-	if i == 0:
-		player.parts.root.rotation.z = 0.15
+	player.hit(i)
 	if i == 2:
-		player.die()
+		player.die(killer.global_position)
 		var pool := store.spawn_blood(p, 0.2)
 		create_tween().tween_property(pool, "scale", Vector3(9, 1, 9), 4.0).set_ease(Tween.EASE_OUT)
 		_chasing = false
@@ -501,6 +514,7 @@ func _where(p: Vector3) -> String:
 func _end_shift() -> void:
 	phase = Phase.END
 	player.controllable = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	killer.deactivate()
 	killer.visible = false
 	_chasing = false

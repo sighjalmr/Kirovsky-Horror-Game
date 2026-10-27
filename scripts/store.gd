@@ -49,7 +49,6 @@ const EDGES := [
 var rows: Array[LightRow] = []
 var interactables: Array[Dictionary] = []
 var chests: Dictionary = {}
-var camera_zones: Array[Dictionary] = []
 var astar := AStar3D.new()
 var booth_rect := Rect2(7.0, 0.2, 4.8, 4.6)
 var duty_rect := Rect2(-2.5, 0.0, 5.0, 2.5)
@@ -68,12 +67,6 @@ func _ready() -> void:
 	_build_hall()
 	_build_rows()
 	_build_waypoints()
-	camera_zones = [
-		{"rect": booth_rect, "pos": Vector3(7.3, 2.6, 4.5)},
-		{"rect": Rect2(-12, 0, 7.5, 3.0), "pos": Vector3(-5.0, 2.7, 4.6)},
-		{"rect": Rect2(-4.5, 6.6, 6.5, 3.4), "pos": Vector3(1.8, 2.9, 10.8)},
-		{"rect": Rect2(4.0, 25.0, 8.0, 3.0), "pos": Vector3(4.4, 2.9, 23.6)},
-	]
 
 
 # --- building helpers -------------------------------------------------------

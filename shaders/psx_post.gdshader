@@ -1,10 +1,10 @@
 shader_type canvas_item;
 
-// Full-frame pass over the 320×240 world image: animated film grain
+// Full-frame pass over the 480×270 world image: animated film grain
 // (stronger in the dark), vignette, a red flash for hits, then 15-bit
 // colour (5 bits per channel) with a 4×4 Bayer dither.
 
-uniform vec2 res = vec2(320.0, 240.0);
+uniform vec2 res = vec2(480.0, 270.0);
 uniform float grain = 0.06;
 uniform float vignette = 0.35;
 uniform float flash = 0.0;
