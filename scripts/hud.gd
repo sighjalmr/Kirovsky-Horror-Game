@@ -3,7 +3,7 @@ extends CanvasLayer
 
 ## Clock, subtitles (Gordeev's voice-over and what he reads), the interact
 ## prompt, his notebook, fades and title cards. Drawn at 1920×1080 over the
-## world view.
+## world view. A subtitle with a recorded take plays it as it appears.
 
 const INK := Color(0.85, 0.88, 0.75)
 const PAPER := Color(0.89, 0.87, 0.8)
@@ -20,6 +20,7 @@ var title_sub: Label
 
 var _queue: Array = []
 var _sub_t := 0.0
+var _voice: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -40,6 +41,9 @@ func _ready() -> void:
 	title_sub = _label(Vector2(360, 440), Vector2(1200, 560), 30, HORIZONTAL_ALIGNMENT_CENTER, INK)
 	title_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title_sub.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_voice = AudioStreamPlayer.new()
+	_voice.process_mode = Node.PROCESS_MODE_PAUSABLE   # holds while the notebook is open
+	add_child(_voice)
 
 	notebook = ColorRect.new()
 	notebook.color = Color(0.89, 0.87, 0.8, 0.97)
@@ -81,12 +85,17 @@ func _process(delta: float) -> void:
 			var next: Array = _queue.pop_front()
 			subtitle.text = next[0]
 			_sub_t = next[1]
+			_speak(next[0])
 
 
 ## Queues a subtitle. `now` drops whatever is queued and shows it at once.
+## A voiced line stays up at least as long as its take.
 func say(text: String, duration := -1.0, now := false) -> void:
+	var take := Voice.find(text)
 	if duration < 0.0:
 		duration = 2.5 + text.length() * 0.05
+	if not take.is_empty():
+		duration = maxf(duration, float(take.length) + 0.4)
 	if now:
 		_queue.clear()
 		_queue.append([text, duration])
@@ -99,6 +108,16 @@ func clear_subtitles() -> void:
 	_queue.clear()
 	_sub_t = 0.0
 	subtitle.text = ""
+	_voice.stop()
+
+
+func _speak(text: String) -> void:
+	var take := Voice.find(text)
+	if take.is_empty():
+		_voice.stop()
+		return
+	_voice.stream = load(take.file)
+	_voice.play()
 
 
 func set_prompt(text: String) -> void:
