@@ -6,6 +6,7 @@ extends Node
 ## the post, the lockers, the tills, the lit hall, the dark with the flashlight,
 ## Kovpak with his carton, the fuse panel, the «Волга» at the doors, the morning,
 ## the killer, his attack, the death) saving a screenshot of each step, then quits.
+## Add --handshot to take only the close-ups of the hand with the torch.
 
 var main: Node
 var out_dir := ""
@@ -17,6 +18,10 @@ func _ready() -> void:
 	var p: Player = main.player
 	var store: Store = main.store
 	var night: NightOne = main.night
+	if "--handshot" in OS.get_cmdline_user_args():
+		await _hand_shots(p, store, night)
+		get_tree().quit()
+		return
 	_place(p, Vector3(9.4, 0, 2.6), Vector3(-1, 0, 0.05))
 	await _wait(2.5)
 	await _shot("00_kovpak")
@@ -102,6 +107,30 @@ func _ready() -> void:
 	await _wait(7.0)
 	await _shot("09_death")
 	get_tree().quit()
+
+
+func _hand_shots(p: Player, store: Store, night: NightOne) -> void:
+	night.kovpak.visible = false
+	night.tamara.visible = false
+	p.force_flashlight = true
+	_place(p, Vector3(3.6, 0, 14.5), Vector3(1, 0, 0.9))
+	p.head.rotation.x = -0.15
+	await _wait(1.0)
+	await _shot("h1_lit")
+	p.head.rotation.x = -0.6
+	await _wait(0.6)
+	await _shot("h2_down")
+	_place(p, Vector3(-10.3, 0, 11.5), Vector3.BACK)
+	p.head.rotation.x = 0.0
+	for i in store.rows.size():
+		store.switch_off(i)
+	await _wait(3.5)
+	await _shot("h3_dark")
+	p.force_flashlight = false
+	await _wait(0.12)
+	await _shot("h4_lowering")
+	await _wait(0.8)
+	await _shot("h5_off")
 
 
 func _place(p: Player, pos: Vector3, dir: Vector3) -> void:
