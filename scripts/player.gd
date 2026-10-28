@@ -43,6 +43,8 @@ var _bulb_mat: ShaderMaterial
 var _spill: OmniLight3D
 var _sway := Vector2.ZERO
 var _pull := 0.0
+## 0 lowered out of sight, 1 held up in front: the hand only comes up with the torch.
+var _raise := 0.0
 
 var _whirr: AudioStreamPlayer3D
 var _steps: AudioStreamPlayer3D
@@ -327,8 +329,13 @@ func _build_hand() -> void:
 	hand.add_child(fill)
 
 
-## Sway behind the mouse, bob with the steps, pull back from walls.
+## Sway behind the mouse, bob with the steps, pull back from walls. With the
+## torch off the hand drops below the frame and is hidden.
 func _update_hand(delta: float, amp: float) -> void:
+	var up := flashlight_on or force_flashlight
+	_raise = move_toward(_raise, 1.0 if up else 0.0, delta * (7.0 if up else 3.5))
+	hand.visible = _raise > 0.0
+	var lift := _raise * _raise * (3.0 - 2.0 * _raise)
 	_sway = _sway.lerp(Vector2.ZERO, 1.0 - exp(-delta * 8.0))
 	_sway = _sway.limit_length(0.05)
 	var q := PhysicsRayQueryParameters3D.create(camera.global_position,
@@ -340,5 +347,6 @@ func _update_hand(delta: float, amp: float) -> void:
 	_pull = lerpf(_pull, want_pull, 1.0 - exp(-delta * 12.0))
 	hand.position = HAND_POS + Vector3(
 		-_sway.x + sin(_bob * 0.5) * 0.012 * amp,
-		_sway.y - absf(cos(_bob)) * 0.012 * amp,
+		_sway.y - absf(cos(_bob)) * 0.012 * amp - (1.0 - lift) * 0.32,
 		_pull)
+	hand.rotation.x = deg_to_rad(-6.0) - (1.0 - lift) * 0.6
