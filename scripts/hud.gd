@@ -8,6 +8,8 @@ extends CanvasLayer
 const INK := Color(0.85, 0.88, 0.75)
 const PAPER := Color(0.89, 0.87, 0.8)
 const RED := Color(0.82, 0.22, 0.18)
+## How far the hall sounds drop while Gordeev speaks, so his voice carries.
+const DUCK_DB := -7.0
 
 var clock: Label
 var subtitle: Label
@@ -75,6 +77,10 @@ func _label(pos: Vector2, size: Vector2, font_size: int, align: HorizontalAlignm
 
 
 func _process(delta: float) -> void:
+	var hall := AudioServer.get_bus_index(Sfx.BUS)
+	if hall != -1:
+		var duck := DUCK_DB if _voice.playing else 0.0
+		AudioServer.set_bus_volume_db(hall, move_toward(AudioServer.get_bus_volume_db(hall), duck, delta * 20.0))
 	if get_tree().paused:
 		return
 	_sub_t -= delta

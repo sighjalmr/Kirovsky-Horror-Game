@@ -1,8 +1,9 @@
 """Draft voice-over for every line in voice/script.json.
 
 Speaks each line with an open Piper neural voice, fixes stresses espeak gets
-wrong, then runs it through ffmpeg: a little lower and slower, low cut,
-compression and a small dry room for the inner voice, loudness to -18 LUFS.
+wrong, then runs it through ffmpeg: aged into an old man (lower, slower, a
+slight tremor, duller top), low cut, compression and a small dry room for
+the inner voice, loudness to -13 LUFS.
 Writes voice/<id>.ogg and voice/index.json (subtitle text -> file and length),
 which scripts/voice.gd reads in the game.
 
@@ -31,6 +32,10 @@ STRESS = {
     "полосы": "pˈoɭʌsy",
     "что-то": "ʃtˈotʌ",
 }
+
+# An old man's voice: a shaky tremor in loudness, a fuller chest and the top
+# end gone dull. Pitch vibrato and a 3 kHz cut made the words mushy.
+AGE = "tremolo=f=5:d=0.2,lowpass=f=7000,equalizer=f=250:t=q:w=1:g=2,"
 
 FX = {
     # Inside his head: close, dry, a touch of room.
@@ -65,8 +70,8 @@ def render(voice, line: dict, out: Path, pitch: float, pace: float) -> None:
             voice.synthesize_wav(spoken(line), w, syn_config=cfg)
         rate = 22050
         chain = (f"asetrate={rate * pitch:.0f},aresample={rate},atempo={1 / pitch:.4f},"
-                 f"{FX[line.get('fx', 'inner')]},"
-                 "adelay=120,apad=pad_dur=0.25,loudnorm=I=-18:TP=-2:LRA=7,aresample=44100")
+                 f"{AGE}{FX[line.get('fx', 'inner')]},"
+                 "adelay=120,apad=pad_dur=0.25,loudnorm=I=-13:TP=-1:LRA=7,aresample=44100")
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(raw), "-af", chain,
                         "-ac", "1", "-c:a", "libvorbis", "-q:a", "6", str(out)], check=True)
 
@@ -74,8 +79,8 @@ def render(voice, line: dict, out: Path, pitch: float, pace: float) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="Piper .onnx voice for Гордеев")
-    ap.add_argument("--pitch", type=float, default=0.93, help="below 1 is lower and older")
-    ap.add_argument("--pace", type=float, default=1.12, help="above 1 is slower")
+    ap.add_argument("--pitch", type=float, default=0.86, help="below 1 is lower and older")
+    ap.add_argument("--pace", type=float, default=1.22, help="above 1 is slower")
     ap.add_argument("--only", nargs="*", help="line ids to redo")
     ap.add_argument("--index-only", action="store_true", help="just rebuild index.json from the .ogg files")
     args = ap.parse_args()
