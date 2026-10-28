@@ -42,6 +42,7 @@ static func box(size: Vector3, tex_m: Variant = 1.0, step := 0.5, faces := ALL, 
 		if (faces & int(d[0])) == 0:
 			continue
 		_face(st, d[1], d[2], d[3], d[4], tm, step, ao)
+	st.generate_tangents()
 	var mesh := st.commit()
 	_cache[key] = mesh
 	return mesh

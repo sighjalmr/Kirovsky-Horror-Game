@@ -59,6 +59,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
 	_setup_input()
+	Sfx.setup_buses()
 	_build_view()
 	_build_world()
 	hud = Hud.new()
@@ -160,14 +161,16 @@ func _build_world() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.6, 0.65, 0.6)
 	env.ambient_light_energy = 0.35
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 1.25
+	env.tonemap_white = 6.0
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = FOG_LIT
 	env.fog_light_energy = 1.0
 	env.fog_density = 1.0
-	env.fog_depth_begin = 2.5
-	env.fog_depth_end = 14.0
+	env.fog_depth_begin = 2.0
+	env.fog_depth_end = 12.0
 	env.fog_depth_curve = 1.0
 	env.fog_sky_affect = 1.0
 	var we := WorldEnvironment.new()
@@ -192,6 +195,7 @@ func _build_world() -> void:
 
 	_phone = AudioStreamPlayer3D.new()
 	_phone.stream = Sfx.get_stream("phone")
+	_phone.bus = Sfx.BUS
 	_phone.max_distance = 40.0
 	_phone.unit_size = 8.0
 	world.add_child(_phone)
@@ -201,6 +205,12 @@ func _build_world() -> void:
 	_chase_music.volume_db = -80.0
 	_chase_music.autoplay = true
 	add_child(_chase_music)
+	var room := AudioStreamPlayer.new()
+	room.stream = Sfx.get_stream("room")
+	room.volume_db = -14.0
+	room.bus = Sfx.BUS
+	room.autoplay = true
+	add_child(room)
 
 
 func _build_timeline() -> void:
@@ -262,9 +272,9 @@ func _update_env(delta: float) -> void:
 	env.fog_light_color = fog
 	env.background_color = fog
 	env.ambient_light_energy = lerpf(0.03, 0.35, _lit)
-	env.fog_depth_begin = lerpf(1.5, 2.5, _lit)
-	env.fog_depth_end = lerpf(9.0, 14.0, _lit)
-	post.set_shader_parameter("grain", lerpf(0.10, 0.06, _lit))
+	env.fog_depth_begin = lerpf(1.0, 2.0, _lit)
+	env.fog_depth_end = lerpf(7.5, 12.0, _lit)
+	post.set_shader_parameter("grain", lerpf(0.11, 0.07, _lit))
 
 
 func _update_interaction() -> void:

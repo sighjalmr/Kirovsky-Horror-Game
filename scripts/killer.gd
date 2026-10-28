@@ -63,6 +63,7 @@ func _ready() -> void:
 	visible = false
 	_steps = AudioStreamPlayer3D.new()
 	_steps.stream = Sfx.get_stream("heavy_step")
+	_steps.bus = Sfx.BUS
 	_steps.max_distance = 22.0
 	_steps.unit_size = 4.0
 	_steps.volume_db = -3.0
