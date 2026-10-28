@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode specular_disabled, diffuse_lambert, cull_disabled, depth_draw_opaque;
+render_mode specular_schlick_ggx, diffuse_burley, cull_disabled, depth_draw_opaque;
 
 // Two-sided material: cloth skirts, baskets, thin sheets seen from both sides.
 #include "res://shaders/psx_common.gdshaderinc"
@@ -11,4 +11,5 @@ void fragment() {
 	}
 	ALBEDO = tex.rgb * tint.rgb * COLOR.rgb;
 	EMISSION = emission * tex.rgb;
+	PSX_SURFACE(tex)
 }

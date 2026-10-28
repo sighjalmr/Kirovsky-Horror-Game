@@ -488,9 +488,9 @@ def cloth(name):
     yy, xx = np.mgrid[0:512, 0:512]
     weave = ((xx % 4 < 2) ^ (yy % 4 < 2)).astype(np.float32)
     t.shade(weave, 0.93, 1.03)
-    warp = t.noise(256, 3)
-    f = np.sin(xx * 2 * np.pi / 128 + warp * 8)
-    t.mul(0.88 + 0.16 * f * np.abs(f))
+    warp = t.noise(256, 2)
+    f = np.sin(xx * 2 * np.pi / 256 + warp * 3)
+    t.mul(0.95 + 0.06 * f)
     t.shade(t.noise(30, 3), 0.95, 1.04)
     t.stain(t.noise(140, 4), 0.7, (0.38, 0.35, 0.28), 0.5)
     t.grain(0.01)
@@ -805,11 +805,17 @@ def clock(name):
 # --- people -------------------------------------------------------------------
 
 def skin(name):
-    t = T(256, 256, (0.78, 0.6, 0.5), name)
-    t.shade(t.noise(60, 4), 0.88, 1.05)
-    t.mix((0.7, 0.42, 0.38), t.noise(20, 3) * 0.25)
-    t.lines(80, 14, (0.6, 0.42, 0.35), 1, 0.35, None, 0.0, 0.3)
-    t.grain(0.012)
+    """Weathered skin of a man's hands: blotchy warm and cool patches, fine
+    pores, creases across the knuckles, faint veins."""
+    t = T(512, 512, (0.76, 0.58, 0.48), name)
+    t.shade(t.noise(90, 4), 0.86, 1.06)
+    t.mix((0.72, 0.4, 0.36), np.clip(t.noise(30, 3) - 0.35, 0, 1) * 0.6)
+    t.mix((0.62, 0.6, 0.55), np.clip(t.noise(45, 3) - 0.55, 0, 1) * 0.5)
+    pores = (t.rng.random((512, 512)) > 0.992).astype(np.float32)
+    t.mix((0.6, 0.44, 0.37), blurred(pores, 0.6) * 0.8)
+    t.lines(160, 22, (0.55, 0.38, 0.32), 1, 0.35, None, 0.0, 0.25)
+    t.lines(40, 60, (0.48, 0.45, 0.55), 2, 0.12, None, 1.57, 0.6)
+    t.grain(0.01)
     t.save(name)
 
 
@@ -879,14 +885,19 @@ def leather(name):
 
 
 def torch(name):
-    """The "zhuchok": ribbed green plastic with a grip pattern."""
-    t = T(256, 256, (0.4, 0.55, 0.36), name)
-    for y in range(80, 256, 12):
-        t.rect(0, y, 256, 3, (0.3, 0.43, 0.27))
-        t.rect(0, y + 3, 256, 1, (0.55, 0.68, 0.5))
-    t.text((128, 40), "ЖУЧОК", 26, (0.3, 0.42, 0.27))
-    t.shade(t.noise(80, 3), 0.9, 1.05)
-    t.grain(0.01)
+    """The "zhuchok": dark olive moulded plastic, a ribbed grip band, a mould
+    seam, worn shiny where the palm rubs, scuffs and the moulded name."""
+    t = T(512, 512, (0.2, 0.23, 0.17), name)
+    t.shade(t.noise(120, 3), 0.85, 1.08)
+    for y in range(190, 380, 14):
+        t.rect(0, y, 512, 5, (0.15, 0.19, 0.12))
+        t.rect(0, y + 5, 512, 2, (0.36, 0.43, 0.3))
+    t.rect(0, 125, 512, 2, (0.14, 0.17, 0.11))
+    t.mix((0.42, 0.48, 0.36), np.clip(t.noise(40, 3) - 0.6, 0, 1) * 1.5)
+    t.lines(90, 18, (0.5, 0.55, 0.45), 1, 0.4)
+    t.text((256, 70), "ЖУЧОК", 46, (0.17, 0.21, 0.13))
+    t.text((256, 112), "ЦЕНА 2 р. 50 к.", 18, (0.17, 0.21, 0.13), bold=False)
+    t.grain(0.012)
     t.save(name)
 
 
@@ -956,9 +967,40 @@ for _k, _v in SIGNS.items():
     ALL[_k] = (lambda text: lambda n: sign(n, text))(_v)
 
 
+# Relief: each of these also gets <name>_n.png, a tangent-space normal map
+# (OpenGL convention, green up) worked out from the brightness of the colour
+# map: dark grout, cracks, weave and grain read as dents. The number is the
+# depth; the second one blurs the height first (pixels) for soft materials.
+NORMALS = {
+    "floor": (3.0, 1.0), "wall": (0.7, 1.5), "ceiling": (1.5, 1.0), "metal": (1.2, 1.0), "paint": (1.2, 1.0),
+    "pegboard": (3.0, 0.8), "locker": (1.5, 1.0), "cloth": (1.5, 0.7), "enamel": (0.8, 1.0), "frozen": (2.0, 1.5),
+    "wood": (2.5, 0.8), "formica": (0.8, 1.0), "door": (1.5, 1.0), "cardboard": (1.5, 1.0), "skin": (0.8, 1.2),
+    "coat": (3.0, 0.7), "guard_wool": (3.0, 0.7), "trousers": (2.5, 0.7), "knit": (4.0, 0.8),
+    "rubber": (2.0, 1.0), "leather": (3.0, 1.0), "torch": (1.0, 1.0), "chrome": (0.6, 1.0), "basket": (2.0, 1.0),
+    "fabric": (2.0, 1.0), "grille": (3.0, 0.7),
+}
+
+
+def normal_map(name):
+    depth, soft = NORMALS[name]
+    img = np.asarray(Image.open(os.path.join(OUT, name + ".png")).convert("RGB"), np.float32) / 255
+    h = blurred(img @ np.array([0.3, 0.59, 0.11], np.float32), soft)
+    scale = h.shape[1] / 512 * depth * 4
+    dx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) * 0.5 * scale
+    drow = (np.roll(h, -1, 0) - np.roll(h, 1, 0)) * 0.5 * scale
+    n = np.stack([-dx, drow, np.ones_like(h)], -1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True)
+    path = os.path.join(OUT, name + "_n.png")
+    Image.fromarray((n * 127.5 + 127.5).clip(0, 255).astype(np.uint8), "RGB").save(path, optimize=True)
+    with open(path + ".import", "w") as f:
+        f.write(IMPORT.format(name=name + "_n").replace("compress/mode=0", "compress/mode=0\ncompress/normal_map=1"))
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     names = sys.argv[1:] or list(ALL)
     for nm in names:
         ALL[nm](nm)
+        if nm in NORMALS:
+            normal_map(nm)
         print("made", nm)

@@ -15,6 +15,8 @@ var ao_enabled := true
 
 var _st := SurfaceTool.new()
 var _count := 0
+var _nb_of := Basis()
+var _nb := Basis()
 
 
 func _init() -> void:
@@ -103,6 +105,80 @@ func cylinder(xf: Transform3D, r_bottom: float, r_top: float, h: float, sides: i
 				_vertex(xf, t[0], t[1], n, color, ao)
 
 
+## A surface of revolution round local +Y: `profile` is a list of
+## Vector2(radius, height) from bottom to top. Smooth normals; u wraps round
+## `rect` once, v runs down it along the profile. Close an end with radius 0.
+func lathe(xf: Transform3D, profile: Array, sides: int, color := Color.WHITE, rect := Rect2(0, 0, 1, 1),
+		ao := true) -> void:
+	var n := profile.size()
+	var lens: Array[float] = [0.0]
+	for i in range(1, n):
+		lens.append(lens[i - 1] + (profile[i] as Vector2).distance_to(profile[i - 1]))
+	var total := maxf(lens[n - 1], 0.0001)
+	var nrm: Array[Vector2] = []
+	for i in n:
+		var t: Vector2 = profile[mini(i + 1, n - 1)] - profile[maxi(i - 1, 0)]
+		if (profile[i] as Vector2).x < 0.00001 and (i == 0 or i == n - 1):
+			nrm.append(Vector2(0, -1 if i == 0 else 1))
+		else:
+			nrm.append(Vector2(t.y, -t.x).normalized())
+	for i in sides:
+		var a0 := -float(i) / sides * TAU
+		var a1 := -float(i + 1) / sides * TAU
+		var u0 := rect.position.x + rect.size.x * float(i) / sides
+		var u1 := rect.position.x + rect.size.x * float(i + 1) / sides
+		for j in n - 1:
+			var p0: Vector2 = profile[j]
+			var p1: Vector2 = profile[j + 1]
+			var v0 := rect.end.y - rect.size.y * lens[j] / total
+			var v1 := rect.end.y - rect.size.y * lens[j + 1] / total
+			var pts := [_rev(p0, a0), _rev(p0, a1), _rev(p1, a1), _rev(p1, a0)]
+			var ns := [_rev(nrm[j], a0), _rev(nrm[j], a1), _rev(nrm[j + 1], a1), _rev(nrm[j + 1], a0)]
+			# Skip the zero-area half of quads that meet at the axis.
+			var tris := [[0, 2, 1], [0, 3, 2]]
+			if p0.x < 0.00001:
+				tris = [[0, 3, 2]]
+			elif p1.x < 0.00001:
+				tris = [[0, 2, 1]]
+			var uvs := [Vector2(u0, v0), Vector2(u1, v0), Vector2(u1, v1), Vector2(u0, v1)]
+			for tri: Array in tris:
+				for idx: int in tri:
+					_vertex(xf, pts[idx], uvs[idx], ns[idx], color, ao)
+
+
+static func _rev(p: Vector2, a: float) -> Vector3:
+	return Vector3(cos(a) * p.x, p.y, sin(a) * p.x)
+
+
+## A rounded limb from `a` to `b`: a tapered cylinder with ball ends, radius
+## `ra` at a and `rb` at b. Finger bones, wrists, the killer's arms.
+func capsule(xf: Transform3D, a: Vector3, b: Vector3, ra: float, rb: float, sides := 12, color := Color.WHITE,
+		rect := Rect2(0, 0, 1, 1), ao := true) -> void:
+	var axis := b - a
+	var length := axis.length()
+	var y := axis / length
+	var x := y.cross(Vector3.FORWARD if absf(y.z) < 0.9 else Vector3.RIGHT).normalized()
+	var z := x.cross(y)
+	var prof: Array = []
+	for k in 5:
+		var t := -PI * 0.5 + PI * 0.5 * k / 4.0
+		prof.append(Vector2(cos(t) * ra, sin(t) * ra))
+	for k in 5:
+		var t := PI * 0.5 * k / 4.0
+		prof.append(Vector2(cos(t) * rb, length + sin(t) * rb))
+	lathe(xf * Transform3D(Basis(x, y, z), a), prof, sides, color, rect, ao)
+
+
+## An ellipsoid with the given half-axes, centred on the transform.
+func ellipsoid(xf: Transform3D, radii: Vector3, sides := 16, rings := 10, color := Color.WHITE,
+		rect := Rect2(0, 0, 1, 1), ao := true) -> void:
+	var prof: Array = []
+	for k in rings + 1:
+		var t := -PI * 0.5 + PI * k / rings
+		prof.append(Vector2(cos(t), sin(t)))
+	lathe(xf * Transform3D(Basis.from_scale(radii), Vector3.ZERO), prof, sides, color, rect, ao)
+
+
 ## A sheet through a grid of points: rows[j][i], i along u, j along v (v
 ## pointing down the sheet). UVs tile every `tex_m` metres of rest length.
 func sheet(xf: Transform3D, rows: Array, color := Color.WHITE, tex_m := 1.0, ao := true) -> void:
@@ -130,7 +206,11 @@ func quad(xf: Transform3D, p: Array, uv: Array, color: Color, ao := true, normal
 
 func _vertex(xf: Transform3D, p: Vector3, uv: Vector2, n: Vector3, color: Color, ao: bool) -> void:
 	var wp := xf * p
-	var wn := (xf.basis * n).normalized()
+	if xf.basis != _nb_of:
+		# Normals go through the inverse transpose so squashed parts shade right.
+		_nb_of = xf.basis
+		_nb = xf.basis.inverse().transposed()
+	var wn := (_nb * n).normalized()
 	var k := 1.0
 	if ao and ao_enabled:
 		if wn.y < -0.5:
@@ -145,6 +225,7 @@ func _vertex(xf: Transform3D, p: Vector3, uv: Vector2, n: Vector3, color: Color,
 
 
 func commit() -> ArrayMesh:
+	_st.generate_tangents()
 	return _st.commit()
 
 

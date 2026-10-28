@@ -195,7 +195,7 @@ func _build_booth() -> void:
 	lamp.omni_range = 4.5
 	lamp.light_energy = 1.3
 	lamp.light_color = WARM_COLOR
-	lamp.light_specular = 0.0
+	lamp.light_specular = 0.5
 	add_child(lamp)
 	add_interactable("phone", Vector3(11.1, 0, 1.2), "Снять трубку", 1.3, false, false)
 	add_interactable("journal", Vector3(10.9, 0, 2.6), "Журнал обходов", 1.3, false)
@@ -284,7 +284,7 @@ func _build_rows() -> void:
 	duty.omni_range = 4.0
 	duty.light_energy = 0.6
 	duty.light_color = Color(0.75, 0.9, 0.75)
-	duty.light_specular = 0.0
+	duty.light_specular = 0.4
 	add_child(duty)
 
 
@@ -302,7 +302,7 @@ func _add_row(title: String, rect: Rect2, points: Array[Vector3], color: Color) 
 		l.omni_range = 6.5
 		l.light_energy = 1.0
 		l.light_color = color
-		l.light_specular = 0.0
+		l.light_specular = 0.5
 		add_child(l)
 		row.lights.append(l)
 		c += p
