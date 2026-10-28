@@ -20,8 +20,8 @@ const STICK_SENS := 2.4
 const PITCH_LIMIT := deg_to_rad(80.0)
 const FLASHLIGHT_NOISE := 9.0
 const RUN_NOISE := 7.0
-const HAND_POS := Vector3(0.17, -0.14, -0.37)
-const HAND_ROT := Vector3(deg_to_rad(-8.0), deg_to_rad(38.0), deg_to_rad(18.0))
+const HAND_POS := Vector3(0.17, -0.15, -0.42)
+const HAND_ROT := Vector3(deg_to_rad(-10.0), deg_to_rad(40.0), 0.0)
 const HAND_REACH := 0.55
 
 var controllable := false
@@ -39,7 +39,6 @@ var flashlight: SpotLight3D
 var hand: TorchHand
 
 var _spill: OmniLight3D
-var _sway := Vector2.ZERO
 var _pull := 0.0
 ## 0 lowered out of sight, 1 held up in front: the hand only comes up with the torch.
 var _raise := 0.0
@@ -108,7 +107,6 @@ func look(rel: Vector2) -> void:
 	if not controllable or dead:
 		return
 	rotation.y -= rel.x * MOUSE_SENS
-	_sway += rel * 0.0004
 	head.rotation.x = clampf(head.rotation.x - rel.y * MOUSE_SENS, -PITCH_LIMIT, PITCH_LIMIT)
 
 
@@ -146,7 +144,7 @@ func _physics_process(delta: float) -> void:
 		var eye_to := SIT_EYE if sitting else (CROUCH_EYE if crouching else EYE_HEIGHT)
 		_eye = move_toward(_eye, eye_to, delta * 2.5)
 		head.position = Vector3(cos(_bob * 0.5) * 0.025 * amp, _eye + absf(sin(_bob)) * 0.035 * amp, 0)
-		_update_hand(delta, amp)
+		_update_hand(delta)
 	_stride += moved * delta
 	if _stride > (0.95 if running else 0.7):
 		_stride = 0.0
@@ -163,9 +161,8 @@ func _physics_process(delta: float) -> void:
 			noise.emit(global_position, RUN_NOISE)
 			_noise_t = 0.4
 	if flashlight_on:
-		# The dynamo pulses with each squeeze of the lever.
+		# The dynamo pulses as he works the lever; the fist itself stays still.
 		flashlight.light_energy = 9.0 + sin(_t * 37.0) * 0.6 + sin(_t * 6.0) * 0.9
-		hand.squeeze(0.5 + 0.5 * sin(_t * TAU * 6.0))
 
 
 func _set_flashlight(on: bool) -> void:
@@ -175,8 +172,6 @@ func _set_flashlight(on: bool) -> void:
 	flashlight.visible = on
 	_spill.visible = on
 	hand.set_lit(on)
-	if not on:
-		hand.squeeze(0.0)
 	if on:
 		_whirr.play()
 	else:
@@ -217,17 +212,19 @@ func hit(i: int) -> void:
 ## lights of its own.
 func _build_hand() -> void:
 	hand = TorchHand.new()
-	hand.roll = 45.0
-	hand.reverse = true
-	hand.slide = 0.01
+	# Four fingers under the torch, the thumb along the top towards the lens.
+	hand.roll = -30.0
+	hand.bend = Vector3(40, 0, 0)
+	hand.slide = 0.0
+	hand.arm_dir = Vector3(0.6, -0.2, 0.77)
 	hand.position = HAND_POS
 	hand.rotation = HAND_ROT
 	camera.add_child(hand)
 	# Light bouncing back from the beam picks out the fist and the torch.
 	_spill = OmniLight3D.new()
-	_spill.position = Vector3(-0.05, 0.12, 0.08)
-	_spill.omni_range = 0.5
-	_spill.light_energy = 0.4
+	_spill.position = Vector3(-0.2, 0.25, -0.15)
+	_spill.omni_range = 0.6
+	_spill.light_energy = 0.25
 	_spill.light_color = Color(1.0, 0.92, 0.75)
 	_spill.visible = false
 	hand.add_child(_spill)
@@ -242,15 +239,13 @@ func _build_hand() -> void:
 	hand.add_child(fill)
 
 
-## Sway behind the mouse, bob with the steps, pull back from walls. With the
-## torch off the hand drops below the frame and is hidden.
-func _update_hand(delta: float, amp: float) -> void:
+## Held steady in front of the eyes (no sway or bob), pulled back from walls.
+## With the torch off the hand drops below the frame and is hidden.
+func _update_hand(delta: float) -> void:
 	var up := flashlight_on or force_flashlight
 	_raise = move_toward(_raise, 1.0 if up else 0.0, delta * (7.0 if up else 3.5))
 	hand.visible = _raise > 0.0
 	var lift := _raise * _raise * (3.0 - 2.0 * _raise)
-	_sway = _sway.lerp(Vector2.ZERO, 1.0 - exp(-delta * 8.0))
-	_sway = _sway.limit_length(0.05)
 	var q := PhysicsRayQueryParameters3D.create(camera.global_position,
 		camera.global_position - camera.global_transform.basis.z * HAND_REACH, 1)
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
@@ -258,8 +253,5 @@ func _update_hand(delta: float, amp: float) -> void:
 	if not hit.is_empty():
 		want_pull = HAND_REACH - camera.global_position.distance_to(hit.position)
 	_pull = lerpf(_pull, want_pull, 1.0 - exp(-delta * 12.0))
-	hand.position = HAND_POS + Vector3(
-		-_sway.x + sin(_bob * 0.5) * 0.012 * amp,
-		_sway.y - absf(cos(_bob)) * 0.012 * amp - (1.0 - lift) * 0.32,
-		_pull)
+	hand.position = HAND_POS + Vector3(0, -(1.0 - lift) * 0.32, _pull)
 	hand.rotation.x = HAND_ROT.x - (1.0 - lift) * 0.6

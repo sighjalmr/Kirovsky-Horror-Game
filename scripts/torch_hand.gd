@@ -3,8 +3,8 @@ extends Node3D
 
 ## Gordeev's right hand round the «жучок», the first-person viewmodel. The
 ## hand is a scanned-looking model with a skeleton (models/hand, CC0, from
-## Godot XR Tools); its fingers are posed round the torch body and squeeze
-## the lever in time with the dynamo. The torch itself is built here: an
+## Godot XR Tools); four fingers are curled under the torch body over the
+## lever and the thumb lies along the top. The torch itself is built here: an
 ## olive moulded body, a chrome bezel with its reflector, a domed glass and
 ## the bulb, the squeeze lever underneath. Origin: the middle of the torch,
 ## its lens looking down -z.
@@ -12,6 +12,11 @@ extends Node3D
 const HAND_SCENE := "res://models/hand/Hand_Nails_R.gltf"
 const POSE_OPEN := "res://models/hand/Grip Shaft.res"
 const POSE_FIST := "res://models/hand/Grip.res"
+## The thumb is taken from this pose: straight, lying along the torch.
+const POSE_THUMB := "res://models/hand/Grip 5.res"
+## The thumb lies along the top of the torch: height of its middle line
+## above the torch axis, and how far forward of its base it reaches.
+const THUMB_TOP := 0.031
 ## The middle of the hole the curled fingers of the model make (its own
 ## space); the torch axis runs along y through it, index finger at +y.
 const GRIP_CENTRE := Vector3(-0.021, 0.0, -0.079)
@@ -44,6 +49,7 @@ var _skeleton: Skeleton3D
 var _open: Dictionary = {}  # bone index -> Quaternion
 var _fist: Dictionary = {}
 var _fingers: Array[int] = []
+var _thumb: Dictionary = {}
 
 
 func _ready() -> void:
@@ -53,6 +59,7 @@ func _ready() -> void:
 
 
 ## 0 lever out, 1 squeezed home: the lever swings in and the fingers close.
+## The player keeps the fist still; this only sets the grip.
 func squeeze(s: float) -> void:
 	_lever.rotation.x = deg_to_rad(-7.0) * s
 	var g := grip + s * 0.12
@@ -119,14 +126,15 @@ func _build_hand() -> void:
 	var mesh: MeshInstance3D = model.find_child("mesh_*", true, false)
 	mesh.material_override = _skin()
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for pose in [[POSE_OPEN, _open], [POSE_FIST, _fist]]:
+	for pose in [[POSE_OPEN, _open], [POSE_FIST, _fist], [POSE_THUMB, _thumb]]:
 		var anim: Animation = load(pose[0])
 		for i in anim.get_track_count():
 			var bone := _skeleton.find_bone(String(anim.track_get_path(i).get_concatenated_subnames()))
 			pose[1][bone] = anim.track_get_key_value(i, 0)
 	for bone in _open:
-		if _fist.has(bone):
+		if _fist.has(bone) and not _skeleton.get_bone_name(bone).begins_with("Thumb"):
 			_fingers.append(bone)
+	_lay_thumb()
 	# Turn the torch in the fist so the lever lies under the middle joints of
 	# the fingers.
 	var d := b * Vector3(-1, 0, -0.6)
@@ -148,6 +156,39 @@ func _build_hand() -> void:
 		Vector2(0.05, -0.005), Vector2(0.05, 0.008), Vector2(0.046, 0.012), Vector2(0.038, 0.01)],
 		24, Color(0.75, 0.75, 0.72), Rect2(0, 0, 3, 0.3))
 	kit.build(self, false)
+
+
+## Thumb straight along the top of the torch, pointing at the lens, the tip
+## bent down a little onto the body: each bone is turned to aim at its point.
+func _lay_thumb() -> void:
+	for bone in _thumb:
+		if _skeleton.get_bone_name(bone).begins_with("Thumb"):
+			_skeleton.set_bone_pose_rotation(bone, _thumb[bone])
+	var to_hand := model.transform.affine_inverse()  # torch space -> skeleton
+	var meta := _skeleton.find_bone("Thumb_Metacarpal_R")
+	var base := model.transform * _bone_global(meta).origin
+	var knuckle := Vector3(base.x * 0.4, THUMB_TOP, base.z - 0.012)
+	var aims: Array[Vector3] = [knuckle, knuckle + Vector3(0, 0.002, -0.04), knuckle + Vector3(0, -0.006, -0.072)]
+	var chain: Array[int] = [meta, _skeleton.find_bone("Thumb_Proximal_R"), _skeleton.find_bone("Thumb_Distal_R")]
+	for i in 3:
+		var b := chain[i]
+		var g := _bone_global(b)
+		var want := ((to_hand * aims[i]) - g.origin).normalized()
+		var have := g.basis.y.normalized()
+		var turn := Quaternion(have, want) if have.cross(want).length() > 0.0001 else Quaternion.IDENTITY
+		var parent := _bone_global(_skeleton.get_bone_parent(b)).basis
+		var q := (parent.inverse() * Basis(turn) * g.basis).get_rotation_quaternion()
+		_skeleton.set_bone_pose_rotation(b, q)
+
+
+## A bone's pose in skeleton space, worked out from the local poses.
+func _bone_global(b: int) -> Transform3D:
+	var t := _skeleton.get_bone_pose(b)
+	var p := _skeleton.get_bone_parent(b)
+	while p >= 0:
+		t = _skeleton.get_bone_pose(p) * t
+		p = _skeleton.get_bone_parent(p)
+	return t
 
 
 ## The skin of a man past fifty under shop light: the model's photo texture
