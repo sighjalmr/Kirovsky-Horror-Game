@@ -1,11 +1,11 @@
 shader_type spatial;
 render_mode specular_disabled, diffuse_lambert, cull_disabled, depth_draw_opaque;
 
-// Two-sided PS1 material: cloth skirts, baskets, thin sheets seen from both sides.
+// Two-sided material: cloth skirts, baskets, thin sheets seen from both sides.
 #include "res://shaders/psx_common.gdshaderinc"
 
 void fragment() {
-	vec4 tex = psx_texel();
+	vec4 tex = psx_texel(UV);
 	if (tex.a < 0.5) {
 		discard;
 	}

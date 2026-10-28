@@ -3,7 +3,7 @@ extends CanvasLayer
 
 ## Clock, subtitles (Gordeev's voice-over and what he reads), the interact
 ## prompt, his notebook, fades and title cards. Drawn at 1920×1080 over the
-## 480×270 world so the text stays readable.
+## world view.
 
 const INK := Color(0.85, 0.88, 0.75)
 const PAPER := Color(0.89, 0.87, 0.8)

@@ -13,7 +13,7 @@ const SIDES := MeshFactory.PX | MeshFactory.NX | MeshFactory.PZ | MeshFactory.NZ
 
 ## Products: [shape, size, label cell]. "box" size is (width along the shelf,
 ## height, depth); "tin" size is (radius, height, 0). Label cells index the
-## 4×4 "labels" atlas (see TexFactory._labels).
+## 4×4 "labels" atlas (see tools/make_textures.py).
 const PRODUCTS := {
 	"salt": ["box", Vector3(0.08, 0.12, 0.05), 4],
 	"tea": ["box", Vector3(0.07, 0.1, 0.045), 5],
@@ -95,7 +95,7 @@ static func product(kit: MeshBuilder.Kit, xf: Transform3D, id: String, pos: Vect
 	if p[0] == "box":
 		mb.box(t, size, Color.WHITE, label_rect(cell))
 	else:
-		mb.cylinder(t, size.x, size.x, size.y, 6 if size.x < 0.05 else 8, Color.WHITE, label_rect(cell), cap_rect(cell))
+		mb.cylinder(t, size.x, size.x, size.y, 12 if size.x < 0.05 else 16, Color.WHITE, label_rect(cell), cap_rect(cell))
 
 
 ## Fills a shelf board. Shelf frame: x along the board from its left end,

@@ -207,15 +207,21 @@ func _build_hand() -> void:
 	wool.cylinder(Transform3D(fwd, Vector3(0.02, -0.06, 0.11)), 0.052, 0.052, 0.035, 8, Color(0.7, 0.7, 0.7))
 	var torch := kit.b("torch")
 	torch.cylinder(Transform3D(fwd * Basis.from_scale(Vector3(0.85, 1.0, 1.15)), Vector3(0, 0.025, -0.015)), 0.048,
-		0.045, 0.12, 10, Color.WHITE, Rect2(0, 0.2, 1, 0.8), Rect2(0, 0, 1, 0.05), true, true)
+		0.045, 0.12, 20, Color.WHITE, Rect2(0, 0.2, 1, 0.8), Rect2(0, 0, 1, 0.05), true, true)
+	kit.b("torch", Color(0.55, 0.6, 0.55)).cylinder(Transform3D(fwd * Basis.from_scale(Vector3(0.85, 1.0, 1.15)),
+		Vector3(0, 0.025, 0.0)), 0.04, 0.046, 0.016, 20, Color.WHITE, Rect2(0, 0.2, 1, 0.8), Rect2(0.3, 0.5, 0.4, 0.4),
+		false, true)
 	var chrome := kit.b("chrome")
-	chrome.cylinder(Transform3D(fwd, Vector3(0, 0.03, -0.134)), 0.035, 0.033, 0.012, 10)
-	kit.custom(_lens_mat).cylinder(Transform3D(fwd, Vector3(0, 0.03, -0.145)), 0.027, 0.027, 0.002, 10, Color.WHITE,
+	chrome.cylinder(Transform3D(fwd, Vector3(0, 0.03, -0.134)), 0.035, 0.033, 0.012, 20)
+	kit.custom(_lens_mat).cylinder(Transform3D(fwd, Vector3(0, 0.03, -0.145)), 0.027, 0.027, 0.002, 20, Color.WHITE,
 		Props.FULL, Rect2(0.4, 0.4, 0.2, 0.2))
+	# Back of the hand along the right of the torch, wrist into the cuff, thumb on top.
 	var skin := kit.b("skin", Color(0.85, 0.82, 0.8))
-	skin.box(Props.at(0.045, -0.055, -0.06), Vector3(0.025, 0.085, 0.08))
-	skin.box(Props.at(0.022, -0.095, 0.015), Vector3(0.06, 0.065, 0.06))
-	skin.box(Props.rot(Vector3.UP, 0.12, Vector3(0.028, 0.075, -0.07)), Vector3(0.024, 0.022, 0.07))
+	skin.cylinder(Transform3D(fwd * Basis.from_scale(Vector3(0.55, 1.0, 1.0)), Vector3(0.045, -0.035, 0.0)), 0.04,
+		0.036, 0.1, 16)
+	skin.cylinder(Transform3D(fwd, Vector3(0.025, -0.065, 0.09)), 0.036, 0.04, 0.1, 16)
+	skin.cylinder(Transform3D(fwd * Basis(Vector3.FORWARD, 0.25), Vector3(0.03, 0.068, -0.01)), 0.012, 0.01, 0.075, 12,
+		Color.WHITE, Props.FULL, Rect2(0.4, 0.4, 0.2, 0.2), true)
 	kit.build(hand, false)
 
 	_lever = Node3D.new()
@@ -224,11 +230,16 @@ func _build_hand() -> void:
 	var lk := MeshBuilder.Kit.new()
 	lk.ao = false
 	lk.b("chrome", Color(0.7, 0.7, 0.7)).box(Props.at(0.0, -0.012, -0.05), Vector3(0.02, 0.012, 0.1))
+	# Four fingers curled under the torch round the lever, tips up its left side.
 	var fingers := lk.b("skin", Color(0.82, 0.78, 0.76))
+	var across := Basis(Vector3.BACK, PI * 0.5)  # cylinders pointing to -x
 	for i in 4:
-		var z := -0.085 + i * 0.021
-		fingers.box(Props.at(0.005, -0.036, z), Vector3(0.085, 0.024, 0.019))
-		fingers.box(Props.at(-0.046, -0.03, z), Vector3(0.018, 0.04, 0.019))
+		var z := -0.088 + i * 0.022
+		var r := 0.0105 - absf(i - 1.0) * 0.0008
+		fingers.cylinder(Transform3D(across, Vector3(0.045, -0.03, z)), r, r * 0.95, 0.088, 12, Color.WHITE,
+			Props.FULL, Rect2(0.4, 0.4, 0.2, 0.2), true, true)
+		fingers.cylinder(Transform3D(Basis.IDENTITY, Vector3(-0.045, -0.03, z)), r * 0.95, r * 0.85, 0.045, 12,
+			Color.WHITE, Props.FULL, Rect2(0.4, 0.4, 0.2, 0.2), true)
 	lk.build(_lever, false)
 	# Light bouncing back from the beam picks out the fist and the torch.
 	_spill = OmniLight3D.new()

@@ -6,7 +6,7 @@ render_mode specular_disabled, diffuse_lambert, cull_disabled, blend_mix, depth_
 #include "res://shaders/psx_common.gdshaderinc"
 
 void fragment() {
-	vec4 tex = psx_texel();
+	vec4 tex = psx_texel(UV);
 	ALBEDO = tex.rgb * tint.rgb * COLOR.rgb;
 	ALPHA = tint.a * tex.a;
 	EMISSION = emission * tex.rgb;

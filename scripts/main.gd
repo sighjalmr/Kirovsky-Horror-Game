@@ -1,7 +1,7 @@
 extends Node
 
 ## Vertical slice: one shortened night shift in universam «Кировский»,
-## 14 October 1988. Builds the 480×270 world viewport with the PS1 post
+## 14 October 1988. Builds the Full HD world viewport with the film post
 ## pass, the store, Gordeev, the killer and the HUD, then runs the shift
 ## from 22:45 to 06:00 (about ten real minutes).
 
@@ -12,8 +12,8 @@ const EARLY_RATE := 0.15              # game minutes per second while the rows g
 const LATE_RATE := 1.0
 
 ## The world renders this small and is scaled ×4 to Full HD with hard pixels.
-const RENDER_W := 480
-const RENDER_H := 270
+const RENDER_W := 1920
+const RENDER_H := 1080
 
 const FOG_LIT := Color("6f7671")
 const FOG_DARK := Color("0d0f0e")
@@ -56,11 +56,6 @@ var _flash := 0.0
 
 
 func _ready() -> void:
-	if "--bake-textures" in OS.get_cmdline_user_args():
-		TexFactory.bake_all()
-		set_process(false)
-		get_tree().quit()
-		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
 	_setup_input()
@@ -136,10 +131,10 @@ func _build_view() -> void:
 	add_child(layer)
 	view = SubViewport.new()
 	view.size = Vector2i(RENDER_W, RENDER_H)
-	view.msaa_3d = Viewport.MSAA_DISABLED
+	view.msaa_3d = Viewport.MSAA_4X
 	view.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	view.audio_listener_enable_3d = true
-	view.positional_shadow_atlas_size = 1024
+	view.positional_shadow_atlas_size = 4096
 	view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	view.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(view)
@@ -149,7 +144,7 @@ func _build_view() -> void:
 	screen.size = Vector2(1920, 1080)
 	screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	screen.stretch_mode = TextureRect.STRETCH_SCALE
-	screen.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	screen.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	post = ShaderMaterial.new()
 	post.shader = load("res://shaders/psx_post.gdshader")
 	screen.material = post
