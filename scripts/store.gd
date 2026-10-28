@@ -249,6 +249,7 @@ func _build_chest(id: String, pos: Vector3, rng: RandomNumberGenerator) -> void:
 	folded.visible = false
 	var hum := AudioStreamPlayer3D.new()
 	hum.stream = Sfx.get_stream("compressor")
+	hum.bus = Sfx.BUS
 	hum.volume_db = -14.0
 	hum.max_distance = 9.0
 	hum.unit_size = 2.0
@@ -308,6 +309,7 @@ func _add_row(title: String, rect: Rect2, points: Array[Vector3], color: Color) 
 	row.center = c / points.size() + Vector3(0, H - 0.3, 0)
 	row.hum = AudioStreamPlayer3D.new()
 	row.hum.stream = Sfx.get_stream("hum")
+	row.hum.bus = Sfx.BUS
 	row.hum.volume_db = -16.0
 	row.hum.max_distance = 14.0
 	row.hum.autoplay = true

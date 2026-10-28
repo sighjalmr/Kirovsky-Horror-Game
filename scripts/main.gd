@@ -59,6 +59,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
 	_setup_input()
+	Sfx.setup_buses()
 	_build_view()
 	_build_world()
 	hud = Hud.new()
@@ -192,6 +193,7 @@ func _build_world() -> void:
 
 	_phone = AudioStreamPlayer3D.new()
 	_phone.stream = Sfx.get_stream("phone")
+	_phone.bus = Sfx.BUS
 	_phone.max_distance = 40.0
 	_phone.unit_size = 8.0
 	world.add_child(_phone)
@@ -201,6 +203,12 @@ func _build_world() -> void:
 	_chase_music.volume_db = -80.0
 	_chase_music.autoplay = true
 	add_child(_chase_music)
+	var room := AudioStreamPlayer.new()
+	room.stream = Sfx.get_stream("room")
+	room.volume_db = -14.0
+	room.bus = Sfx.BUS
+	room.autoplay = true
+	add_child(room)
 
 
 func _build_timeline() -> void:
