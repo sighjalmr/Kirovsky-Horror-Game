@@ -7,7 +7,7 @@ extends RefCounted
 ## Everything plays through the "Hall" bus, which adds the echo of the big
 ## empty tiled hall.
 
-const LOOPS := ["hum", "whirr", "phone", "compressor", "drone", "room", "engine"]
+const LOOPS := ["hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd"]
 const TAKES := {"step": 4, "heavy_step": 4}
 const BUS := "Hall"
 

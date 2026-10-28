@@ -21,7 +21,7 @@ import numpy as np
 SR = 44100
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "sounds")
-LOOPS = {"hum", "whirr", "phone", "compressor", "drone", "room", "engine"}
+LOOPS = {"hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd"}
 
 IMPORT = """[remap]
 
@@ -439,6 +439,40 @@ def cans(name):
     save(name, x, 0.85)
 
 
+def crowd(name):
+    """A Saturday afternoon in the hall: a dozen voices too far off to make
+    out (formant-shaped noise in syllables), till keys clattering and the
+    drawer, baskets set down, a wire cart, a cough. Loops."""
+    g = Gen(name)
+    dur = 14.0
+    t = g.t(dur)
+    x = np.zeros_like(t)
+    for _ in range(12):
+        lo = g.rng.uniform(250, 600)
+        voice = band(g.noise(dur), lo, lo * g.rng.uniform(2.5, 4.0), True)
+        rate = g.rng.uniform(3.5, 5.5)
+        syl = (0.5 + 0.5 * np.sin(2 * np.pi * rate * t + g.rng.uniform(0, 6) + 2 * np.sin(2 * np.pi * 0.7 * t))) ** 3
+        # Each one talks in phrases with pauses between.
+        k = int(g.rng.integers(2, 5))
+        phrase = (0.5 + 0.5 * np.sin(2 * np.pi * k / dur * t + g.rng.uniform(0, 6))) ** 2
+        x += voice * syl * phrase * g.rng.uniform(0.4, 1.0)
+    x = norm(x, 1.0) * 0.6
+    x += norm(band(g.noise(dur), 80, 400, True), 1.0) * 0.12
+    for _ in range(9):  # till keys
+        at = g.rng.uniform(0.2, dur - 1.5)
+        for j in range(int(g.rng.integers(3, 7))):
+            place(x, modal(g.t(0.1), [(2300, 0.012, 1.0), (4100, 0.008, 0.5)]) * 0.12, at + j * g.rng.uniform(0.11, 0.2))
+    for at in (3.1, 9.4):  # the drawer: bell and the slide out
+        place(x, modal(g.t(1.0), [(1870, 0.35, 1.0), (4670, 0.2, 0.4)]) * 0.1, at)
+        place(x, band(g.noise(0.3), 300, 2500) * env(g.t(0.3), 0.02, 0.1) * 0.15, at + 0.05)
+    for at in (1.7, 6.2, 11.8):  # baskets set down
+        place(x, modal(g.t(0.4), [(520, 0.05, 1.0), (1210, 0.04, 0.6), (2650, 0.02, 0.3)]) * 0.12, at)
+    tt = g.t(3.0)  # a wire cart rolling past
+    place(x, band(g.noise(3.0), 900, 5000) * (0.6 + 0.4 * np.sin(2 * np.pi * 7 * tt)) * np.sin(np.pi * tt / 3.0) * 0.05, 7.0)
+    place(x, band(g.noise(0.35), 200, 1800) * env(g.t(0.35), 0.01, 0.08) * 0.35, 12.6)  # a cough
+    save(name, band(x, 60, 7000, True), 0.6)
+
+
 def lock(name):
     """A key going into a mortise lock, the turn, the bolt shooting home."""
     g = Gen(name)
@@ -454,7 +488,7 @@ def lock(name):
 
 
 ALL = {
-    "engine": engine, "knock": knock, "cans": cans, "lock": lock,
+    "engine": engine, "knock": knock, "cans": cans, "lock": lock, "crowd": crowd,
     "hum": hum, "click": click, "whirr": whirr, "phone": phone, "compressor": compressor, "room": room,
     "cloth": cloth, "stinger": stinger, "stab": stab, "drone": drone, "chime": chime, "breath": breath,
     "clank": clank, "keys": keys, "pickup": pickup,

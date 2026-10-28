@@ -139,7 +139,8 @@ static func walk(parts: Dictionary, phase: float, amount: float, swing_right_arm
 
 ## Ordinary people of the store, built like the killer but with their faces
 ## showing. `look` keys: coat, coat_tint, face, skin, trousers, boots, hat
-## ("fur", "cap", "scarf"), long (coat skirt below the knee), woman (narrower,
+## ("fur", "cap", "scarf", "hair" cropped, "perm" curled up high; hat_tint
+## colours the hair), long (coat skirt below the knee), woman (narrower,
 ## a skirt over stockings), bag ("briefcase", "handbag" or none).
 ## Returns the same parts as build_killer plus "box": a carton held in both
 ## arms, hidden until Npc.carry() shows it.
@@ -226,7 +227,20 @@ static func build_person(look: Dictionary) -> Dictionary:
 		face.quad(Props.at(0, 0.0, 0), [p1, p0, p0 + Vector3(0, 0.23, 0), p1 + Vector3(0, 0.23, 0)],
 			[Vector2(1.0 - (i + 1) / 3.0, 1), Vector2(1.0 - i / 3.0, 1), Vector2(1.0 - i / 3.0, 0), Vector2(1.0 - (i + 1) / 3.0, 0)],
 			Color.WHITE, false)
+	var hair_tint: Color = look.get("hat_tint", Color(0.4, 0.3, 0.24))
 	match look.get("hat", ""):
+		"hair":
+			# Cropped hair over the crown and the back of the head, clear of the forehead.
+			var hr := hk.b("hair", hair_tint)
+			hr.ellipsoid(Props.at(0, 0.235, 0.012), Vector3(0.098, 0.055, 0.107) * w, 14, 8)
+			hr.ellipsoid(Props.at(0, 0.15, 0.045), Vector3(0.093, 0.11, 0.075) * w, 14, 8)
+		"perm":
+			# A perm: a cloud of curls up high, over the ears at the sides.
+			var pm := hk.b("hair", hair_tint)
+			pm.ellipsoid(Props.at(0, 0.25, 0.015), Vector3(0.125, 0.085, 0.128) * w, 16, 10)
+			for side: float in [-1.0, 1.0]:
+				pm.ellipsoid(Props.at(side * 0.088 * w, 0.15, 0.03), Vector3(0.05, 0.085, 0.075), 10, 8)
+			pm.ellipsoid(Props.at(0, 0.14, 0.06), Vector3(0.105, 0.11, 0.075) * w, 14, 8)
 		"fur":
 			# A tall muskrat hat, the badge of a director.
 			hk.b("fur").cylinder(_oval(Vector3(0, 0.17, 0.005), 1.05), 0.118, 0.125, 0.16, 16, Color.WHITE, Rect2(0, 0, 2, 0.6))

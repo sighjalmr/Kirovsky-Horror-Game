@@ -6,8 +6,11 @@ extends Node
 ## viewport with the film post pass, the store, Gordeev, the killer and the
 ## HUD, keeps the clock and the timeline, and handles death, saving at the
 ## journal and the end of the shift. The story itself is in night_one.gd.
+## The same store by day, Saturday the 15th, is day_one.gd: Main switches
+## chapters by reloading the scene with `chapter` set.
 
 const START_MIN := 22.0 * 60.0 + 30.0
+const DAY_START_MIN := 12.0 * 60.0 + 40.0
 const KILLER_MIN := 23.0 * 60.0 + 10.0
 const END_MIN := 30.0 * 60.0          # 06:00 next morning
 const EARLY_RATE := 0.15              # game minutes per second until the killer comes
@@ -25,6 +28,11 @@ enum Phase { TITLE, PLAY, DEAD, END }
 ## The last signed round, kept across a scene reload after death.
 static var checkpoint: Dictionary = {}
 static var _resume := false
+## "night1" or "day1"; survives the reload between chapters.
+static var chapter := "night1"
+## What night one turned up, handed on to the day. Starting the day from the
+## title screen counts every clue as found.
+static var night_clues: Dictionary = {}
 
 var phase := Phase.TITLE
 var minutes := START_MIN
@@ -35,6 +43,7 @@ var player: Player
 var killer: Killer
 var hud: Hud
 var night: NightOne
+var day: DayOne
 var env: Environment
 var post: ShaderMaterial
 var chasing := false
@@ -66,6 +75,11 @@ func _ready() -> void:
 	_build_world()
 	hud = Hud.new()
 	add_child(hud)
+	if "--daytest" in OS.get_cmdline_user_args():
+		chapter = "day1"
+	if chapter == "day1":
+		_ready_day()
+		return
 	night = NightOne.new(self)
 	add_child(night)
 	night.build_timeline()
@@ -94,7 +108,29 @@ func _ready() -> void:
 		"Мышь — смотреть      W / A / S / D — идти\n" +
 		"Shift — бег (шумно)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
-		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену")
+		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену\n2 — сразу к дню первому")
+
+
+## Day one: the lights on, people in the hall, no killer and no rounds.
+func _ready_day() -> void:
+	minutes = DAY_START_MIN
+	if night_clues.is_empty():
+		night_clues = {"bag": true, "clip": true, "tape": true, "page": true, "invoice": true}
+	day = DayOne.new(self, night_clues)
+	add_child(day)
+	hud.clock.text = _fmt(minutes)
+	env.fog_depth_end = 16.0
+	player.global_position = Vector3(-0.3, 0, 1.0)
+	player.face(Vector3(0.15, 0, 1))
+	post.set_shader_parameter("grain", 0.06)
+	if "--daytest" in OS.get_cmdline_user_args():
+		add_child(load("res://scripts/dev_daytest.gd").new().with(self))
+		return
+	hud.fade.color.a = 1.0
+	hud.show_title("ДЕНЬ ПЕРВЫЙ",
+		"Суббота, 15 октября 1988, 12:40\nУниверсам «Кировский», Сиреневый бульвар, 2\n\n\n" +
+		"Выходной. Гордеев пришёл как покупатель.\nТамара Ивановна сидит на второй кассе.\n\n" +
+		"E — поговорить      цифры или мышь — выбрать вопрос\nTab — блокнот\n\nНажмите E, чтобы войти")
 
 
 # --- setup ----------------------------------------------------------------------
@@ -244,7 +280,7 @@ func _process(delta: float) -> void:
 	post.set_shader_parameter("flash", _flash)
 	if phase != Phase.PLAY or get_tree().paused:
 		return
-	var rate := EARLY_RATE if minutes < KILLER_MIN else LATE_RATE
+	var rate := EARLY_RATE if minutes < KILLER_MIN or day else LATE_RATE
 	if player.sitting:
 		rate *= WAIT_RATE
 		if Input.get_vector("strafe_left", "strafe_right", "move_forward", "move_back").length() > 0.3 \
@@ -260,6 +296,9 @@ func _process(delta: float) -> void:
 	hud.clock.text = _fmt(minutes)
 	_update_env(delta)
 	_update_interaction()
+	if day:
+		day.update(delta)
+		return
 	night.update(delta)
 	store.update_compressors(killer.global_position if killer.is_active() else Vector3(999, 0, 999), delta)
 	var music_target := -6.0 if chasing else -80.0
@@ -267,6 +306,8 @@ func _process(delta: float) -> void:
 
 
 func _update_env(delta: float) -> void:
+	if day:
+		return
 	_lit = move_toward(_lit, store.lit_fraction(), delta * 0.4)
 	var fog := FOG_DARK.lerp(FOG_LIT, _lit)
 	env.fog_light_color = fog
@@ -305,6 +346,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if phase == Phase.TITLE and event.is_action_pressed("interact"):
 		_start()
+	elif phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
+			and (event as InputEventKey).physical_keycode == KEY_2:
+		_go_to("day1", {})
+	elif phase == Phase.END and night and event.is_action_pressed("interact"):
+		_go_to("day1", night.clues.duplicate())
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook"):
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
@@ -315,14 +361,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
 		get_tree().reload_current_scene()
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
-		get_tree().paused = false
-		checkpoint = {}
-		get_tree().reload_current_scene()
+		_go_to("night1", {})
+
+
+## Reloads the scene into another chapter.
+func _go_to(ch: String, clues: Dictionary) -> void:
+	get_tree().paused = false
+	checkpoint = {}
+	chapter = ch
+	night_clues = clues
+	get_tree().reload_current_scene()
 
 
 func _start() -> void:
 	checkpoint = {}
 	start_now()
+	if day:
+		day.start()
 	hud.fade.color.a = 1.0
 	hud.fade_to(0.0, 2.0)
 	hud.hide_title()
@@ -340,7 +395,10 @@ func start_now() -> void:
 # --- interactions -----------------------------------------------------------------
 
 func _interact(id: String) -> void:
-	night.interact(id)
+	if day:
+		day.interact(id)
+	else:
+		night.interact(id)
 
 
 func sit_down() -> void:
@@ -475,7 +533,21 @@ func end_shift() -> void:
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
 	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
-		"%s\n\nДальше: день первый и вторая ночь.\nR: сыграть ночь ещё раз" % night.summary())
+		"%s\n\nE: дальше, день первый\nR: сыграть ночь ещё раз" % night.summary())
+
+
+## Gordeev walks out into the afternoon; the day's statements on the card.
+func end_day() -> void:
+	if phase != Phase.PLAY:
+		return
+	phase = Phase.END
+	player.controllable = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	hud.set_prompt("")
+	hud.clear_subtitles()
+	hud.fade_to(0.92, 1.0)
+	hud.show_title("КОНЕЦ ДНЯ ПЕРВОГО",
+		"%s\n\nДальше: ночь вторая.\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
 
 
 func _fmt(m: float) -> String:

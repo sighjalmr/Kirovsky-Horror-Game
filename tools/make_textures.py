@@ -922,6 +922,31 @@ def fur(name):
     t.save(name)
 
 
+def hair(name):
+    """Permed or cropped hair: tight curls as overlapping dark and lit
+    rings, tinted per person in the game."""
+    t = T(256, 256, (0.42, 0.4, 0.38), name)
+    t.shade(t.noise(14, 3), 0.6, 1.25)
+    img, d = t.layer()
+    for _ in range(900):
+        x, y, r = t.rng.random() * 256, t.rng.random() * 256, 2 + t.rng.random() * 4
+        d.arc((x - r, y - r, x + r, y + r), 200, 360, fill=rgb8((0.75, 0.72, 0.7)), width=1)
+        d.arc((x - r, y - r, x + r, y + r), 20, 180, fill=rgb8((0.12, 0.11, 0.1)), width=1)
+    t.over(img, 0.6)
+    t.grain(0.02)
+    t.save(name)
+
+
+def denim(name):
+    """Варёнка: stone-washed jeans, a fine blue twill with pale bleached clouds."""
+    t = T(256, 256, (0.2, 0.27, 0.42), name)
+    yy, xx = np.mgrid[0:256, 0:256]
+    t.shade(((xx + yy) % 4 < 2).astype(np.float32), 0.8, 1.06)
+    t.mix((0.62, 0.68, 0.78), np.clip(t.noise(30, 4) - 0.45, 0, 1) * 1.8)
+    t.grain(0.02)
+    t.save(name)
+
+
 def quilted(name):
     """A loader's телогрейка: dark blue-grey cotton stitched in vertical
     channels, padding bulging between the seams, grease and wear."""
@@ -1049,7 +1074,13 @@ ALL = {
                                          moustache=(0.25, 0.2, 0.16), flush=0.35),
     "face_tamara": lambda n: person_face(n, (0.8, 0.64, 0.56), (0.25, 0.18, 0.14), 30, lips=(0.6, 0.18, 0.2)),
     "face_vasya": lambda n: person_face(n, (0.7, 0.5, 0.42), (0.18, 0.14, 0.11), 44, stubble=0.6, flush=0.6),
-    "fur": fur, "quilted": quilted,
+    "face_edik": lambda n: person_face(n, (0.78, 0.6, 0.52), (0.16, 0.12, 0.1), 26, moustache=(0.18, 0.13, 0.1),
+                                       lips=(0.55, 0.3, 0.28)),
+    "face_shopper": lambda n: person_face(n, (0.76, 0.6, 0.54), (0.3, 0.24, 0.2), 34, lips=(0.5, 0.28, 0.28),
+                                          flush=0.25),
+    "fur": fur, "quilted": quilted, "hair": hair, "denim": denim,
+    "smock": lambda n: twill(n, (0.55, 0.66, 0.74)),
+    "jacket": lambda n: plain(n, (0.12, 0.1, 0.09), 12, 0.35),
     "dublyonka": lambda n: twill(n, (0.36, 0.25, 0.16)),
     "woman_coat": lambda n: twill(n, (0.3, 0.2, 0.24)),
     "headscarf": lambda n: twill(n, (0.5, 0.12, 0.1)),
@@ -1074,7 +1105,8 @@ NORMALS = {
     "coat": (3.0, 0.7), "guard_wool": (3.0, 0.7), "trousers": (2.5, 0.7), "knit": (4.0, 0.8),
     "rubber": (2.0, 1.0), "leather": (3.0, 1.0), "fur": (4.0, 0.8), "quilted": (3.0, 1.0),
     "dublyonka": (3.0, 0.7), "woman_coat": (3.0, 0.7), "headscarf": (2.0, 0.7), "torch": (1.0, 1.0), "chrome": (0.6, 1.0), "basket": (2.0, 1.0),
-    "fabric": (2.0, 1.0), "grille": (3.0, 0.7),
+    "fabric": (2.0, 1.0), "grille": (3.0, 0.7), "hair": (4.0, 0.6), "denim": (2.5, 0.7), "smock": (2.0, 0.7),
+    "jacket": (3.0, 1.0),
 }
 
 
