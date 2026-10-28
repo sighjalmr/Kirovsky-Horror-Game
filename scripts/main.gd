@@ -1,17 +1,19 @@
+class_name Main
 extends Node
 
-## Vertical slice: one shortened night shift in universam «Кировский»,
-## 14 October 1988. Builds the Full HD world viewport with the film post
-## pass, the store, Gordeev, the killer and the HUD, then runs the shift
-## from 22:45 to 06:00 (about ten real minutes).
+## The first night shift in universam «Кировский», Friday 14 October 1988,
+## from 22:30 to 06:00 (about half an hour of play). Builds the Full HD world
+## viewport with the film post pass, the store, Gordeev, the killer and the
+## HUD, keeps the clock and the timeline, and handles death, saving at the
+## journal and the end of the shift. The story itself is in night_one.gd.
 
-const START_MIN := 22.0 * 60.0 + 45.0
+const START_MIN := 22.0 * 60.0 + 30.0
 const KILLER_MIN := 23.0 * 60.0 + 10.0
 const END_MIN := 30.0 * 60.0          # 06:00 next morning
-const EARLY_RATE := 0.15              # game minutes per second while the rows go dark
-const LATE_RATE := 1.0
+const EARLY_RATE := 0.15              # game minutes per second until the killer comes
+const LATE_RATE := 0.3
+const WAIT_RATE := 6.0                # how much faster time goes on the chair
 
-## The world renders this small and is scaled ×4 to Full HD with hard pixels.
 const RENDER_W := 1920
 const RENDER_H := 1080
 
@@ -20,39 +22,39 @@ const FOG_DARK := Color("0d0f0e")
 
 enum Phase { TITLE, PLAY, DEAD, END }
 
-const CHEST_TEXT := {
-	"A1": "Масло «Крестьянское», двенадцать пачек. По накладной должно быть сорок.",
-	"A2": "Пельмени «Сибирские». Одна пачка надорвана, кто-то ел их прямо мёрзлыми.",
-	"A4": "Пусто. Иней на дне стёрт ладонью, широкой, мужской.",
-	"D1": "Мороженая треска в коробке без маркировки. В зале такую не продают.",
-	"D2": "Творожные сырки. Кто-то сложил их аккуратными рядами, как на витрине.",
-	"D3": "Говядина, четыре куска в бумаге. Бумага подписана карандашом: «Р.».",
-	"D4": "Пломбир в стаканчиках. Половина ларя пустая, а в журнале приёмки полный.",
-}
-const CLUE_BAG := "Ячейка № 31. Сумка Нины: пропуск в универсам, кошелёк, три рубля сорок копеек, ключи от квартиры. К матери в Тагил без ключей и денег не уезжают."
-const CLUE_CLIP := "Под покрывалом пачки пельменей, а между ними женская заколка-«краб». На инее бурые полосы, будто что-то тащили к краю. Масло так не течёт."
-const CLUE_TAPE := "Касса № 2, контрольная лента. Последний чек за 7 октября пробит в 22:58, когда зал уже был закрыт. Кассу в тот вечер сдавала Тамара Ивановна. Ключ от аппарата есть ещё у директора."
-const FINAL_ENTRY := "Нина не уезжала. Седьмого в 22:58 кто-то пробил чек на второй кассе в закрытом магазине, а потом её тащили к третьему ларю. Это свой. У него есть ключи."
+## The last signed round, kept across a scene reload after death.
+static var checkpoint: Dictionary = {}
+static var _resume := false
 
 var phase := Phase.TITLE
 var minutes := START_MIN
 var view: SubViewport
+var world: Node3D
 var store: Store
 var player: Player
 var killer: Killer
 var hud: Hud
+var night: NightOne
 var env: Environment
 var post: ShaderMaterial
-var clues := {"bag": false, "clip": false, "tape": false}
+var chasing := false
+## Developer runs speed the clock up.
+var time_scale := 1.0
 
 var _timeline: Array = []
-var _phone: AudioStreamPlayer3D
-var _phone_t := 0.0
-var _phone_noise_t := 0.0
 var _chase_music: AudioStreamPlayer
-var _chasing := false
 var _lit := 1.0
 var _flash := 0.0
+var _morning := false
+
+
+## Minutes since midnight of the 14th for a clock time; after-midnight hours
+## count on into the 15th.
+static func clock(h: int, m: int) -> float:
+	var t := float(h * 60 + m)
+	if h < 12:
+		t += 1440.0
+	return t
 
 
 func _ready() -> void:
@@ -64,13 +66,22 @@ func _ready() -> void:
 	_build_world()
 	hud = Hud.new()
 	add_child(hud)
-	_build_timeline()
-	_update_notebook()
+	night = NightOne.new(self)
+	add_child(night)
+	night.build_timeline()
+	night.update_notebook()
 	hud.clock.text = _fmt(minutes)
+	if _resume:
+		_resume = false
+		_restore()
+		return
 	var shot_dir := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--autoshot="):
 			shot_dir = a.get_slice("=", 1)
+	if "--nighttest" in OS.get_cmdline_user_args():
+		add_child(load("res://scripts/dev_nighttest.gd").new().with(self))
+		return
 	if shot_dir != "":
 		var dev: Node = load("res://scripts/dev_autoshot.gd").new()
 		dev.set("main", self)
@@ -79,10 +90,11 @@ func _ready() -> void:
 		return
 	hud.fade.color.a = 1.0
 	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ",
-		"Свердловск, октябрь 1988\n\nНочь первая\n\n\n" +
+		"Свердловск, октябрь 1988\n\nНочь первая. Пятница, 14 октября\n\n\n" +
 		"Мышь — смотреть      W / A / S / D — идти\n" +
-		"Shift — бег (шумно)      F (держать) — фонарик-«жучок» (шумно)\n" +
-		"E — осмотреть      Tab — блокнот\n\nНажмите E, чтобы начать смену")
+		"Shift — бег (шумно)      C — пригнуться (тихо)\n" +
+		"F (держать) — фонарик-«жучок» (шумно)\n" +
+		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену")
 
 
 # --- setup ----------------------------------------------------------------------
@@ -100,7 +112,9 @@ func _setup_input() -> void:
 	_bind("flashlight", [KEY_F], [JOY_BUTTON_RIGHT_SHOULDER], [[JOY_AXIS_TRIGGER_RIGHT, 1.0]])
 	_bind("interact", [KEY_E, KEY_SPACE, KEY_ENTER], [JOY_BUTTON_A], [])
 	_bind("notebook", [KEY_TAB], [JOY_BUTTON_BACK, JOY_BUTTON_Y], [])
+	_bind("crouch", [KEY_C, KEY_CTRL], [JOY_BUTTON_LEFT_STICK], [])
 	_bind("restart", [KEY_R], [JOY_BUTTON_START], [])
+	_bind("new_night", [KEY_N], [], [])
 	if InputMap.action_get_events("flashlight").size() < 4:
 		var m := InputEventMouseButton.new()
 		m.button_index = MOUSE_BUTTON_RIGHT
@@ -153,7 +167,7 @@ func _build_view() -> void:
 
 
 func _build_world() -> void:
-	var world := Node3D.new()
+	world = Node3D.new()
 	view.add_child(world)
 	env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -181,9 +195,9 @@ func _build_world() -> void:
 	world.add_child(store)
 	player = Player.new()
 	world.add_child(player)
-	player.global_position = Vector3(9.0, 0, 2.6)
+	player.global_position = Vector3(9.2, 0, 2.7)
 	player.face(Vector3.LEFT)
-	player.noise.connect(_on_noise)
+	player.noise.connect(on_noise)
 	killer = Killer.new()
 	world.add_child(killer)
 	killer.setup(store, player)
@@ -193,13 +207,6 @@ func _build_world() -> void:
 	killer.caught_player.connect(_on_caught)
 	player.camera.current = true
 
-	_phone = AudioStreamPlayer3D.new()
-	_phone.stream = Sfx.get_stream("phone")
-	_phone.bus = Sfx.BUS
-	_phone.max_distance = 40.0
-	_phone.unit_size = 8.0
-	world.add_child(_phone)
-	_phone.global_position = store.phone_pos
 	_chase_music = AudioStreamPlayer.new()
 	_chase_music.stream = Sfx.get_stream("drone")
 	_chase_music.volume_db = -80.0
@@ -213,35 +220,21 @@ func _build_world() -> void:
 	add_child(room)
 
 
-func _build_timeline() -> void:
-	_at(22, 45, func(): hud.say("Двадцать два сорок пять. Касса сдана, директор Ковпак уехал на своей «Волге». Магазин мой до шести утра."))
-	_at(22, 46, func():
-		hud.say("Свет гасят рядами, начиная с бакалеи. Директор говорит, экономия. В восемьдесят восьмом всё экономия.")
-		hud.say("Нина Лукина ушла со смены седьмого. В милиции сказали: уехала к матери. А её сумка до сих пор в камере хранения, ячейка тридцать один."))
-	var lines := ["Бакалея.", "Консервы.", "Молочный.", "Заморозка. Лари под покрывалами, как под простынями.", "Задний проход.",
-		"Касса и вход. Остался дежурный свет над дверью и лампа на посту."]
-	for i in store.rows.size():
-		var idx := i
-		_at(22, 50 + i * 3, func():
-			store.switch_off(idx)
-			hud.say(lines[idx]))
-	_at(23, 10, func():
-		store.open_storage_door()
-		killer.activate(store.killer_spawn)
-		hud.say("Хлопнула дверь склада. Ключи от неё есть у троих, и я не из них.", -1.0, true))
-	_at(23, 14, func(): hud.say("Компрессоры ларей гудят всю ночь. Если какой-то замолчал, значит, рядом кто-то стоит."))
-	_at(0, 40, _ring_phone)
-	_at(2, 30, func(): hud.say("Половина третьего. Ковпак на прошлой неделе тоже задерживался допоздна. Говорил, ревизия."))
-	_at(4, 0, func(): hud.say("Четыре. Самое глухое время. Даже трамваи на Сиреневом не ходят."))
-	_at(5, 30, func(): hud.say("Полшестого. Скоро придут грузчики."))
-	_timeline.sort_custom(func(a, b): return a[0] < b[0])
+func at(h: int, m: int, f: Callable) -> void:
+	at_min(clock(h, m), f)
 
 
-func _at(h: int, m: int, f: Callable) -> void:
-	var t := float(h * 60 + m)
-	if h < 12:
-		t += 1440.0
-	_timeline.append([t, f])
+## Adds an event at `t` game minutes, in order.
+func at_min(t: float, f: Callable) -> void:
+	var i := 0
+	while i < _timeline.size() and _timeline[i][0] <= t:
+		i += 1
+	_timeline.insert(i, [t, f])
+
+
+## An event `dm` game minutes from now (postponed story beats).
+func after(dm: float, f: Callable) -> void:
+	at_min(minutes + dm, f)
 
 
 # --- loop -------------------------------------------------------------------------
@@ -251,19 +244,26 @@ func _process(delta: float) -> void:
 	post.set_shader_parameter("flash", _flash)
 	if phase != Phase.PLAY or get_tree().paused:
 		return
-	minutes += (EARLY_RATE if minutes < KILLER_MIN else LATE_RATE) * delta
+	var rate := EARLY_RATE if minutes < KILLER_MIN else LATE_RATE
+	if player.sitting:
+		rate *= WAIT_RATE
+		if Input.get_vector("strafe_left", "strafe_right", "move_forward", "move_back").length() > 0.3 \
+				or Input.is_action_just_pressed("interact") or chasing:
+			stand_up()
+	if not _morning:
+		minutes = minf(minutes + rate * delta * time_scale, END_MIN)
 	while not _timeline.is_empty() and minutes >= _timeline[0][0]:
 		var ev: Array = _timeline.pop_front()
+		if player.sitting:
+			stand_up()
 		(ev[1] as Callable).call()
 	hud.clock.text = _fmt(minutes)
 	_update_env(delta)
 	_update_interaction()
-	_update_phone(delta)
+	night.update(delta)
 	store.update_compressors(killer.global_position if killer.is_active() else Vector3(999, 0, 999), delta)
-	var music_target := -6.0 if _chasing else -80.0
-	_chase_music.volume_db = move_toward(_chase_music.volume_db, music_target, delta * (60.0 if _chasing else 12.0))
-	if minutes >= END_MIN:
-		_end_shift()
+	var music_target := -6.0 if chasing else -80.0
+	_chase_music.volume_db = move_toward(_chase_music.volume_db, music_target, delta * (60.0 if chasing else 12.0))
 
 
 func _update_env(delta: float) -> void:
@@ -278,6 +278,9 @@ func _update_env(delta: float) -> void:
 
 
 func _update_interaction() -> void:
+	if player.sitting:
+		hud.set_prompt("Сидите и ждёте. W / A / S / D — встать")
+		return
 	if not player.controllable or player.busy:
 		hud.set_prompt("")
 		return
@@ -309,10 +312,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if open else Input.MOUSE_MODE_CAPTURED
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("restart"):
 		get_tree().paused = false
+		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
+		get_tree().reload_current_scene()
+	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
+		get_tree().paused = false
+		checkpoint = {}
 		get_tree().reload_current_scene()
 
 
 func _start() -> void:
+	checkpoint = {}
 	start_now()
 	hud.fade.color.a = 1.0
 	hud.fade_to(0.0, 2.0)
@@ -331,148 +340,67 @@ func start_now() -> void:
 # --- interactions -----------------------------------------------------------------
 
 func _interact(id: String) -> void:
-	match id:
-		"locker31":
-			if clues.bag:
-				hud.say("Сумка Нины. Я оставил всё как было.", -1.0, true)
-			else:
-				Sfx.play_3d(view, "clank", player.global_position + Vector3(0, 1, 0), -10.0, 1.6)
-				_find_clue("bag", CLUE_BAG)
-		"register2":
-			if clues.tape:
-				hud.say("Лента на месте. 22:58.", -1.0, true)
-			else:
-				Sfx.play_3d(view, "pickup", player.global_position, -6.0)
-				_find_clue("tape", CLUE_TAPE)
-		"register1":
-			hud.say("Касса № 1. Лента чистая, смену закрыли вовремя.", -1.0, true)
-		"register3":
-			hud.say("Касса № 3. Не работает с августа. Под ней окурки «Беломора».", -1.0, true)
-		"journal":
-			var n := clues.values().count(true)
-			hud.say("Журнал обходов. «22:45 — пост принял, Гордеев». Сам себе написал план: камера хранения, лари в заморозке, касса № 2. Проверено: %d из 3." % n, -1.0, true)
-		"door_front":
-			hud.say("Заперто снаружи до шести. Так положено. За стеклом дождь и пустой Сиреневый бульвар.", -1.0, true)
-		"phone":
-			_answer_phone()
-		_:
-			if id.begins_with("chest_"):
-				_lift(id.trim_prefix("chest_"))
+	night.interact(id)
 
 
-func _lift(chest: String) -> void:
-	var c: Dictionary = store.chests[chest]
-	if c.lifted:
-		hud.say("Этот ларь я уже смотрел.", -1.0, true)
-		return
+func sit_down() -> void:
+	player.sitting = true
 	player.busy = true
-	Sfx.play_3d(view, "cloth", c.pos + Vector3(0, 0.8, 0), 0.0)
-	_on_noise(c.pos, 8.0)
-	await get_tree().create_timer(1.3).timeout
-	if phase != Phase.PLAY:
-		return
-	store.lift_cloth(chest)
+	player.global_position = Vector3(10.15, 0, 2.2)
+	player.face(Vector3(-0.4, 0, 1))
+
+
+func stand_up() -> void:
+	player.sitting = false
 	player.busy = false
-	if chest == Store.CLUE_CHEST:
-		Sfx.play_2d(self, "stinger", -10.0)
-		_find_clue("clip", CLUE_CLIP)
-	else:
-		hud.say(CHEST_TEXT[chest], -1.0, true)
 
 
-func _find_clue(key: String, text: String) -> void:
-	clues[key] = true
-	hud.say(text, -1.0, true)
-	if not clues.values().has(false):
-		hud.say("Записал в блокнот. " + FINAL_ENTRY)
-	_update_notebook()
+# --- saving at the journal -------------------------------------------------------
+
+func save_checkpoint() -> void:
+	checkpoint = night.save_state()
+	checkpoint["minutes"] = minutes
+	hud.flash_note("Смена сохранена: %s" % _fmt(minutes))
 
 
-func _update_notebook() -> void:
-	var lines := PackedStringArray([
-		"БЛОКНОТ ГОРДЕЕВА", "Ночь первая, 14 октября 1988, пятница", "",
-		"Обход:",
-		("[x] " if clues.bag else "[  ] ") + "Камера хранения, ячейка № 31",
-		("[x] " if clues.clip else "[  ] ") + "Лари в заморозке",
-		("[x] " if clues.tape else "[  ] ") + "Касса № 2, контрольная лента",
-		""])
-	if clues.bag:
-		lines.append("— Сумка Нины на месте. Кошелёк и ключи внутри. К матери так не уезжают.")
-	if clues.clip:
-		lines.append("— В третьем ларе её заколка. На инее бурые полосы.")
-	if clues.tape:
-		lines.append("— Чек на второй кассе пробит 7-го в 22:58, после закрытия.")
-	if not clues.values().has(false):
-		lines.append("")
-		lines.append(FINAL_ENTRY)
-	lines.append("")
-	lines.append("Подозреваемые: Ковпак (директор), Вася Кран (грузчик), Ринат (мясник), Колесников (участковый), Эдик (фарцовщик), Тамара Ивановна (кассир).")
-	lines.append("")
-	lines.append("Tab: закрыть")
-	hud.set_notebook("\n".join(lines))
-
-
-# --- the phone --------------------------------------------------------------------
-
-func _ring_phone() -> void:
-	_phone.play()
-	_phone_t = 40.0
-	store.set_interactable("phone", true)
-	hud.say("Звонит телефон на посту. В час ночи сюда не звонят.", -1.0, true)
-
-
-func _update_phone(delta: float) -> void:
-	if _phone_t <= 0.0:
-		return
-	_phone_t -= delta
-	_phone_noise_t -= delta
-	if _phone_noise_t <= 0.0:
-		_phone_noise_t = 2.0
-		killer.hear(store.phone_pos, 30.0)
-	if _phone_t <= 0.0:
-		_phone.stop()
-		store.set_interactable("phone", false)
-		hud.say("Перестал звонить.")
-
-
-func _answer_phone() -> void:
-	_phone_t = 0.0
-	_phone.stop()
-	store.set_interactable("phone", false)
-	player.busy = true
-	Sfx.play_3d(view, "pickup", store.phone_pos, -4.0)
-	hud.say("— Пост охраны, Гордеев. Слушаю.", 2.5, true)
-	hud.say("В трубке молчат. Потом кто-то дышит, ровно, никуда не торопясь.", 4.0)
-	Sfx.play_2d(self, "breath", -6.0)
-	if killer.is_active():
-		killer.wander_to(store.random_patrol_point())
-	await get_tree().create_timer(6.0).timeout
-	if phase != Phase.PLAY:
-		return
-	hud.say("Короткие гудки. Где-то в зале скрипнула тележка.")
-	player.busy = false
+## Back at the post at the time of the last signature.
+func _restore() -> void:
+	minutes = checkpoint.minutes
+	while not _timeline.is_empty() and _timeline[0][0] <= minutes:
+		_timeline.pop_front()
+	night.restore_state(checkpoint)
+	_lit = store.lit_fraction()
+	hud.clock.text = _fmt(minutes)
+	player.global_position = Vector3(10.3, 0, 3.4)
+	player.face(Vector3(0.3, 0, -1))
+	start_now()
+	hud.fade.color.a = 1.0
+	hud.fade_to(0.0, 1.5)
+	hud.flash_note("Продолжение с подписи в журнале: %s" % _fmt(minutes))
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 # --- the killer -------------------------------------------------------------------
 
-func _on_noise(pos: Vector3, radius: float) -> void:
+func on_noise(pos: Vector3, radius: float) -> void:
 	if killer.is_active():
 		killer.hear(pos, radius)
 
 
 func _on_spotted() -> void:
-	_chasing = true
+	chasing = true
 	Sfx.play_2d(self, "stinger", -4.0)
 
 
 func _on_lost() -> void:
-	_chasing = false
+	chasing = false
 
 
 func _on_caught() -> void:
 	if phase != Phase.PLAY:
 		return
 	phase = Phase.DEAD
+	stand_up()
 	player.controllable = false
 	player.busy = true
 	hud.set_prompt("")
@@ -497,15 +425,18 @@ func _on_hit(i: int) -> void:
 		player.die(killer.global_position)
 		var pool := store.spawn_blood(p, 0.2)
 		create_tween().tween_property(pool, "scale", Vector3(9, 1, 9), 4.0).set_ease(Tween.EASE_OUT)
-		_chasing = false
+		chasing = false
 		_show_death()
 
 
 func _show_death() -> void:
 	await get_tree().create_timer(2.0).timeout
 	hud.fade_to(0.75, 2.0)
+	var again := "R: начать смену заново"
+	if not checkpoint.is_empty():
+		again = "R: продолжить с подписи в журнале (%s)\nN: начать ночь сначала" % _fmt(checkpoint.minutes)
 	hud.show_title("ГОРДЕЕВ НЕ ДОЖИЛ ДО УТРА",
-		"В 6:10 его нашли грузчики, у %s.\nУчастковый Колесников записал: несчастный случай на рабочем месте.\n\nR: начать смену заново" % _where(player.global_position),
+		"В 6:10 его нашли грузчики, у %s.\nУчастковый Колесников записал: несчастный случай на рабочем месте.\n\n%s" % [_where(player.global_position), again],
 		Hud.RED)
 
 
@@ -521,21 +452,30 @@ func _where(p: Vector3) -> String:
 	return "ларей с заморозкой" if absf(p.x) > 6.5 else "стеллажей"
 
 
-func _end_shift() -> void:
+## 06:00: the clock stops, Gordeev can look round but not walk; the morning
+## scene plays out in night_one.gd and calls end_shift().
+func begin_morning() -> void:
+	_morning = true
+	minutes = END_MIN
+	stand_up()
+	player.busy = true
+	chasing = false
+	night.stop_sounds()
+	hud.set_prompt("")
+
+
+func end_shift() -> void:
+	if phase != Phase.PLAY:
+		return
 	phase = Phase.END
+	checkpoint = {}
 	player.controllable = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	killer.deactivate()
-	killer.visible = false
-	_chasing = false
-	_phone.stop()
 	hud.set_prompt("")
 	hud.clear_subtitles()
-	hud.fade_to(0.9, 2.5)
-	var n := clues.values().count(true)
-	var summary := FINAL_ENTRY if n == 3 else "В блокноте пока мало. Нина так и числится уехавшей к матери."
-	hud.show_title("06:00. КОНЕЦ СМЕНЫ",
-		"Пришли грузчики. Вася Кран прячет глаза и пахнет вчерашним.\nУлик найдено: %d из 3.\n\n%s\n\nДальше: дневной эпизод и вторая ночь.\nКонец вертикального среза. R: сыграть ещё раз" % [n, summary])
+	hud.fade_to(0.92, 2.5)
+	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
+		"%s\n\nДальше: день первый и вторая ночь.\nR: сыграть ночь ещё раз" % night.summary())
 
 
 func _fmt(m: float) -> String:

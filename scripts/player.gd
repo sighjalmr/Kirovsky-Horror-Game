@@ -12,6 +12,9 @@ const WALK_SPEED := 1.7
 const RUN_SPEED := 3.4
 const BACK_SPEED := 1.1
 const EYE_HEIGHT := 1.6
+const CROUCH_EYE := 1.0
+const SIT_EYE := 1.2
+const CROUCH_SPEED := 0.8
 const MOUSE_SENS := 0.0025
 const STICK_SENS := 2.4
 const PITCH_LIMIT := deg_to_rad(80.0)
@@ -25,6 +28,10 @@ var busy := false
 var dead := false
 var flashlight_on := false
 var force_flashlight := false  # dev screenshots
+## C toggles: low behind a chest he is hard to see, slow and quiet.
+var crouching := false
+## On the chair at the post, waiting out the night.
+var sitting := false
 var head: Node3D
 var camera: Camera3D
 var flashlight: SpotLight3D
@@ -43,11 +50,12 @@ var _bob := 0.0
 var _stride := 0.0
 var _noise_t := 0.0
 var _t := 0.0
+var _eye := EYE_HEIGHT
 
 
 func _ready() -> void:
 	collision_layer = 2
-	collision_mask = 1
+	collision_mask = 1 | 8  # 8: the storage doorway, closed to him only
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
@@ -116,10 +124,14 @@ func _physics_process(delta: float) -> void:
 		head.rotation.x = clampf(head.rotation.x - stick.y * STICK_SENS * delta, -PITCH_LIMIT, PITCH_LIMIT)
 		if not busy:
 			move = Input.get_vector("strafe_left", "strafe_right", "move_forward", "move_back")
-			running = Input.is_action_pressed("run") and move.y < -0.1
+			if Input.is_action_just_pressed("crouch"):
+				crouching = not crouching
+			running = Input.is_action_pressed("run") and move.y < -0.1 and not crouching
 	_set_flashlight(want_light and not dead)
 
 	var speed := RUN_SPEED if running else (BACK_SPEED if move.y > 0.1 else WALK_SPEED)
+	if crouching:
+		speed = CROUCH_SPEED
 	var dir := global_transform.basis * Vector3(move.x, 0, move.y)
 	dir.y = 0.0
 	velocity = dir.normalized() * speed * minf(move.length(), 1.0) if dir.length() > 0.01 else Vector3.ZERO
@@ -131,13 +143,15 @@ func _physics_process(delta: float) -> void:
 		# Head bob: small, PS1 games kept it subtle.
 		_bob += delta * moved * 4.2
 		var amp := clampf(moved / WALK_SPEED, 0.0, 1.5)
-		head.position = Vector3(cos(_bob * 0.5) * 0.025 * amp, EYE_HEIGHT + absf(sin(_bob)) * 0.035 * amp, 0)
+		var eye_to := SIT_EYE if sitting else (CROUCH_EYE if crouching else EYE_HEIGHT)
+		_eye = move_toward(_eye, eye_to, delta * 2.5)
+		head.position = Vector3(cos(_bob * 0.5) * 0.025 * amp, _eye + absf(sin(_bob)) * 0.035 * amp, 0)
 		_update_hand(delta, amp)
 	_stride += moved * delta
 	if _stride > (0.95 if running else 0.7):
 		_stride = 0.0
 		_steps.pitch_scale = randf_range(0.92, 1.08)
-		_steps.volume_db = -4.0 if running else -11.0
+		_steps.volume_db = -4.0 if running else (-19.0 if crouching else -11.0)
 		_steps.play()
 
 	_noise_t -= delta
@@ -168,6 +182,11 @@ func _set_flashlight(on: bool) -> void:
 		_whirr.play()
 	else:
 		_whirr.stop()
+
+
+## Height the killer looks for: the head, lower when crouching or sitting.
+func sight_height() -> float:
+	return _eye - 0.35
 
 
 func face(dir: Vector3) -> void:

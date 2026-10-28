@@ -6,7 +6,7 @@ config_version=5
 [application]
 
 config/name="Кировский: Закрытие"
-config/description="Нуар-хоррор. Свердловск, октябрь 1988. Вертикальный срез."
+config/description="Нуар-хоррор. Свердловск, октябрь 1988. Ночь первая."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"

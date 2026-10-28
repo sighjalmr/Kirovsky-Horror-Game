@@ -19,6 +19,7 @@ var notebook_text: Label
 var fade: ColorRect
 var title: Label
 var title_sub: Label
+var note: Label
 
 var _queue: Array = []
 var _sub_t := 0.0
@@ -35,6 +36,8 @@ func _ready() -> void:
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(fade)
 	clock = _label(Vector2(1560, 28), Vector2(330, 44), 32, HORIZONTAL_ALIGNMENT_RIGHT, INK)
+	note = _label(Vector2(30, 28), Vector2(1000, 44), 28, HORIZONTAL_ALIGNMENT_LEFT, PAPER)
+	note.modulate.a = 0.0
 	prompt = _label(Vector2(260, 830), Vector2(1400, 44), 30, HORIZONTAL_ALIGNMENT_CENTER, PAPER)
 	subtitle = _label(Vector2(260, 890), Vector2(1400, 170), 32, HORIZONTAL_ALIGNMENT_CENTER, INK)
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -124,6 +127,15 @@ func _speak(text: String) -> void:
 		return
 	_voice.stream = load(take.file)
 	_voice.play()
+
+
+## A short line in the corner that fades out: "the shift is saved".
+func flash_note(text: String) -> void:
+	note.text = text
+	var tw := create_tween()
+	tw.tween_property(note, "modulate:a", 1.0, 0.5)
+	tw.tween_interval(3.5)
+	tw.tween_property(note, "modulate:a", 0.0, 1.5)
 
 
 func set_prompt(text: String) -> void:
