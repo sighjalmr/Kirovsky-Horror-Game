@@ -3,7 +3,7 @@
 Speaks each line with Silero (ru v5, a male speaker; free for non-commercial
 use only) or an open Piper neural voice, then runs it through ffmpeg: aged into an old man (lower, slower, a
 slight tremor, duller top), low cut, compression and a small dry room for
-the inner voice, loudness to -13 LUFS.
+the inner voice, loudness to -17 LUFS.
 Writes voice/<id>.ogg and voice/index.json (subtitle text -> file and length),
 which scripts/voice.gd reads in the game.
 
@@ -12,7 +12,7 @@ voice/<id>.ogg (same ids) and run this with --index-only.
 
     pip install torch
     curl -O https://models.silero.ai/models/tts/ru/v5_5_ru.pt
-    python tools/make_voice.py --silero v5_5_ru.pt --speaker eugene
+    python tools/make_voice.py --silero v5_5_ru.pt --speaker eugene --pace 1.12
 
     pip install piper-tts
     python tools/make_voice.py --model path/to/ru_RU-dmitri-medium.onnx
@@ -59,7 +59,7 @@ def spoken(line: dict) -> str:
     return text
 
 
-LOUDNESS = -13.0  # LUFS: loud enough to carry over the hall
+LOUDNESS = -17.0  # LUFS: clear over the hall without shouting
 
 
 def loudness(path: Path) -> float:
@@ -127,7 +127,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="Piper .onnx voice for Гордеев")
     ap.add_argument("--silero", help="Silero ru v5 .pt model instead of Piper")
-    ap.add_argument("--speaker", default="eugene", help="Silero speaker: eugene or aidar")
+    ap.add_argument("--speaker", default="eugene", help="Silero speaker: eugene (chosen) or aidar")
     ap.add_argument("--pitch", type=float, default=0.86, help="below 1 is lower and older")
     ap.add_argument("--pace", type=float, default=1.22, help="above 1 is slower")
     ap.add_argument("--only", nargs="*", help="line ids to redo")
