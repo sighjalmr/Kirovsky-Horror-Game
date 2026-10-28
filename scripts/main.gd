@@ -56,6 +56,11 @@ var _flash := 0.0
 
 
 func _ready() -> void:
+	if "--bake-textures" in OS.get_cmdline_user_args():
+		TexFactory.bake_all()
+		set_process(false)
+		get_tree().quit()
+		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
 	_setup_input()

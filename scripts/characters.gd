@@ -1,11 +1,15 @@
 class_name Characters
 extends RefCounted
 
-## Low-poly box people in the PS1 budget (a few hundred triangles each).
+## People at the Silent Hill 1 budget (about a thousand triangles each):
+## tapered limbs, clothes with their own textures, hands with fingers.
 ## Front is -Z. Limbs hang from pivots so they can swing.
 ## Returns {root, leg_l, leg_r, arm_l, arm_r, head}.
 
+const NO_RECT := Rect2()
 
+
+## A single box with the PS1 material (the viewmodel hand uses it).
 static func part(parent: Node3D, size: Vector3, pos: Vector3, tex: String, tint: Color) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = MeshFactory.box(size, 0.5, 10.0, MeshFactory.ALL, false)
@@ -22,68 +26,97 @@ static func _pivot(parent: Node3D, pos: Vector3) -> Node3D:
 	return n
 
 
-## Gordeev: night watchman of the vnevedomstvennaya okhrana. Grey-green
-## jacket, red armband, peaked cap, moustache, dynamo flashlight on the chest.
-static func build_guard() -> Dictionary:
-	var root := Node3D.new()
-	var trousers := Color(0.2, 0.22, 0.28)
-	var coat := Color(0.3, 0.33, 0.28)
-	var boots := Color(0.08, 0.08, 0.08)
-	var legs: Array[Node3D] = []
-	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(root, Vector3(0.11 * side, 0.86, 0))
-		part(leg, Vector3(0.17, 0.86, 0.19), Vector3(0, -0.86, 0), "fabric", trousers)
-		part(leg, Vector3(0.18, 0.12, 0.26), Vector3(0, -0.86, -0.03), "fabric", boots)
-		legs.append(leg)
-	part(root, Vector3(0.5, 0.64, 0.28), Vector3(0, 0.82, 0), "fabric", coat)
-	part(root, Vector3(0.52, 0.06, 0.3), Vector3(0, 0.86, 0), "fabric", Color(0.25, 0.15, 0.08))
-	part(root, Vector3(0.1, 0.12, 0.07), Vector3(0.12, 1.2, -0.16), "metal", Color(0.55, 0.75, 0.5))
-	var arms: Array[Node3D] = []
-	for side: float in [-1.0, 1.0]:
-		var arm := _pivot(root, Vector3(0.32 * side, 1.42, 0))
-		part(arm, Vector3(0.14, 0.62, 0.15), Vector3(0, -0.62, 0), "fabric", coat)
-		part(arm, Vector3(0.11, 0.1, 0.12), Vector3(0, -0.72, 0), "skin", Color.WHITE)
-		if side < 0:
-			part(arm, Vector3(0.15, 0.08, 0.16), Vector3(0, -0.24, 0), "fabric", Color(0.6, 0.1, 0.08))
-		arms.append(arm)
-	var head := _pivot(root, Vector3(0, 1.46, 0))
-	part(head, Vector3(0.22, 0.27, 0.24), Vector3(0, 0.0, 0), "skin", Color.WHITE)
-	part(head, Vector3(0.27, 0.08, 0.29), Vector3(0, 0.25, 0), "fabric", Color(0.15, 0.17, 0.24))
-	part(head, Vector3(0.22, 0.02, 0.1), Vector3(0, 0.25, -0.18), "fabric", Color(0.06, 0.06, 0.08))
-	for side: float in [-1.0, 1.0]:
-		part(head, Vector3(0.04, 0.03, 0.01), Vector3(0.05 * side, 0.16, -0.125), "fabric", Color(0.05, 0.05, 0.05))
-	part(head, Vector3(0.1, 0.025, 0.01), Vector3(0, 0.08, -0.125), "fabric", Color(0.22, 0.14, 0.08))
-	return {"root": root, "leg_l": legs[0], "leg_r": legs[1], "arm_l": arms[0], "arm_r": arms[1], "head": head}
+## Flattened (elliptic) upright cylinder: depth is `flat` times the width.
+static func _oval(x: Vector3, flat: float) -> Transform3D:
+	return Transform3D(Basis.from_scale(Vector3(1, 1, flat)), x)
 
 
-## The killer: tall, long dark coat, knitted hat, rubber boots, a butcher's
-## cleaver in the right hand. No face, only a dark slit, so nobody can be
-## recognised before the fifth night.
+## A hand at the end of an arm, fingers curled round a grip or hanging loose.
+## `pos` is the wrist; the hand hangs down from it.
+static func hand(kit: MeshBuilder.Kit, pos: Vector3, tint: Color, side: float, grip: bool) -> void:
+	var skin := kit.b("skin", tint)
+	skin.box(Props.at(pos.x, pos.y - 0.1, pos.z), Vector3(0.035, 0.1, 0.085), Color.WHITE, NO_RECT, Vector2(0.3, 0.3))
+	for i in 4:
+		var z := pos.z - 0.03 + i * 0.02
+		if grip:
+			skin.box(Props.at(pos.x - side * 0.025, pos.y - 0.13, z), Vector3(0.03, 0.035, 0.017))
+		else:
+			skin.box(Props.rot(Vector3.FORWARD, side * 0.15, Vector3(pos.x, pos.y - 0.2 + absf(i - 1.5) * 0.01, z)),
+				Vector3(0.022, 0.09, 0.017))
+	skin.box(Props.rot(Vector3.RIGHT, -0.5, Vector3(pos.x - side * 0.022, pos.y - 0.11, pos.z - 0.045)),
+		Vector3(0.02, 0.06, 0.02))
+
+
+## The killer: tall, a long dark drape coat with the collar up, a knitted
+## hat pulled low and a scarf over the mouth, rubber boots, a butcher's
+## cleaver in the right hand. Only the eyes show, deep in shadow, so nobody
+## can be recognised before the fifth night.
 static func build_killer() -> Dictionary:
 	var root := Node3D.new()
-	var coat := Color(0.17, 0.14, 0.12)
-	var pale := Color(0.78, 0.72, 0.68)
+	var coat := Color(1.0, 1.0, 1.0)
+	var pale := Color(0.85, 0.8, 0.78)
+	var body := MeshBuilder.Kit.new()
+	body.ao = false
+	var c := body.b("coat")
+	# Coat: chest, shoulders, flared skirt to below the knee, collar turned up.
+	c.cylinder(_oval(Vector3(0, 0.98, 0), 0.62), 0.25, 0.27, 0.6, 10, coat, Rect2(0, 0, 3, 1.2))
+	c.box(Props.at(0, 1.5, 0), Vector3(0.62, 0.1, 0.3), coat, NO_RECT, Vector2(0.5, 0.5))
+	c.cylinder(_oval(Vector3(0, 0.36, 0), 0.68), 0.36, 0.26, 0.64, 10, coat, Rect2(0, 0, 3.5, 1.3), Rect2(), false)
+	c.cylinder(_oval(Vector3(0, 1.56, 0.01), 0.85), 0.14, 0.16, 0.13, 8, Color(0.85, 0.85, 0.85))
+	c.box(Props.at(0, 0.98, -0.165), Vector3(0.04, 0.58, 0.01), Color(0.7, 0.7, 0.7))
+	var btn := body.b("leather", Color(0.4, 0.4, 0.4))
+	for i in 4:
+		btn.box(Props.at(0.06, 1.0 + i * 0.13, -0.172), Vector3(0.03, 0.03, 0.008))
+	body.b("leather", Color(0.6, 0.6, 0.6)).cylinder(_oval(Vector3(0, 0.95, 0), 0.63), 0.262, 0.262, 0.05, 10)
+	body.build(root)
+
 	var legs: Array[Node3D] = []
 	for side: float in [-1.0, 1.0]:
-		var leg := _pivot(root, Vector3(0.12 * side, 0.92, 0))
-		part(leg, Vector3(0.19, 0.92, 0.2), Vector3(0, -0.92, 0), "fabric", Color(0.12, 0.12, 0.13))
-		part(leg, Vector3(0.2, 0.36, 0.26), Vector3(0, -0.92, -0.02), "fabric", Color(0.05, 0.06, 0.05))
+		var leg := _pivot(root, Vector3(0.11 * side, 0.92, 0))
+		var k := MeshBuilder.Kit.new()
+		k.ao = false
+		k.b("trousers").cylinder(Props.at(0, -0.62, 0), 0.07, 0.09, 0.62, 8)
+		var boot := k.b("rubber")
+		boot.cylinder(Props.at(0, -0.92, 0), 0.075, 0.08, 0.34, 8)
+		boot.box(Props.at(0, -0.92, -0.06), Vector3(0.11, 0.08, 0.25))
+		boot.box(Props.at(0, -0.92, -0.06), Vector3(0.12, 0.025, 0.27), Color(0.6, 0.6, 0.6))
+		k.build(leg)
 		legs.append(leg)
-	part(root, Vector3(0.6, 0.5, 0.32), Vector3(0, 0.5, 0), "fabric", coat)
-	part(root, Vector3(0.58, 0.7, 0.32), Vector3(0, 0.95, 0), "fabric", coat)
+
 	var arms: Array[Node3D] = []
 	for side: float in [-1.0, 1.0]:
-		var arm := _pivot(root, Vector3(0.37 * side, 1.6, 0))
-		part(arm, Vector3(0.16, 0.72, 0.17), Vector3(0, -0.72, 0), "fabric", coat)
-		part(arm, Vector3(0.12, 0.11, 0.13), Vector3(0, -0.82, 0), "skin", pale)
+		var arm := _pivot(root, Vector3(0.33 * side, 1.56, 0))
+		var k := MeshBuilder.Kit.new()
+		k.ao = false
+		var sl := k.b("coat")
+		sl.cylinder(Props.at(0, -0.36, 0), 0.07, 0.085, 0.38, 8)
+		sl.cylinder(Props.at(0, -0.66, 0), 0.068, 0.07, 0.31, 8)
+		sl.cylinder(Props.at(0, -0.7, 0), 0.075, 0.075, 0.06, 8, Color(0.8, 0.8, 0.8))
+		hand(k, Vector3(0, -0.7, 0), pale, side, side > 0)
 		if side > 0:
-			part(arm, Vector3(0.04, 0.04, 0.24), Vector3(0, -0.86, -0.02), "wood", Color.WHITE)
-			part(arm, Vector3(0.025, 0.15, 0.2), Vector3(0, -0.93, -0.24), "metal", Color(1.5, 1.2, 1.2))
+			# Cleaver: wooden grip in the fist, a wide blade pointing forward, dull and stained.
+			k.b("wood").box(Props.at(0.0, -0.86, -0.05), Vector3(0.03, 0.035, 0.14))
+			var blade := k.b("chrome", Color(0.85, 0.8, 0.78))
+			blade.box(Props.at(0.0, -0.94, -0.26), Vector3(0.006, 0.13, 0.22))
+			k.b("blood").box(Props.at(0.0, -0.94, -0.3), Vector3(0.008, 0.08, 0.13), Color(1.2, 1.0, 1.0),
+				Rect2(0.3, 0.3, 0.4, 0.4))
+		k.build(arm)
 		arms.append(arm)
-	var head := _pivot(root, Vector3(0, 1.65, 0))
-	part(head, Vector3(0.25, 0.29, 0.26), Vector3(0, 0.0, 0), "skin", pale)
-	part(head, Vector3(0.28, 0.16, 0.29), Vector3(0, 0.2, 0), "fabric", Color(0.06, 0.06, 0.06))
-	part(head, Vector3(0.18, 0.04, 0.01), Vector3(0, 0.15, -0.135), "fabric", Color(0.02, 0.02, 0.02))
+
+	var head := _pivot(root, Vector3(0, 1.62, 0))
+	var hk := MeshBuilder.Kit.new()
+	hk.ao = false
+	hk.b("skin", pale).cylinder(Props.at(0, -0.04, 0), 0.06, 0.06, 0.1, 6)
+	var skull := hk.b("skin", pale)
+	skull.box(Props.at(0, 0.04, 0), Vector3(0.19, 0.25, 0.22), Color.WHITE, NO_RECT, Vector2(0.3, 0.3),
+		MeshFactory.ALL & ~MeshFactory.NZ)
+	hk.b("face").box(Props.at(0, 0.04, 0), Vector3(0.19, 0.25, 0.22), Color.WHITE, Props.FULL, Vector2.ONE, MeshFactory.NZ)
+	# Hat pulled down to the brows, its turned-up cuff, and the scarf.
+	var knit := hk.b("knit")
+	knit.cylinder(_oval(Vector3(0, 0.19, 0.005), 1.08), 0.122, 0.09, 0.15, 10, Color.WHITE, Rect2(0, 0, 2, 0.5))
+	knit.cylinder(_oval(Vector3(0, 0.18, 0.005), 1.08), 0.128, 0.127, 0.05, 10, Color(1.3, 1.3, 1.3))
+	hk.b("knit", Color(1.6, 1.4, 1.3)).cylinder(_oval(Vector3(0, -0.05, -0.005), 1.15), 0.13, 0.12, 0.13, 10)
+	hk.build(head)
 	return {"root": root, "leg_l": legs[0], "leg_r": legs[1], "arm_l": arms[0], "arm_r": arms[1], "head": head}
 
 

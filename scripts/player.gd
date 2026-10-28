@@ -189,33 +189,47 @@ func hit(i: int) -> void:
 	tw.tween_property(head, "position:y", head.position.y - 0.25, 0.15)
 
 
-## Right forearm, fist and the "zhuchok": a green dynamo torch with the
-## squeeze lever underneath. Drawn with the same PS1 material as the world.
+## Right forearm in the wool sleeve, and the "zhuchok": a green dynamo
+## torch with a chrome bezel. The thumb lies along the top, the fingers are
+## curled round the squeeze lever underneath and pump with it. Drawn with the
+## same PS1 material as the world.
 func _build_hand() -> void:
 	hand = Node3D.new()
 	hand.position = HAND_POS
 	hand.rotation = Vector3(deg_to_rad(4.0), deg_to_rad(6.0), 0)
 	camera.add_child(hand)
-	var sleeve := Color(0.2, 0.22, 0.19)
-	var body := Color(0.5, 0.66, 0.44)
-	var parts: Array[MeshInstance3D] = [
-		Characters.part(hand, Vector3(0.09, 0.09, 0.34), Vector3(0.015, -0.1, 0.2), "fabric", sleeve),
-		Characters.part(hand, Vector3(0.1, 0.03, 0.05), Vector3(0.015, -0.1, 0.04), "fabric", sleeve * 0.8),
-		Characters.part(hand, Vector3(0.09, 0.06, 0.075), Vector3(0.0, -0.06, -0.06), "skin", Color(0.85, 0.85, 0.85)),
-		Characters.part(hand, Vector3(0.025, 0.025, 0.05), Vector3(-0.045, 0.02, -0.07), "skin", Color(0.85, 0.85, 0.85)),
-		Characters.part(hand, Vector3(0.075, 0.1, 0.12), Vector3(0.0, -0.025, -0.08), "metal", body),
-		Characters.part(hand, Vector3(0.078, 0.02, 0.005), Vector3(0.0, 0.055, -0.141), "metal", body * 0.7),
-	]
-	var lens := Characters.part(hand, Vector3(0.055, 0.055, 0.008), Vector3(0.0, 0.0, -0.142), "white", Color(0.6, 0.6, 0.55))
 	_lens_mat = Mats.unique("white", Color(0.6, 0.6, 0.55))
-	lens.material_override = _lens_mat
-	parts.append(lens)
+	var fwd := Basis(Vector3.RIGHT, -PI * 0.5)  # cylinders pointing ahead (-z)
+	var kit := MeshBuilder.Kit.new()
+	kit.ao = false
+	var wool := kit.b("guard_wool")
+	wool.cylinder(Transform3D(fwd, Vector3(0.02, -0.06, 0.42)), 0.056, 0.048, 0.33, 8, Color.WHITE, Rect2(0, 0, 2, 2))
+	wool.cylinder(Transform3D(fwd, Vector3(0.02, -0.06, 0.11)), 0.052, 0.052, 0.035, 8, Color(0.7, 0.7, 0.7))
+	var torch := kit.b("torch")
+	torch.cylinder(Transform3D(fwd * Basis.from_scale(Vector3(0.85, 1.0, 1.15)), Vector3(0, 0.025, -0.015)), 0.048,
+		0.045, 0.12, 10, Color.WHITE, Rect2(0, 0.2, 1, 0.8), Rect2(0, 0, 1, 0.05), true, true)
+	var chrome := kit.b("chrome")
+	chrome.cylinder(Transform3D(fwd, Vector3(0, 0.03, -0.134)), 0.035, 0.033, 0.012, 10)
+	kit.custom(_lens_mat).cylinder(Transform3D(fwd, Vector3(0, 0.03, -0.145)), 0.027, 0.027, 0.002, 10, Color.WHITE,
+		Props.FULL, Rect2(0.4, 0.4, 0.2, 0.2))
+	var skin := kit.b("skin", Color(0.85, 0.82, 0.8))
+	skin.box(Props.at(0.045, -0.055, -0.06), Vector3(0.025, 0.085, 0.08))
+	skin.box(Props.at(0.022, -0.095, 0.015), Vector3(0.06, 0.065, 0.06))
+	skin.box(Props.rot(Vector3.UP, 0.12, Vector3(0.028, 0.075, -0.07)), Vector3(0.024, 0.022, 0.07))
+	kit.build(hand, false)
+
 	_lever = Node3D.new()
 	_lever.position = Vector3(0.0, -0.03, -0.03)
 	hand.add_child(_lever)
-	parts.append(Characters.part(_lever, Vector3(0.018, 0.015, 0.1), Vector3(0.0, -0.015, -0.05), "metal", Color(0.55, 0.55, 0.55)))
-	for mi in parts:
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var lk := MeshBuilder.Kit.new()
+	lk.ao = false
+	lk.b("chrome", Color(0.7, 0.7, 0.7)).box(Props.at(0.0, -0.012, -0.05), Vector3(0.02, 0.012, 0.1))
+	var fingers := lk.b("skin", Color(0.82, 0.78, 0.76))
+	for i in 4:
+		var z := -0.085 + i * 0.021
+		fingers.box(Props.at(0.005, -0.036, z), Vector3(0.085, 0.024, 0.019))
+		fingers.box(Props.at(-0.046, -0.03, z), Vector3(0.018, 0.04, 0.019))
+	lk.build(_lever, false)
 	# Light bouncing back from the beam picks out the fist and the torch.
 	_spill = OmniLight3D.new()
 	_spill.position = Vector3(-0.05, 0.12, 0.08)

@@ -24,6 +24,14 @@ func _ready() -> void:
 	_place(p, Vector3(0.5, 0, 5.0), Vector3(-0.3, 0, 1))
 	await _wait(1.0)
 	await _shot("03_checkout")
+	_place(p, Vector3(3.6, 0, 14.5), Vector3(1, 0, 0.9))
+	p.head.rotation.x = -0.15
+	await _wait(1.0)
+	await _shot("03b_shelves")
+	_place(p, Vector3(-7.5, 0, 12.6), Vector3(-0.8, 0, 1))
+	p.head.rotation.x = -0.35
+	await _wait(1.0)
+	await _shot("03c_chests")
 	_place(p, Vector3(-10.3, 0, 11.5), Vector3.BACK)
 	await _wait(1.5)
 	await _shot("04_hall_lit")

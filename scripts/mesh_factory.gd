@@ -6,6 +6,8 @@ extends RefCounted
 ## UVs are in world metres (one texture repeat per `tex_m`), and vertical
 ## faces get a baked darkening towards the floor.
 ## Boxes are bottom-centred: x and z centred on the origin, y from 0 to size.y.
+## `tex_m` is a float, or a Vector2 for different horizontal and vertical
+## repeats (a texture mapped exactly once over a face of that size).
 
 const PX := 1
 const NX := 2
@@ -18,10 +20,11 @@ const ALL := 63
 static var _cache: Dictionary = {}
 
 
-static func box(size: Vector3, tex_m := 1.0, step := 0.5, faces := ALL, ao := true) -> ArrayMesh:
+static func box(size: Vector3, tex_m: Variant = 1.0, step := 0.5, faces := ALL, ao := true) -> ArrayMesh:
 	var key := "%s|%s|%s|%s|%s" % [size, tex_m, step, faces, ao]
 	if _cache.has(key):
 		return _cache[key]
+	var tm: Vector2 = tex_m if tex_m is Vector2 else Vector2(tex_m, tex_m)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var hx := size.x * 0.5
@@ -38,13 +41,13 @@ static func box(size: Vector3, tex_m := 1.0, step := 0.5, faces := ALL, ao := tr
 	for d in defs:
 		if (faces & int(d[0])) == 0:
 			continue
-		_face(st, d[1], d[2], d[3], d[4], tex_m, step, ao)
+		_face(st, d[1], d[2], d[3], d[4], tm, step, ao)
 	var mesh := st.commit()
 	_cache[key] = mesh
 	return mesh
 
 
-static func _face(st: SurfaceTool, o: Vector3, u: Vector3, v: Vector3, n: Vector3, tex_m: float, step: float, ao: bool) -> void:
+static func _face(st: SurfaceTool, o: Vector3, u: Vector3, v: Vector3, n: Vector3, tex_m: Vector2, step: float, ao: bool) -> void:
 	var lu := u.length()
 	var lv := v.length()
 	var nu := maxi(1, ceili(lu / step))
