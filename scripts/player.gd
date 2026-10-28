@@ -84,8 +84,9 @@ func _ready() -> void:
 	_whirr = AudioStreamPlayer3D.new()
 	_whirr.stream = Sfx.get_stream("whirr")
 	_whirr.bus = Sfx.BUS
-	_whirr.volume_db = -8.0
-	_whirr.max_distance = 15.0
+	_whirr.volume_db = -24.0
+	_whirr.max_distance = 6.0
+	_whirr.unit_size = 1.0
 	add_child(_whirr)
 	_steps = AudioStreamPlayer3D.new()
 	_steps.stream = Sfx.get_stream("step")

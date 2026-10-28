@@ -116,8 +116,9 @@ def save(name, x, peak=0.9):
         w.setsampwidth(2)
         w.setframerate(SR)
         w.writeframes(data.tobytes())
-    with open(path + ".import", "w") as f:
-        f.write(IMPORT.format(name=name, loop=1 if name in LOOPS else 0))
+    if not os.path.exists(path + ".import"):  # Godot fills in the rest itself; keep its version
+        with open(path + ".import", "w") as f:
+            f.write(IMPORT.format(name=name, loop=1 if name in LOOPS else 0))
 
 
 # --- the store -------------------------------------------------------------------
@@ -174,13 +175,13 @@ def whirr(name):
     clicks = np.zeros_like(t)
     clicks[ticks] = 1.0
     clicks = band(np.convolve(clicks, g.rng.standard_normal(60) * np.exp(-np.arange(60) / 12), "same"), 2000, 9000, True)
-    x += norm(clicks, 0.4)
+    x += norm(clicks, 0.12)
     # Lever knock at each squeeze.
     for k in range(6):
-        place(x, band(g.noise(0.01), 600, 4000) * env(g.t(0.01), 0.0005, 0.003) * 1.5, k / 6 + 0.002)
-    x = band(x, 80, 11000, True)
+        place(x, band(g.noise(0.01), 600, 4000) * env(g.t(0.01), 0.0005, 0.003) * 0.3, k / 6 + 0.002)
+    x = band(x, 80, 5000, True)
     x[-200:] = x[-200:] * np.linspace(1, 0, 200) + x[:200] * np.linspace(0, 1, 200)
-    save(name, x, 0.7)
+    save(name, x, 0.45)
 
 
 def step(name, heavy=False):
