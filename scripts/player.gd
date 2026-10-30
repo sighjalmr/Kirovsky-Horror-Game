@@ -20,8 +20,8 @@ const STICK_SENS := 2.4
 const PITCH_LIMIT := deg_to_rad(80.0)
 const FLASHLIGHT_NOISE := 9.0
 const RUN_NOISE := 7.0
-const HAND_POS := Vector3(0.17, -0.15, -0.42)
-const HAND_ROT := Vector3(deg_to_rad(-10.0), deg_to_rad(40.0), 0.0)
+const HAND_POS := Vector3(0.16, -0.15, -0.36)
+const HAND_ROT := Vector3(deg_to_rad(8.0), deg_to_rad(25.0), 0.0)
 const HAND_REACH := 0.55
 
 var controllable := false
@@ -212,11 +212,11 @@ func hit(i: int) -> void:
 ## lights of its own.
 func _build_hand() -> void:
 	hand = TorchHand.new()
-	# Four fingers under the torch, the thumb along the top towards the lens.
+	# Thumb along the top towards the lens, four fingers round the body, the
+	# torch across the palm; the forearm bends away down to the frame's edge.
+	hand.diagonal = 40.0
 	hand.roll = -30.0
-	hand.bend = Vector3(40, 0, 0)
-	hand.slide = 0.0
-	hand.arm_dir = Vector3(0.6, -0.2, 0.77)
+	hand.arm_dir = Vector3(0.7, -0.6, 0.4)
 	hand.position = HAND_POS
 	hand.rotation = HAND_ROT
 	camera.add_child(hand)

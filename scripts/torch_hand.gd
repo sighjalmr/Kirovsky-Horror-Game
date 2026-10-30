@@ -10,32 +10,29 @@ extends Node3D
 ## its lens looking down -z.
 
 const HAND_SCENE := "res://models/hand/Hand_Nails_R.gltf"
-const POSE_OPEN := "res://models/hand/Grip Shaft.res"
-const POSE_FIST := "res://models/hand/Grip.res"
+## Fingers start straight and are curled onto the torch one joint at a time.
+const POSE_OPEN := "res://models/hand/Default pose.res"
 ## The thumb is taken from this pose: straight, lying along the torch.
 const POSE_THUMB := "res://models/hand/Grip 5.res"
 ## The thumb lies along the top of the torch: height of its middle line
 ## above the torch axis, and how far forward of its base it reaches.
-const THUMB_TOP := 0.031
-## The middle of the hole the curled fingers of the model make (its own
-## space); the torch axis runs along y through it, index finger at +y.
-const GRIP_CENTRE := Vector3(-0.021, 0.0, -0.079)
+const THUMB_TOP := 0.027
+## A point of the torch axis in the hand model's own space: a finger's
+## breadth off the middle of the palm (the palm faces -x).
+const PALM_LINE := Vector3(-0.052, 0.0, -0.05)
+## Distance from the torch axis at which a finger joint rests on the body.
+const TOUCH := 0.031
 ## The torch is modelled at 1.2 times its size: a real «жучок» is 10 cm long.
 const TORCH_SCALE := 0.76
 ## Where the beam leaves the glass.
 const LENS := Vector3(0, 0, -0.062 * TORCH_SCALE)
 
-## How the hand holds the torch: rolled round the torch axis (degrees), then
-## the wrist bent (x: towards the little finger, z: back of the hand).
-var roll := -135.0
-var bend := Vector3(0, 0, 0)
-## The lens comes out of the fist on the little finger's side (true) or the
-## thumb's.
-var reverse := false
+## How the hand holds the torch: the angle between the torch and the line
+## of the knuckles (degrees), and the fist rolled round the torch axis.
+var diagonal := 55.0
+var roll := 0.0
 ## The torch slides this far forward through the fist (metres).
-var slide := 0.02
-## How far the fingers close from the loose shaft grip towards a fist.
-var grip := 0.3
+var slide := 0.0
 ## The forearm leaves the wrist this way (towards the elbow).
 var arm_dir := Vector3(0.55, -0.55, 0.62)
 
@@ -47,24 +44,12 @@ var _body: Node3D
 var _lever: Node3D
 var _skeleton: Skeleton3D
 var _open: Dictionary = {}  # bone index -> Quaternion
-var _fist: Dictionary = {}
-var _fingers: Array[int] = []
 var _thumb: Dictionary = {}
 
 
 func _ready() -> void:
 	_build_torch()
 	_build_hand()
-	squeeze(0.0)
-
-
-## 0 lever out, 1 squeezed home: the lever swings in and the fingers close.
-## The player keeps the fist still; this only sets the grip.
-func squeeze(s: float) -> void:
-	_lever.rotation.x = deg_to_rad(-7.0) * s
-	var g := grip + s * 0.12
-	for b in _fingers:
-		_skeleton.set_bone_pose_rotation(b, (_open[b] as Quaternion).slerp(_fist[b], g))
 
 
 func set_lit(on: bool) -> void:
@@ -118,43 +103,55 @@ func _build_torch() -> void:
 
 func _build_hand() -> void:
 	model = (load(HAND_SCENE) as PackedScene).instantiate()
-	var b := Basis(Vector3.BACK, deg_to_rad(roll)) * Basis(Vector3.RIGHT, PI * (0.5 if reverse else -0.5)) \
-		* Basis.from_euler(bend * PI / 180.0)
-	model.transform = Transform3D(b, -(b * GRIP_CENTRE) + Vector3(0, 0, slide))
+	# The torch lies diagonally across the palm, from the heel of the hand to
+	# the root of the index finger, as people really hold one: the lens ahead,
+	# the forearm behind, the palm on the torch's side.
+	var b := Basis(Vector3.BACK, deg_to_rad(roll)) * Basis(Vector3.RIGHT, deg_to_rad(diagonal - 90.0))
+	model.transform = Transform3D(b, -(b * PALM_LINE) + Vector3(0, 0, slide))
 	add_child(model)
 	_skeleton = model.find_child("Skeleton3D", true, false)
 	var mesh: MeshInstance3D = model.find_child("mesh_*", true, false)
 	mesh.material_override = _skin()
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for pose in [[POSE_OPEN, _open], [POSE_FIST, _fist], [POSE_THUMB, _thumb]]:
+	for pose in [[POSE_OPEN, _open], [POSE_THUMB, _thumb]]:
 		var anim: Animation = load(pose[0])
 		for i in anim.get_track_count():
 			var bone := _skeleton.find_bone(String(anim.track_get_path(i).get_concatenated_subnames()))
 			pose[1][bone] = anim.track_get_key_value(i, 0)
 	for bone in _open:
-		if _fist.has(bone) and not _skeleton.get_bone_name(bone).begins_with("Thumb"):
-			_fingers.append(bone)
+		_skeleton.set_bone_pose_rotation(bone, _open[bone])
+	for f in ["Index", "Middle", "Ring", "Little"]:
+		for j in ["Proximal", "Intermediate", "Distal"]:
+			_close_on_torch(_skeleton.find_bone("%s_%s_R" % [f, j]))
 	_lay_thumb()
-	# Turn the torch in the fist so the lever lies under the middle joints of
-	# the fingers.
-	var d := b * Vector3(-1, 0, -0.6)
-	_body.rotation.z = atan2(d.x, -d.y)
 
-	# Wool sleeve with a turned cuff over the wrist, the forearm going back
-	# from it towards the elbow.
+	# Wool sleeve: a turned cuff round the wrist on the line of the hand,
+	# then the forearm inside the sleeve bending away towards the elbow
+	# (arm_dir), so it leaves the frame instead of covering the view.
 	var wrist := model.transform * Vector3(0, -0.004, 0.012)
-	var up := -arm_dir.normalized()
+	var stub := (model.basis * Vector3.BACK).normalized()
+	var up := -stub
 	var side := up.cross(Vector3.FORWARD).normalized()
 	var sb := Basis(side, up, side.cross(up))
 	var kit := MeshBuilder.Kit.new()
 	kit.ao = false
 	var wool := kit.b("guard_wool")
 	var o := wrist - up * 0.012
-	wool.lathe(Transform3D(sb, o), [Vector2(0.056, -0.34), Vector2(0.05, -0.08), Vector2(0.047, -0.03),
-		Vector2(0.044, -0.01)], 24, Color.WHITE, Rect2(0, 0, 3, 2))
 	wool.lathe(Transform3D(sb, o), [Vector2(0.0, -0.02), Vector2(0.035, -0.015), Vector2(0.047, -0.01),
 		Vector2(0.05, -0.005), Vector2(0.05, 0.008), Vector2(0.046, 0.012), Vector2(0.038, 0.01)],
 		24, Color(0.75, 0.75, 0.72), Rect2(0, 0, 3, 0.3))
+	# The forearm along a curve from the cuff: out along the hand, round
+	# towards the elbow; short capsules make the bend.
+	var p0 := o - stub * 0.01
+	var p1 := p0 + stub * 0.02
+	var p2 := p1 + arm_dir.normalized() * 0.36
+	var prev := p0
+	for i in range(1, 9):
+		var t := i / 8.0
+		var p := p0.lerp(p1, t).lerp(p1.lerp(p2, t), t)
+		wool.capsule(Transform3D.IDENTITY, prev, p, 0.042 + 0.008 * (t - 0.125), 0.042 + 0.008 * t, 24, Color.WHITE,
+			Rect2(0, 0, 3, 0.4))
+		prev = p
 	kit.build(self, false)
 
 
@@ -179,6 +176,26 @@ func _lay_thumb() -> void:
 		var parent := _bone_global(_skeleton.get_bone_parent(b)).basis
 		var q := (parent.inverse() * Basis(turn) * g.basis).get_rotation_quaternion()
 		_skeleton.set_bone_pose_rotation(b, q)
+
+
+## Curls one finger bone (round its own z, the way the knuckle bends) until
+## the joint after it touches the torch body, as a hand closing on it would.
+func _close_on_torch(b: int) -> void:
+	var tip := _skeleton.get_bone_children(b)[0]
+	var start := _skeleton.get_bone_pose_rotation(b)
+	var best := start
+	var best_gap := INF
+	for step in 60:
+		var q := start * Quaternion(Vector3.BACK, deg_to_rad(-10.0 + step * 2.0))
+		_skeleton.set_bone_pose_rotation(b, q)
+		var p := model.transform * _bone_global(tip).origin
+		var gap := Vector2(p.x / 1.1, p.y).length() - TOUCH
+		if absf(gap) < best_gap:
+			best_gap = absf(gap)
+			best = q
+		if gap < 0.0:
+			break
+	_skeleton.set_bone_pose_rotation(b, best)
 
 
 ## A bone's pose in skeleton space, worked out from the local poses.
