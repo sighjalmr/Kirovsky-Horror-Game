@@ -11,6 +11,8 @@ const RED := Color(0.82, 0.22, 0.18)
 ## How far the hall sounds drop while Gordeev speaks, so his voice carries.
 const DUCK_DB := -7.0
 
+signal chosen(index: int)
+
 var clock: Label
 var subtitle: Label
 var prompt: Label
@@ -19,6 +21,12 @@ var notebook_text: Label
 var fade: ColorRect
 var title: Label
 var title_sub: Label
+var note: Label
+var choices: ColorRect
+
+var _choice_box: VBoxContainer
+var _choice_title: Label
+var _choice_count := 0
 
 var _queue: Array = []
 var _sub_t := 0.0
@@ -35,6 +43,8 @@ func _ready() -> void:
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(fade)
 	clock = _label(Vector2(1560, 28), Vector2(330, 44), 32, HORIZONTAL_ALIGNMENT_RIGHT, INK)
+	note = _label(Vector2(30, 28), Vector2(1000, 44), 28, HORIZONTAL_ALIGNMENT_LEFT, PAPER)
+	note.modulate.a = 0.0
 	prompt = _label(Vector2(260, 830), Vector2(1400, 44), 30, HORIZONTAL_ALIGNMENT_CENTER, PAPER)
 	subtitle = _label(Vector2(260, 890), Vector2(1400, 170), 32, HORIZONTAL_ALIGNMENT_CENTER, INK)
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -60,6 +70,62 @@ func _ready() -> void:
 	notebook_text.add_theme_font_size_override("font_size", 27)
 	notebook_text.add_theme_color_override("font_color", Color(0.14, 0.13, 0.11))
 	notebook.add_child(notebook_text)
+
+	choices = ColorRect.new()
+	choices.color = Color(0.03, 0.03, 0.03, 0.78)
+	choices.position = Vector2(410, 380)
+	choices.size = Vector2(1100, 480)
+	choices.visible = false
+	add_child(choices)
+	_choice_title = Label.new()
+	_choice_title.position = Vector2(36, 24)
+	_choice_title.size = Vector2(1028, 40)
+	_choice_title.add_theme_font_size_override("font_size", 26)
+	_choice_title.add_theme_color_override("font_color", Color(0.65, 0.66, 0.58))
+	choices.add_child(_choice_title)
+	_choice_box = VBoxContainer.new()
+	_choice_box.position = Vector2(36, 78)
+	_choice_box.size = Vector2(1028, 380)
+	_choice_box.add_theme_constant_override("separation", 6)
+	choices.add_child(_choice_box)
+
+
+## A list of answers to pick with the mouse or the number keys; returns the
+## index of the one picked. The player is held still meanwhile by the caller.
+func choose(heading: String, labels: Array[String]) -> int:
+	for c in _choice_box.get_children():
+		c.queue_free()
+	_choice_title.text = heading
+	_choice_count = labels.size()
+	for i in labels.size():
+		var b := Button.new()
+		b.text = "%d.  %s" % [i + 1, labels[i]]
+		b.flat = true
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.add_theme_font_size_override("font_size", 30)
+		b.add_theme_color_override("font_color", PAPER)
+		b.add_theme_color_override("font_hover_color", Color(1.0, 0.85, 0.55))
+		b.add_theme_color_override("font_focus_color", Color(1.0, 0.85, 0.55))
+		b.pressed.connect(func() -> void: chosen.emit(i))
+		_choice_box.add_child(b)
+	choices.size.y = 110 + labels.size() * 58
+	choices.position.y = 860 - choices.size.y
+	choices.visible = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var pick: int = await chosen
+	choices.visible = false
+	_choice_count = 0
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	return pick
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if _choice_count == 0 or not event.is_pressed() or event.is_echo():
+		return
+	var k := (event as InputEventKey).physical_keycode
+	if k >= KEY_1 and k < KEY_1 + _choice_count:
+		get_viewport().set_input_as_handled()
+		chosen.emit(k - KEY_1)
 
 
 func _label(pos: Vector2, size: Vector2, font_size: int, align: HorizontalAlignment, color: Color) -> Label:
@@ -124,6 +190,15 @@ func _speak(text: String) -> void:
 		return
 	_voice.stream = load(take.file)
 	_voice.play()
+
+
+## A short line in the corner that fades out: "the shift is saved".
+func flash_note(text: String) -> void:
+	note.text = text
+	var tw := create_tween()
+	tw.tween_property(note, "modulate:a", 1.0, 0.5)
+	tw.tween_interval(3.5)
+	tw.tween_property(note, "modulate:a", 0.0, 1.5)
 
 
 func set_prompt(text: String) -> void:

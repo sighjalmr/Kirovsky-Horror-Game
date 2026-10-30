@@ -21,7 +21,7 @@ import numpy as np
 SR = 44100
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "sounds")
-LOOPS = {"hum", "whirr", "phone", "compressor", "drone", "room"}
+LOOPS = {"hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd"}
 
 IMPORT = """[remap]
 
@@ -385,7 +385,110 @@ def pickup(name):
     save(name, x, 0.8)
 
 
+def engine(name):
+    """A ГАЗ-24 «Волга» idling in the rain: a four-cylinder at ~800 rpm
+    (firing at 27 Hz) with its harmonics, the exhaust burble, the fan belt,
+    rain on the bonnet. Loops."""
+    g = Gen(name)
+    t = g.t(4.0)
+    f = 27.0
+    wob = 1 + 0.01 * np.sin(2 * np.pi * 0.5 * t)
+    ph = 2 * np.pi * f * np.cumsum(wob) / SR
+    x = np.zeros_like(t)
+    for k, a in ((1, 1.0), (2, 0.6), (3, 0.3), (4, 0.25), (6, 0.1), (8, 0.06)):
+        x += a * np.sin(k * ph + k)
+    pulses = (0.5 + 0.5 * np.sin(ph)) ** 6
+    x += band(g.noise(4.0), 60, 400, True) * pulses * 1.2
+    x += band(g.noise(4.0), 1800, 3200, True) * 0.05
+    x += band(g.noise(4.0), 3000, 12000, True) * 0.12  # rain
+    x = band(x, 25, 6000, True)
+    save(name, x, 0.7)
+
+
+def knock(name):
+    """Knuckles on the plate glass of the front door: a dull thud with the
+    pane ringing faintly."""
+    g = Gen(name)
+    t = g.t(0.5)
+    x = band(g.noise(0.01), 150, 2500) * env(g.t(0.01), 0.001, 0.003) * 2
+    x = np.concatenate([x, np.zeros(len(t) - len(x))])
+    x += modal(t, [(180, 0.05, 1.0), (420, 0.04, 0.5), (1320, 0.08, 0.15), (2710, 0.06, 0.08)])
+    save(name, x, 0.85)
+
+
+def cans(name):
+    """A pyramid of tins comes down: a dozen tinplate cans hitting the tile and
+    each other, then two rolling away and a last one wobbling to rest."""
+    g = Gen(name)
+    t = g.t(3.5)
+    x = np.zeros_like(t)
+    for i in range(14):
+        at = 0.05 + g.rng.uniform(0, 0.7) ** 1.4
+        f = g.rng.uniform(650, 1100)
+        p = [(f, 0.06, 1.0), (f * 2.3, 0.04, 0.6), (f * 3.9, 0.025, 0.4), (f * 5.6, 0.015, 0.2)]
+        hit = modal(g.t(0.3), p) + band(g.noise(0.3), 1500, 7000) * env(g.t(0.3), 0.0005, 0.01)
+        place(x, hit * g.rng.uniform(0.4, 1.0), at)
+    for start, dur in ((0.8, 2.0), (1.0, 2.4)):
+        tt = g.t(dur)
+        roll = band(g.noise(dur), 300, 2500) * (0.5 + 0.5 * np.sin(2 * np.pi * 9 * tt) ** 2) * np.exp(-tt / (dur * 0.5))
+        place(x, roll * 0.25, start)
+    tt = g.t(0.6)
+    wob = modal(tt, [(900, 0.05, 1.0), (2100, 0.03, 0.5)])
+    for k in range(5):
+        place(x, wob * 0.3 * 0.7 ** k, 2.6 + 0.06 * k * (1 - 0.1 * k))
+    save(name, x, 0.85)
+
+
+def crowd(name):
+    """A Saturday afternoon in the hall: a dozen voices too far off to make
+    out (formant-shaped noise in syllables), till keys clattering and the
+    drawer, baskets set down, a wire cart, a cough. Loops."""
+    g = Gen(name)
+    dur = 14.0
+    t = g.t(dur)
+    x = np.zeros_like(t)
+    for _ in range(12):
+        lo = g.rng.uniform(250, 600)
+        voice = band(g.noise(dur), lo, lo * g.rng.uniform(2.5, 4.0), True)
+        rate = g.rng.uniform(3.5, 5.5)
+        syl = (0.5 + 0.5 * np.sin(2 * np.pi * rate * t + g.rng.uniform(0, 6) + 2 * np.sin(2 * np.pi * 0.7 * t))) ** 3
+        # Each one talks in phrases with pauses between.
+        k = int(g.rng.integers(2, 5))
+        phrase = (0.5 + 0.5 * np.sin(2 * np.pi * k / dur * t + g.rng.uniform(0, 6))) ** 2
+        x += voice * syl * phrase * g.rng.uniform(0.4, 1.0)
+    x = norm(x, 1.0) * 0.6
+    x += norm(band(g.noise(dur), 80, 400, True), 1.0) * 0.12
+    for _ in range(9):  # till keys
+        at = g.rng.uniform(0.2, dur - 1.5)
+        for j in range(int(g.rng.integers(3, 7))):
+            place(x, modal(g.t(0.1), [(2300, 0.012, 1.0), (4100, 0.008, 0.5)]) * 0.12, at + j * g.rng.uniform(0.11, 0.2))
+    for at in (3.1, 9.4):  # the drawer: bell and the slide out
+        place(x, modal(g.t(1.0), [(1870, 0.35, 1.0), (4670, 0.2, 0.4)]) * 0.1, at)
+        place(x, band(g.noise(0.3), 300, 2500) * env(g.t(0.3), 0.02, 0.1) * 0.15, at + 0.05)
+    for at in (1.7, 6.2, 11.8):  # baskets set down
+        place(x, modal(g.t(0.4), [(520, 0.05, 1.0), (1210, 0.04, 0.6), (2650, 0.02, 0.3)]) * 0.12, at)
+    tt = g.t(3.0)  # a wire cart rolling past
+    place(x, band(g.noise(3.0), 900, 5000) * (0.6 + 0.4 * np.sin(2 * np.pi * 7 * tt)) * np.sin(np.pi * tt / 3.0) * 0.05, 7.0)
+    place(x, band(g.noise(0.35), 200, 1800) * env(g.t(0.35), 0.01, 0.08) * 0.35, 12.6)  # a cough
+    save(name, band(x, 60, 7000, True), 0.6)
+
+
+def lock(name):
+    """A key going into a mortise lock, the turn, the bolt shooting home."""
+    g = Gen(name)
+    t = g.t(0.9)
+    x = np.zeros_like(t)
+    scrape = band(g.noise(0.18), 2000, 9000) * np.linspace(0.2, 1, int(0.18 * SR)) * 0.25
+    place(x, scrape, 0.0)
+    place(x, modal(g.t(0.2), [(3100, 0.02, 0.6), (5200, 0.01, 0.3)]), 0.2)
+    place(x, band(g.noise(0.25), 800, 4000) * env(g.t(0.25), 0.05, 0.08) * 0.2, 0.3)
+    place(x, modal(g.t(0.4), [(640, 0.06, 1.0), (1730, 0.04, 0.6), (3900, 0.02, 0.3)]) +
+          band(g.noise(0.4), 500, 6000) * env(g.t(0.4), 0.0005, 0.006), 0.55)
+    save(name, x, 0.85)
+
+
 ALL = {
+    "engine": engine, "knock": knock, "cans": cans, "lock": lock, "crowd": crowd,
     "hum": hum, "click": click, "whirr": whirr, "phone": phone, "compressor": compressor, "room": room,
     "cloth": cloth, "stinger": stinger, "stab": stab, "drone": drone, "chime": chime, "breath": breath,
     "clank": clank, "keys": keys, "pickup": pickup,

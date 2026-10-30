@@ -848,6 +848,119 @@ def face(name):
     t.save(name)
 
 
+def person_face(name, skin_tone, brow, top_shadow, glasses=False, moustache=None, lips=(0.55, 0.32, 0.3),
+                stubble=0.0, flush=0.0):
+    """A bare face mapped on the front of the head like the killer's: the
+    forehead under a hat (its shadow on top), brows, eyes with lids and
+    bags, the nose, the mouth, the chin. Optional glasses, a moustache,
+    stubble, a drinker's red nose."""
+    t = T(256, 256, skin_tone, name)
+    t.shade(t.noise(60, 4), 0.86, 1.04)
+    yy, xx = np.mgrid[0:256, 0:256].astype(np.float32)
+    t.mul(1 - np.clip((top_shadow - yy) / max(top_shadow, 1), 0, 1) * 0.55)
+    t.mul(1 - np.clip((np.abs(xx - 128) - 96) / 32, 0, 1) * 0.3)  # cheeks turn away
+    dark = np.array(skin_tone) * 0.45
+    for cx in (86, 170):
+        sock = np.exp(-(((xx - cx) / 30) ** 2 + ((yy - 98) / 16) ** 2))
+        t.mix(tuple(dark), np.clip(sock * 0.7, 0, 1))
+        bag = np.exp(-(((xx - cx) / 22) ** 2 + ((yy - 112) / 4) ** 2))
+        t.mix(tuple(np.array(skin_tone) * 0.7), bag * 0.6)
+        white = ((xx - cx) / 13) ** 2 + ((yy - 99) / 4.5) ** 2 < 1
+        t.mix((0.78, 0.74, 0.68), white)
+        t.mix((0.18, 0.14, 0.1), ((xx - cx) ** 2 + (yy - 99) ** 2) < 16)
+        t.mix((0.03, 0.03, 0.03), ((xx - cx) ** 2 + (yy - 99) ** 2) < 5)
+        t.mix((0.9, 0.9, 0.85), ((xx - cx - 2) ** 2 + (yy - 97) ** 2) < 1.5)
+        lid = np.abs(yy - 94.5 + 0.004 * (xx - cx) ** 2) < 1.6
+        t.mix(tuple(dark), lid * (np.abs(xx - cx) < 15))
+        brow_y = 80 - 0.15 * (np.abs(xx - 128) - 42)
+        t.mix(brow, np.exp(-(((xx - cx) / 24) ** 2 + ((yy - brow_y) / 3.2) ** 2)) * 0.95)
+        if glasses:
+            ring = np.abs(np.sqrt(((xx - cx) / 1.25) ** 2 + (yy - 100) ** 2) - 19) < 1.6
+            t.mix((0.12, 0.1, 0.08), ring)
+            t.mix((0.85, 0.88, 0.9), (((xx - cx + 8) ** 2 + (yy - 92) ** 2) < 10) * 0.35)
+    if glasses:
+        t.mix((0.12, 0.1, 0.08), (np.abs(yy - 98) < 1.4) & (np.abs(xx - 128) < 20))
+    # Nose: a lit ridge, shaded sides, nostrils.
+    ridge = np.exp(-(((xx - 128) / 6) ** 2)) * ((yy > 100) & (yy < 158))
+    t.mix(tuple(np.minimum(np.array(skin_tone) * 1.12, 1)), ridge * 0.5)
+    for sx in (-1, 1):
+        t.mix(tuple(np.array(skin_tone) * 0.72), np.exp(-(((xx - 128 - sx * 13) / 5) ** 2)) * ((yy > 108) & (yy < 156)) * 0.5)
+        t.mix((0.15, 0.08, 0.07), (((xx - 128 - sx * 9) / 4.5) ** 2 + ((yy - 160) / 2.5) ** 2) < 1)
+    if flush:
+        t.mix((0.72, 0.3, 0.28), np.exp(-(((xx - 128) / 14) ** 2 + ((yy - 150) / 12) ** 2)) * flush)
+        t.mix((0.7, 0.36, 0.32), np.exp(-(((np.abs(xx - 128) - 52) / 18) ** 2 + ((yy - 140) / 14) ** 2)) * flush * 0.6)
+    # Lines from the nose to the mouth corners.
+    for sx in (-1, 1):
+        fold = np.abs((xx - 128) * sx - (22 + (yy - 150) * 0.35)) < 1.8
+        t.mix(tuple(np.array(skin_tone) * 0.75), fold * ((yy > 150) & (yy < 196)) * 0.7)
+    mouth = np.abs(yy - 188 - 0.0025 * (xx - 128) ** 2) < 3.2
+    t.mix(lips, mouth * (np.abs(xx - 128) < 26))
+    t.mix((0.2, 0.1, 0.09), (np.abs(yy - 188.5 - 0.0025 * (xx - 128) ** 2) < 1.1) * (np.abs(xx - 128) < 25))
+    t.mix(tuple(np.array(skin_tone) * 0.8), np.exp(-(((xx - 128) / 22) ** 2 + ((yy - 218) / 6) ** 2)) * 0.5)
+    if moustache is not None:
+        m = np.zeros_like(xx, bool)
+        for sx in (-1, 1):
+            m |= (((xx - 128 - sx * 15) / 21) ** 2 + ((yy - 175 - 0.012 * (xx - 128) ** 2) / 6.5) ** 2) < 1
+        t.mix(moustache, m * 0.95)
+        hair = (t.rng.random((256, 256)) > 0.6) & m
+        t.mix(tuple(np.array(moustache) * 0.6), hair)
+    if stubble:
+        area = np.clip((yy - 160) / 25, 0, 1) * np.clip((110 - np.abs(xx - 128)) / 20, 0, 1)
+        dots = blurred((t.rng.random((256, 256)) > 0.6).astype(np.float32), 0.6)
+        t.mix((0.2, 0.16, 0.14), np.clip(area * dots * stubble, 0, 1))
+    t.grain(0.012)
+    t.save(name)
+
+
+def fur(name):
+    """Muskrat fur of a director's hat: dense brown pile in tufts."""
+    t = T(256, 256, (0.24, 0.16, 0.1), name)
+    t.shade(t.noise(20, 4), 0.6, 1.3)
+    t.lines(1500, 7, (0.42, 0.3, 0.2), 1, 0.5, None, 1.4, 0.4)
+    t.lines(900, 6, (0.08, 0.05, 0.03), 1, 0.6, None, 1.5, 0.4)
+    t.grain(0.02)
+    t.save(name)
+
+
+def hair(name):
+    """Permed or cropped hair: tight curls as overlapping dark and lit
+    rings, tinted per person in the game."""
+    t = T(256, 256, (0.42, 0.4, 0.38), name)
+    t.shade(t.noise(14, 3), 0.6, 1.25)
+    img, d = t.layer()
+    for _ in range(900):
+        x, y, r = t.rng.random() * 256, t.rng.random() * 256, 2 + t.rng.random() * 4
+        d.arc((x - r, y - r, x + r, y + r), 200, 360, fill=rgb8((0.75, 0.72, 0.7)), width=1)
+        d.arc((x - r, y - r, x + r, y + r), 20, 180, fill=rgb8((0.12, 0.11, 0.1)), width=1)
+    t.over(img, 0.6)
+    t.grain(0.02)
+    t.save(name)
+
+
+def denim(name):
+    """Варёнка: stone-washed jeans, a fine blue twill with pale bleached clouds."""
+    t = T(256, 256, (0.2, 0.27, 0.42), name)
+    yy, xx = np.mgrid[0:256, 0:256]
+    t.shade(((xx + yy) % 4 < 2).astype(np.float32), 0.8, 1.06)
+    t.mix((0.62, 0.68, 0.78), np.clip(t.noise(30, 4) - 0.45, 0, 1) * 1.8)
+    t.grain(0.02)
+    t.save(name)
+
+
+def quilted(name):
+    """A loader's телогрейка: dark blue-grey cotton stitched in vertical
+    channels, padding bulging between the seams, grease and wear."""
+    t = T(256, 256, (0.16, 0.18, 0.2), name)
+    yy, xx = np.mgrid[0:256, 0:256].astype(np.float32)
+    t.shade(np.sin((xx % 32) / 32 * np.pi), 0.6, 1.1)
+    t.mix((0.06, 0.06, 0.07), (xx % 32 < 2))
+    t.mix((0.3, 0.3, 0.3), (xx % 32 < 2) & (yy % 10 < 5), )
+    t.shade(t.noise(70, 4), 0.8, 1.1)
+    t.stain(t.noise(40, 3), 0.68, (0.08, 0.08, 0.06), 0.6)
+    t.grain(0.015)
+    t.save(name)
+
+
 def twill(name, base):
     t = T(256, 256, base, name)
     yy, xx = np.mgrid[0:256, 0:256]
@@ -957,6 +1070,20 @@ ALL = {
     "guard_wool": lambda n: twill(n, (0.3, 0.33, 0.27)),
     "trousers": lambda n: twill(n, (0.17, 0.18, 0.22)),
     "knit": knit,
+    "face_kovpak": lambda n: person_face(n, (0.74, 0.55, 0.47), (0.22, 0.17, 0.13), 40, glasses=True,
+                                         moustache=(0.25, 0.2, 0.16), flush=0.35),
+    "face_tamara": lambda n: person_face(n, (0.8, 0.64, 0.56), (0.25, 0.18, 0.14), 30, lips=(0.6, 0.18, 0.2)),
+    "face_vasya": lambda n: person_face(n, (0.7, 0.5, 0.42), (0.18, 0.14, 0.11), 44, stubble=0.6, flush=0.6),
+    "face_edik": lambda n: person_face(n, (0.78, 0.6, 0.52), (0.16, 0.12, 0.1), 26, moustache=(0.18, 0.13, 0.1),
+                                       lips=(0.55, 0.3, 0.28)),
+    "face_shopper": lambda n: person_face(n, (0.76, 0.6, 0.54), (0.3, 0.24, 0.2), 34, lips=(0.5, 0.28, 0.28),
+                                          flush=0.25),
+    "fur": fur, "quilted": quilted, "hair": hair, "denim": denim,
+    "smock": lambda n: twill(n, (0.55, 0.66, 0.74)),
+    "jacket": lambda n: plain(n, (0.12, 0.1, 0.09), 12, 0.35),
+    "dublyonka": lambda n: twill(n, (0.36, 0.25, 0.16)),
+    "woman_coat": lambda n: twill(n, (0.3, 0.2, 0.24)),
+    "headscarf": lambda n: twill(n, (0.5, 0.12, 0.1)),
     "rubber": lambda n: plain(n, (0.08, 0.09, 0.08), 40, 0.2),
     "leather": leather, "torch": torch, "chrome": chrome, "blood": blood, "basket": basket,
     "fabric": lambda n: plain(n, (0.82, 0.82, 0.82), 60, 0.1),
@@ -976,8 +1103,10 @@ NORMALS = {
     "pegboard": (3.0, 0.8), "locker": (1.5, 1.0), "cloth": (1.5, 0.7), "enamel": (0.8, 1.0), "frozen": (2.0, 1.5),
     "wood": (2.5, 0.8), "formica": (0.8, 1.0), "door": (1.5, 1.0), "cardboard": (1.5, 1.0), "skin": (0.8, 1.2),
     "coat": (3.0, 0.7), "guard_wool": (3.0, 0.7), "trousers": (2.5, 0.7), "knit": (4.0, 0.8),
-    "rubber": (2.0, 1.0), "leather": (3.0, 1.0), "torch": (1.0, 1.0), "chrome": (0.6, 1.0), "basket": (2.0, 1.0),
-    "fabric": (2.0, 1.0), "grille": (3.0, 0.7),
+    "rubber": (2.0, 1.0), "leather": (3.0, 1.0), "fur": (4.0, 0.8), "quilted": (3.0, 1.0),
+    "dublyonka": (3.0, 0.7), "woman_coat": (3.0, 0.7), "headscarf": (2.0, 0.7), "torch": (1.0, 1.0), "chrome": (0.6, 1.0), "basket": (2.0, 1.0),
+    "fabric": (2.0, 1.0), "grille": (3.0, 0.7), "hair": (4.0, 0.6), "denim": (2.5, 0.7), "smock": (2.0, 0.7),
+    "jacket": (3.0, 1.0),
 }
 
 

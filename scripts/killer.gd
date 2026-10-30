@@ -10,8 +10,9 @@ extends CharacterBody3D
 signal spotted
 signal lost
 signal caught_player
+signal left
 
-enum State { INACTIVE, PATROL, INVESTIGATE, CHASE, SEARCH, ATTACK }
+enum State { INACTIVE, PATROL, INVESTIGATE, CHASE, SEARCH, ATTACK, LEAVE }
 
 const PATROL_SPEED := 1.2
 const INVESTIGATE_SPEED := 1.8
@@ -19,14 +20,21 @@ const CHASE_SPEED := 3.0
 const SIGHT_LIT := 14.0
 const SIGHT_FLASH := 18.0
 const SIGHT_DARK := 2.2
+const SIGHT_DARK_LOW := 1.3
+const SIGHT_LIT_LOW := 9.0
 const FOV_COS := 0.42
 const REACH := 1.2
+
+## Developer runs: he never notices Gordeev.
+static var blind := false
 
 var state := State.INACTIVE
 var store: Store
 var player: Player
 var parts: Dictionary
 var suspicion := 0.0
+## Told to go: he finishes any chase, then walks out through the storage door.
+var leaving := false
 
 var _path := PackedVector3Array()
 var _path_i := 0
@@ -77,6 +85,8 @@ func is_active() -> bool:
 func activate(pos: Vector3) -> void:
 	global_position = pos
 	visible = true
+	leaving = false
+	suspicion = 0.0
 	state = State.PATROL
 	_wait = 1.5
 	_path.clear()
@@ -87,8 +97,21 @@ func deactivate() -> void:
 	velocity = Vector3.ZERO
 
 
+## Walks back out through the storage door and is gone (emits `left`).
+func leave() -> void:
+	leaving = true
+	if state in [State.PATROL, State.INVESTIGATE, State.SEARCH]:
+		_start_leave()
+
+
+func _start_leave() -> void:
+	state = State.LEAVE
+	_go_to(store.killer_spawn)
+	_path.append(store.storage_inside)
+
+
 func hear(pos: Vector3, radius: float) -> void:
-	if state in [State.INACTIVE, State.CHASE, State.ATTACK]:
+	if state in [State.INACTIVE, State.CHASE, State.ATTACK, State.LEAVE]:
 		return
 	if global_position.distance_to(pos) > radius:
 		return
@@ -120,8 +143,17 @@ func _physics_process(delta: float) -> void:
 
 	var speed := 0.0
 	match state:
-		State.PATROL:
+		State.LEAVE:
 			if _path_done():
+				deactivate()
+				visible = false
+				left.emit()
+				return
+			speed = INVESTIGATE_SPEED
+		State.PATROL:
+			if leaving:
+				_start_leave()
+			elif _path_done():
 				_wait -= delta
 				if _wait <= 0.0:
 					_go_to(store.random_patrol_point())
@@ -135,6 +167,8 @@ func _physics_process(delta: float) -> void:
 				if _wait > 3.5:
 					state = State.PATROL
 					_wait = 1.0
+					if leaving:
+						_start_leave()
 			else:
 				speed = INVESTIGATE_SPEED
 		State.CHASE:
@@ -169,6 +203,8 @@ func _physics_process(delta: float) -> void:
 				if _wait > 5.0:
 					state = State.PATROL
 					_wait = 0.5
+					if leaving:
+						_start_leave()
 			else:
 				speed = INVESTIGATE_SPEED
 	_move(speed, delta)
@@ -190,16 +226,17 @@ func _dist_to_player() -> float:
 
 
 func _sees_player() -> bool:
-	if player.dead:
+	if player.dead or blind:
 		return false
 	var eye := global_position + Vector3(0, 1.7, 0)
-	var tgt := player.global_position + Vector3(0, 1.2, 0)
+	var tgt := player.global_position + Vector3(0, player.sight_height(), 0)
 	var d := eye.distance_to(tgt)
-	var limit := SIGHT_DARK
+	var low := player.crouching
+	var limit := SIGHT_DARK_LOW if low else SIGHT_DARK
 	if player.flashlight_on:
 		limit = SIGHT_FLASH
 	elif store.is_lit(player.global_position):
-		limit = SIGHT_LIT
+		limit = SIGHT_LIT_LOW if low else SIGHT_LIT
 	if d > limit:
 		return false
 	var to := tgt - eye

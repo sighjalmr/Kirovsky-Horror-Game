@@ -24,6 +24,8 @@ const H := 3.2  # ceiling height
 const TUBE_COLOR := Color(0.79, 0.84, 0.65)
 const WARM_COLOR := Color(1.0, 0.78, 0.5)
 const CLUE_CHEST := "A3"
+## The «Волга» headlights have to carry eight metres into the hall.
+const HEADLIGHT := 40.0
 
 ## Waypoints for the killer, on the floor plane (x, z).
 const NODES := {
@@ -54,6 +56,18 @@ var booth_rect := Rect2(7.0, 0.2, 4.8, 4.6)
 var duty_rect := Rect2(-2.5, 0.0, 5.0, 2.5)
 var phone_pos := Vector3(11.1, 0.9, 1.2)
 var killer_spawn := Vector3(9.0, 0, 27.3)
+## Behind the storage door, out of sight: where people go when they "leave" that way.
+var storage_inside := Vector3(9.0, 0, 29.6)
+## Just outside the glass doors, where people leaving by the front vanish.
+var street := Vector3(-1.0, 0, -4.0)
+var storage_open := false
+var front_open := false
+var car: Node3D
+
+var _car_lights: Array[SpotLight3D] = []
+var _engine: AudioStreamPlayer3D
+var _front_hinge: Node3D
+var _invoice: Node3D
 
 var _patrol_ids: Array[int] = []
 var _storage_hinge: Node3D
@@ -77,6 +91,8 @@ func box(pos: Vector3, size: Vector3, tex: String, tint := Color.WHITE, tex_m: V
 	mi.mesh = MeshFactory.box(size, tex_m, 0.5, faces)
 	mi.extra_cull_margin = 0.5  # flat floor and ceiling pieces need volume for spot light culling
 	mi.material_override = Mats.get_mat(tex, tint)
+	if tex == "glass":  # light from the street comes through the doors
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.position = pos
 	(parent if parent != null else self).add_child(mi)
 	if collide:
@@ -93,6 +109,12 @@ func box(pos: Vector3, size: Vector3, tex: String, tint := Color.WHITE, tex_m: V
 
 func add_interactable(id: String, pos: Vector3, prompt: String, radius := 1.4, needs_light := true, active := true) -> void:
 	interactables.append({"id": id, "pos": pos, "prompt": prompt, "radius": radius, "needs_light": needs_light, "active": active})
+
+
+func move_interactable(id: String, pos: Vector3) -> void:
+	for it in interactables:
+		if it.id == id:
+			it.pos = pos
 
 
 func set_interactable(id: String, active: bool, prompt := "") -> void:
@@ -131,11 +153,17 @@ func _build_shell() -> void:
 	for span: Vector2 in [Vector2(-12, -8), Vector2(-8, -4), Vector2(-4, -2), Vector2(2, 4), Vector2(4, 8), Vector2(8, 12)]:
 		box(Vector3((span.x + span.y) * 0.5, 0, -0.15), Vector3(span.y - span.x, H, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.PZ)
 	box(Vector3(0, 2.4, -0.15), Vector3(4, H - 2.4, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.PZ)
+	# The left leaf hangs on a hinge at x = -2 and swings out to the street.
+	_front_hinge = Node3D.new()
+	_front_hinge.position = Vector3(-2.0, 0, 0)
+	add_child(_front_hinge)
 	for x: float in [-1.0, 1.0]:
-		box(Vector3(x, 0, -0.03), Vector3(1.95, 2.4, 0.06), "glass", Color.WHITE, Vector2(1.95, 2.4), true, MeshFactory.PZ)
-		box(Vector3(x, 0.95, 0.03), Vector3(1.4, 0.05, 0.04), "chrome", Color.WHITE, 1.0, false)
+		var parent: Node3D = _front_hinge if x < 0.0 else self
+		var o := Vector3(1.0, 0, 0) if x < 0.0 else Vector3(x, 0, 0)
+		box(o + Vector3(0, 0, -0.03), Vector3(1.95, 2.4, 0.06), "glass", Color.WHITE, Vector2(1.95, 2.4), true, MeshFactory.PZ, parent)
+		box(o + Vector3(0, 0.95, 0.03), Vector3(1.4, 0.05, 0.04), "chrome", Color.WHITE, 1.0, false, MeshFactory.ALL, parent)
 		for bx: float in [-0.62, 0.62]:
-			box(Vector3(x + bx, 0.96, 0.01), Vector3(0.03, 0.03, 0.04), "chrome", Color.WHITE, 1.0, false)
+			box(o + Vector3(bx, 0.96, 0.01), Vector3(0.03, 0.03, 0.04), "chrome", Color.WHITE, 1.0, false, MeshFactory.ALL, parent)
 	for x: float in [-2.0, 0.0, 2.0]:
 		box(Vector3(x, 0, 0.0), Vector3(0.08, 2.4, 0.12), "chrome", Color(0.8, 0.8, 0.8))
 	box(Vector3(0, 2.4, 0.0), Vector3(4.1, 0.08, 0.12), "chrome", Color(0.8, 0.8, 0.8), 1.0, false)
@@ -143,6 +171,20 @@ func _build_shell() -> void:
 		Mats.get_mat("exit", Color.WHITE, Color(0.5, 0.8, 0.55))
 	box(Vector3(0, 2.5, 0.03), Vector3(0.64, 0.19, 0.04), "paint", Color(0.3, 0.3, 0.3), 1.0, false, MeshFactory.ALL & ~MeshFactory.PZ)
 	add_interactable("door_front", Vector3(0, 0, 0.4), "Подёргать дверь", 1.6, false)
+	_build_street()
+	# Only Gordeev is stopped at the storage doorway; the killer has keys.
+	var block := StaticBody3D.new()
+	block.collision_layer = 8
+	block.collision_mask = 0
+	var bs := CollisionShape3D.new()
+	var bb := BoxShape3D.new()
+	bb.size = Vector3(1.4, 2.2, 0.3)
+	bs.shape = bb
+	bs.position = Vector3(9.0, 1.1, 28.45)
+	block.add_child(bs)
+	add_child(block)
+	add_interactable("storage_door", Vector3(9.0, 0, 27.2), "Проверить дверь склада", 1.6)
+	_build_panel()
 	# Wall clock over the entrance, stopped at twenty to five.
 	var clock := MeshBuilder.Kit.new()
 	clock.b("clock").cylinder(Props.rot(Vector3.RIGHT, PI * 0.5, Vector3(3.2, 2.65, 0.0)), 0.18, 0.18, 0.04, 14,
@@ -199,6 +241,7 @@ func _build_booth() -> void:
 	add_child(lamp)
 	add_interactable("phone", Vector3(11.1, 0, 1.2), "Снять трубку", 1.3, false, false)
 	add_interactable("journal", Vector3(10.9, 0, 2.6), "Журнал обходов", 1.3, false)
+	add_interactable("chair", Vector3(10.2, 0, 2.2), "Сесть на стул и ждать", 0.9, false)
 
 
 func _build_checkout() -> void:
@@ -332,6 +375,76 @@ func _build_waypoints() -> void:
 		astar.connect_points(ids[e[0]], ids[e[1]])
 
 
+## Wet asphalt beyond the glass doors and the director's «Волга», dark
+## until its headlights come on.
+func _build_street() -> void:
+	box(Vector3(0, -0.12, -8.0), Vector3(28, 0.1, 15.6), "rubber", Color(0.9, 0.9, 0.9), 2.0, false, MeshFactory.PY)
+	box(Vector3(0, -0.02, -1.2), Vector3(6, 0.1, 2.0), "wall", Color(0.45, 0.45, 0.45), 2.0, false, MeshFactory.PY | MeshFactory.NZ)
+	car = Node3D.new()
+	car.position = Vector3(-14.0, 0, -9.0)
+	add_child(car)
+	var body := MeshBuilder.Kit.new()
+	var paint := body.b("paint", Color(0.12, 0.13, 0.15))
+	paint.box(Props.at(0, 0.25, 0), Vector3(1.8, 0.6, 4.7))
+	paint.box(Props.at(0, 0.85, 0.35), Vector3(1.6, 0.5, 2.4))
+	body.b("glass", Color(0.2, 0.25, 0.3, 0.5), Color.BLACK, Mats.GLASS).box(Props.at(0, 0.87, 0.35), Vector3(1.62, 0.44, 2.2))
+	body.b("chrome").box(Props.at(0, 0.3, -2.36), Vector3(1.4, 0.18, 0.04))
+	var rubber := body.b("rubber")
+	for o: Vector2 in [Vector2(-0.8, -1.4), Vector2(0.8, -1.4), Vector2(-0.8, 1.5), Vector2(0.8, 1.5)]:
+		rubber.cylinder(Props.rot(Vector3.BACK, PI * 0.5, Vector3(o.x, 0.33, o.y)), 0.33, 0.33, 0.2, 12)
+	body.build(car)
+	for sx: float in [-0.6, 0.6]:
+		var lamp := MeshBuilder.Kit.new()
+		lamp.b("white", Color.WHITE, Color(2.5, 2.3, 1.8)).cylinder(Props.rot(Vector3.RIGHT, -PI * 0.5, Vector3(sx, 0.45, -2.35)),
+			0.09, 0.09, 0.02, 12)
+		lamp.build(car, false)
+		var l := SpotLight3D.new()
+		l.position = Vector3(sx, 0.5, -2.4)
+		l.rotation.x = deg_to_rad(-4.0)
+		l.spot_range = 26.0
+		l.spot_angle = 32.0
+		l.light_energy = 0.0
+		l.light_color = Color(1.0, 0.92, 0.75)
+		l.shadow_enabled = sx < 0.0
+		car.add_child(l)
+		_car_lights.append(l)
+	car.rotation.y = -PI  # nose to the doors (-z of the car points at +z of the store)
+	car.visible = false
+	_engine = AudioStreamPlayer3D.new()
+	_engine.stream = Sfx.get_stream("engine")
+	_engine.bus = Sfx.BUS
+	_engine.max_distance = 40.0
+	_engine.unit_size = 6.0
+	_engine.volume_db = -6.0
+	car.add_child(_engine)
+
+
+## The fuse panel in the back passage: one knife switch per row of lamps.
+func _build_panel() -> void:
+	var kit := MeshBuilder.Kit.new()
+	var grey := kit.b("metal", Color(0.75, 0.78, 0.72))
+	grey.box(Props.at(-0.5, 1.0, 27.92), Vector3(0.7, 0.9, 0.16))
+	grey.box(Props.at(-0.5, 1.9, 27.97), Vector3(0.05, 1.3, 0.05))
+	var handle := kit.b("rubber")
+	for i in 6:
+		var x := -0.78 + i * 0.112
+		kit.b("white", Color(0.85, 0.8, 0.6)).box(Props.at(x, 1.62, 27.835), Vector3(0.08, 0.04, 0.004))
+		kit.b("chrome").box(Props.at(x, 1.3, 27.83), Vector3(0.02, 0.18, 0.02))
+		handle.box(Props.rot(Vector3.RIGHT, 0.5, Vector3(x, 1.2, 27.8)), Vector3(0.05, 0.03, 0.08))
+	kit.b("blood", Color(0.9, 0.2, 0.15)).box(Props.at(-0.5, 1.75, 27.835), Vector3(0.18, 0.12, 0.004))
+	kit.build(self)
+	add_interactable("panel", Vector3(-0.5, 0, 27.2), "Проверить электрощиток", 1.4)
+	# The delivery note Kovpak drops on his way out; shown after his visit.
+	_invoice = Node3D.new()
+	var paper := MeshBuilder.Kit.new()
+	paper.b("tags", Color(1.1, 1.1, 1.05)).box(Props.rot(Vector3.UP, 0.4, Vector3(9.5, 0.004, 26.6)), Vector3(0.15, 0.003, 0.21),
+		Color.WHITE, Rect2(0, 0, 0.5, 0.25))
+	paper.build(_invoice, false)
+	_invoice.visible = false
+	add_child(_invoice)
+	add_interactable("invoice", Vector3(9.5, 0, 26.6), "Поднять бумагу", 1.3, true, false)
+
+
 # --- runtime ------------------------------------------------------------------
 
 func is_lit(pos: Vector3) -> bool:
@@ -353,11 +466,16 @@ func lit_fraction() -> float:
 
 
 ## The row clicks, flickers three times and goes dark; the hum stops.
-func switch_off(i: int) -> void:
+## `instant` puts it out silently (restoring a saved shift).
+func switch_off(i: int, instant := false) -> void:
 	var row := rows[i]
 	if not row.lit:
 		return
 	row.lit = false
+	if instant:
+		_set_row_light(row, false)
+		row.hum.stop()
+		return
 	Sfx.play_3d(self, "click", row.center, -2.0)
 	var tw := create_tween()
 	for k in 3:
@@ -375,10 +493,138 @@ func _set_row_light(row: LightRow, on: bool) -> void:
 	row.tube_mat.set_shader_parameter("emission", row.tube_on if on else Color(0.02, 0.02, 0.02))
 
 
-func open_storage_door() -> void:
+## Morning: the row comes back on with a click and the hum.
+func switch_on(i: int) -> void:
+	var row := rows[i]
+	if row.lit:
+		return
+	row.lit = true
+	Sfx.play_3d(self, "click", row.center, -2.0)
+	var tw := create_tween()
+	for k in 2:
+		tw.tween_callback(_set_row_light.bind(row, true))
+		tw.tween_interval(0.06)
+		tw.tween_callback(_set_row_light.bind(row, false))
+		tw.tween_interval(0.2)
+	tw.tween_callback(_set_row_light.bind(row, true))
+	tw.tween_callback(row.hum.play)
+
+
+## Somebody switched a dark row on at the panel for a moment, then off.
+func flicker(i: int) -> void:
+	var row := rows[i]
+	Sfx.play_3d(self, "click", Vector3(-0.5, 1.3, 27.8), -4.0)
+	var tw := create_tween()
+	tw.tween_callback(_set_row_light.bind(row, true))
+	tw.tween_interval(0.08)
+	tw.tween_callback(_set_row_light.bind(row, false))
+	tw.tween_interval(0.15)
+	tw.tween_callback(_set_row_light.bind(row, true))
+	tw.tween_interval(0.9)
+	tw.tween_callback(func(): Sfx.play_3d(self, "click", Vector3(-0.5, 1.3, 27.8), -6.0, 0.9))
+	tw.tween_callback(_set_row_light.bind(row, false))
+
+
+func open_storage_door(instant := false) -> void:
+	storage_open = true
+	if instant:
+		_storage_hinge.rotation.y = deg_to_rad(-100)
+		return
 	Sfx.play_3d(self, "clank", Vector3(9, 1.2, 27.8), 2.0, 0.8)
 	create_tween().tween_property(_storage_hinge, "rotation:y", deg_to_rad(-100), 1.4) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func close_storage_door() -> void:
+	if not storage_open:
+		return
+	storage_open = false
+	var tw := create_tween()
+	tw.tween_property(_storage_hinge, "rotation:y", 0.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): Sfx.play_3d(self, "clank", Vector3(9, 1.2, 27.8), 4.0, 0.75))
+	tw.tween_interval(0.6)
+	tw.tween_callback(func(): Sfx.play_3d(self, "lock", Vector3(9, 1.0, 28.2), -2.0))
+
+
+## A key turns in the glass doors and the left leaf swings out (or back).
+func set_front_door(open: bool) -> void:
+	if open == front_open:
+		return
+	front_open = open
+	var tw := create_tween()
+	if open:
+		tw.tween_callback(func(): Sfx.play_3d(self, "lock", Vector3(-1, 1.0, -0.1), 0.0))
+		tw.tween_interval(0.9)
+	tw.tween_property(_front_hinge, "rotation:y", deg_to_rad(80.0) if open else 0.0, 1.1) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT if open else Tween.EASE_IN)
+	if not open:
+		tw.tween_callback(func(): Sfx.play_3d(self, "clank", Vector3(-1, 1.2, 0.0), -8.0, 1.4))
+		tw.tween_interval(0.4)
+		tw.tween_callback(func(): Sfx.play_3d(self, "lock", Vector3(-1, 1.0, -0.1), 0.0))
+
+
+## The «Волга» stands at the doors with its lights off (the prologue).
+func car_park() -> void:
+	car.visible = true
+	car.position = Vector3(-1.0, 0, -8.5)
+	car.rotation.y = -PI
+	for l in _car_lights:
+		l.light_energy = 0.0
+
+
+func car_start() -> void:
+	_engine.volume_db = -10.0
+	_engine.play()
+	var tw := create_tween().set_parallel()
+	for l in _car_lights:
+		tw.tween_property(l, "light_energy", HEADLIGHT, 0.6)
+
+
+## The «Волга» pulls up facing the doors, headlights through the glass.
+func car_arrive() -> void:
+	car.visible = true
+	car.position = Vector3(-14.0, 0, -8.5)
+	car.rotation.y = -PI * 0.5
+	_engine.play()
+	var tw := create_tween().set_parallel()
+	for l in _car_lights:
+		tw.tween_property(l, "light_energy", HEADLIGHT, 1.5)
+	tw.tween_property(car, "position", Vector3(-1.0, 0, -8.5), 5.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(car, "rotation:y", -PI, 5.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_callback(func(): _engine.volume_db = -14.0)
+
+
+## It backs away, the beams sweep across the hall and are gone.
+func car_leave() -> void:
+	_engine.volume_db = -4.0
+	if not _engine.playing:
+		_engine.play()
+	var tw := create_tween().set_parallel()
+	tw.tween_property(car, "rotation:y", -PI * 0.5, 4.0).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(car, "position", Vector3(16.0, 0, -9.5), 6.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	for l in _car_lights:
+		tw.tween_property(l, "light_energy", 0.0, 5.0).set_delay(1.0)
+	tw.tween_property(_engine, "volume_db", -40.0, 7.0)
+	tw.chain().tween_callback(func():
+		_engine.stop()
+		car.visible = false)
+
+
+func show_invoice() -> void:
+	_invoice.visible = true
+	set_interactable("invoice", true)
+
+
+func hide_invoice() -> void:
+	_invoice.visible = false
+	set_interactable("invoice", false)
+
+
+## Floor path between two points through the aisle waypoints.
+func route(from: Vector3, to: Vector3) -> PackedVector3Array:
+	var pts := astar.get_point_path(closest_node(from), closest_node(to))
+	pts.append(Vector3(to.x, 0, to.z))
+	return pts
 
 
 func lift_cloth(id: String) -> void:

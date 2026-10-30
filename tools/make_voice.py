@@ -12,7 +12,8 @@ voice/<id>.ogg (same ids) and run this with --index-only.
 
     pip install torch
     curl -O https://models.silero.ai/models/tts/ru/v5_5_ru.pt
-    python tools/make_voice.py --silero v5_5_ru.pt --speaker eugene --pace 1.12
+    python tools/make_voice.py --silero v5_5_ru.pt
+    python tools/make_voice.py --silero v5_5_ru.pt --only p_kovpak_ask m_vasya
 
     pip install piper-tts
     python tools/make_voice.py --model path/to/ru_RU-dmitri-medium.onnx
@@ -48,6 +49,9 @@ FX = {
     # Said aloud into the phone at the post: more of the hall around him.
     "aloud": "highpass=f=110,acompressor=threshold=-18dB:ratio=3:attack=5:release=150,"
              "aecho=0.8:0.4:45|90|140:0.18|0.12|0.07",
+    # Shouted through the plate glass of the front door from the street.
+    "glass": "highpass=f=180,lowpass=f=2800,acompressor=threshold=-18dB:ratio=3:attack=5:release=150,"
+             "aecho=0.8:0.3:30|70:0.15|0.08",
 }
 
 
@@ -101,7 +105,7 @@ def synth_silero(voice, line: dict, raw: Path, pace: float) -> int:
     return rate
 
 
-def render(voice, line: dict, out: Path, pitch: float, pace: float) -> None:
+def render(voice, line: dict, out: Path, pitch: float, pace: float, age: bool = True) -> None:
     with tempfile.TemporaryDirectory() as tmp:
         raw = Path(tmp) / "raw.wav"
         if isinstance(voice, tuple):
@@ -111,7 +115,7 @@ def render(voice, line: dict, out: Path, pitch: float, pace: float) -> None:
             rate = synth_piper(voice, line, raw, pace)
             slow = f"atempo={1 / pitch:.4f}"
         chain = (f"asetrate={rate * pitch:.0f},aresample={rate},{slow},"
-                 f"{AGE}{FX[line.get('fx', 'inner')]},"
+                 f"{AGE if age else ''}{FX[line.get('fx', 'inner')]},"
                  "adelay=120,apad=pad_dur=0.25,aresample=44100")
         dry = Path(tmp) / "dry.wav"
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(raw), "-af", chain, "-ac", "1", str(dry)],
@@ -127,9 +131,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="Piper .onnx voice for Гордеев")
     ap.add_argument("--silero", help="Silero ru v5 .pt model instead of Piper")
-    ap.add_argument("--speaker", default="eugene", help="Silero speaker: eugene (chosen) or aidar")
-    ap.add_argument("--pitch", type=float, default=0.86, help="below 1 is lower and older")
-    ap.add_argument("--pace", type=float, default=1.22, help="above 1 is slower")
+    ap.add_argument("--speaker", help="Silero speaker for every line (default: each character's own, "
+                    "see characters.*.tts in script.json)")
+    ap.add_argument("--pitch", type=float, help="below 1 is lower and older (default: per character)")
+    ap.add_argument("--pace", type=float, help="above 1 is slower (default: per character)")
     ap.add_argument("--only", nargs="*", help="line ids to redo")
     ap.add_argument("--out", help="write the takes here instead of voice/ (auditions)")
     ap.add_argument("--index-only", action="store_true", help="just rebuild index.json from the .ogg files")
@@ -141,17 +146,22 @@ def main() -> None:
             import torch
             model = torch.package.PackageImporter(args.silero).load_pickle("tts_models", "model")
             torch.set_num_threads(4)
-            voice = (model, args.speaker)
         else:
             from piper import PiperVoice
-            voice = PiperVoice.load(args.model)
+            piper = PiperVoice.load(args.model)
         for line in script["lines"]:
             if args.only and line["id"] not in args.only:
                 continue
+            # Гордеев is the default; Ковпак, Тамара Ивановна, Вася have their own voices.
+            tts = script["characters"].get(line.get("who", "gordeev"), {}).get("tts", {})
+            speaker = args.speaker or tts.get("speaker", "eugene")
+            pitch = args.pitch or tts.get("pitch", 0.86)
+            pace = args.pace or tts.get("pace", 1.12)
+            voice = (model, speaker) if args.silero else piper
             out = Path(args.out) if args.out else VOICE
             out.mkdir(parents=True, exist_ok=True)
-            render(voice, line, out / f"{line['id']}.ogg", args.pitch, args.pace)
-            print(line["id"])
+            render(voice, line, out / f"{line['id']}.ogg", pitch, pace, tts.get("age", True))
+            print(line["id"], speaker)
 
     index = {}
     for line in script["lines"]:
