@@ -2,7 +2,7 @@ class_name Characters
 extends RefCounted
 
 ## Who is who in the store, and the things they wear or carry that the
-## photographed avatars (Person) do not have: Kovpak's muskrat hat and
+## photographed avatars (Person) do not have: Kovpak's spectacles and
 ## briefcase, Vasya's cap, the women's handbags, the killer's knitted hat,
 ## the scarf over his face and his cleaver. Everything here is built in the
 ## person's own space (+Y up, -Z forward) around the bone it hangs from.
@@ -11,7 +11,7 @@ const NO_RECT := Rect2()
 
 ## name -> [avatar in models/people, woman, hat, bag]
 const CAST := {
-	"kovpak": ["kovpak", false, "fur", "briefcase"],
+	"kovpak": ["kovpak", false, "glasses", "briefcase"],
 	"tamara": ["tamara", true, "", "handbag"],
 	"tamara_day": ["tamara", true, "", ""],
 	"vasya": ["vasya", false, "cap", ""],
@@ -27,6 +27,8 @@ static func build(role: String) -> Person:
 	var c: Array = CAST[role]
 	var p := Person.new().setup(c[0], c[1])
 	match c[2]:
+		"glasses":
+			p.attach("Bip01 Head", glasses())
 		"fur":
 			# A tall muskrat hat, the badge of a director.
 			var k := MeshBuilder.Kit.new()
@@ -86,6 +88,36 @@ static func build_killer() -> Person:
 		Rect2(0.3, 0.3, 0.4, 0.4))
 	p.attach("Bip01 R Hand", _built(ck))
 	return p
+
+
+## Heavy Soviet spectacles: a dark tortoiseshell top bar over thin
+## metal rims, a bridge across the nose and temples back to the ears.
+## Built round the eyes, which sit 0.085 m above the head bone.
+static func glasses() -> Node3D:
+	var k := MeshBuilder.Kit.new()
+	k.ao = false
+	var top := k.b("leather", Color(0.16, 0.11, 0.08))
+	var rim := k.b("chrome", Color(0.55, 0.5, 0.45))
+	var lens := k.b("white", Color(0.85, 0.9, 0.9, 0.12), Color.BLACK, Mats.GLASS)
+	const Y := 0.09
+	const Z := -0.128
+	for side: float in [-1.0, 1.0]:
+		var cx := side * 0.033
+		# The lens plane turns a little round the face.
+		var xf := Props.rot(Vector3.UP, -side * 0.12, Vector3(cx, Y, Z))
+		top.box(xf * Props.at(0, 0.013, 0), Vector3(0.054, 0.009, 0.006))
+		rim.box(xf * Props.at(0, -0.019, 0), Vector3(0.05, 0.003, 0.003))
+		rim.box(xf * Props.at(-0.026, -0.018, 0), Vector3(0.003, 0.033, 0.003))
+		rim.box(xf * Props.at(0.026, -0.018, 0), Vector3(0.003, 0.033, 0.003))
+		lens.box(xf * Props.at(0, -0.017, 0), Vector3(0.05, 0.031, 0.002))
+		# Temple: from the outer corner of the frame back over the ear.
+		var a := Vector3(side * 0.062, Y + 0.012, Z + 0.01)
+		var b := Vector3(side * 0.074, Y + 0.008, -0.02)
+		var mid := (a + b) * 0.5
+		var temple := Transform3D(Basis.looking_at(b - a, Vector3.UP), mid)
+		top.box(temple, Vector3(0.004, 0.006, a.distance_to(b)))
+	rim.box(Props.at(0, Y + 0.004, Z - 0.003), Vector3(0.018, 0.004, 0.004))
+	return _built(k)
 
 
 ## A carton held against the chest in both arms (Kovpak's night visit).
