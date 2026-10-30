@@ -241,19 +241,33 @@ static func aisle_sign(parent: Node3D, pos: Vector3, text: String, ceiling: floa
 	kit.build(parent, false)
 
 
-## Two-tube fluorescent fitting under the ceiling; the tubes use the row's
+## Two-tube fluorescent fitting (ЛПО) under the ceiling: a sheet-steel
+## body with sloped reflector sides, end caps with the tube holders, a grid of
+## white louvres under the tubes, dead flies in it. The tubes use the row's
 ## shared material so the whole row switches together.
 static func fixture(parent: Node3D, pos: Vector3, tube_mat: Material) -> void:
 	var kit := MeshBuilder.Kit.new()
-	var body := kit.b("paint", Color(0.85, 0.87, 0.85))
+	var body := kit.b("paint", Color(0.86, 0.87, 0.84))
 	body.box(at(pos.x, pos.y, pos.z), Vector3(0.3, 0.07, 1.3))
-	for sx: float in [-0.15, 0.15]:
-		kit.b("chrome").box(at(pos.x + sx, pos.y - 0.05, pos.z), Vector3(0.01, 0.05, 1.28))
-	for sz: float in [-0.63, 0.63]:
-		body.box(at(pos.x, pos.y - 0.05, pos.z + sz), Vector3(0.3, 0.05, 0.03))
+	for sx: float in [-1.0, 1.0]:
+		body.box(rot(Vector3.BACK, -sx * 0.5, Vector3(pos.x + sx * 0.14, pos.y - 0.06, pos.z)), Vector3(0.008, 0.08, 1.28))
+	for sz: float in [-0.635, 0.635]:
+		body.box(at(pos.x, pos.y - 0.08, pos.z + sz), Vector3(0.34, 0.08, 0.03))
+		kit.b("white", Color(0.75, 0.73, 0.68)).box(at(pos.x, pos.y - 0.05, pos.z + sz * 0.97), Vector3(0.16, 0.03, 0.02))
+	var louvre := kit.b("paint", Color(0.92, 0.92, 0.9))
+	for sx: float in [-0.165, 0.165]:
+		louvre.box(at(pos.x + sx, pos.y - 0.085, pos.z), Vector3(0.01, 0.035, 1.24))
+	var k := -0.56
+	while k < 0.57:
+		louvre.box(at(pos.x, pos.y - 0.085, pos.z + k), Vector3(0.33, 0.035, 0.006))
+		k += 0.08
+	var flies := kit.b("white", Color(0.05, 0.04, 0.03))
+	for f in 5:
+		var h := float((int(pos.x * 13.0 + pos.z * 7.0) + f * 37) % 100) / 100.0
+		flies.box(at(pos.x - 0.1 + h * 0.2, pos.y - 0.088, pos.z - 0.5 + fmod(h * 7.3, 1.0)), Vector3(0.01, 0.003, 0.006))
 	var tubes := kit.custom(tube_mat)
 	for sx: float in [-0.06, 0.06]:
-		tubes.cylinder(rot(Vector3.RIGHT, PI * 0.5, pos + Vector3(sx, -0.03, -0.6)), 0.017, 0.017, 1.2, 6,
+		tubes.cylinder(rot(Vector3.RIGHT, PI * 0.5, pos + Vector3(sx, -0.035, -0.6)), 0.013, 0.013, 1.2, 8,
 			Color.WHITE, FULL, NO_RECT, false, false, false)
 	kit.build(parent, false)
 
@@ -435,7 +449,7 @@ static func booth(parent: Node3D, rect: Rect2) -> void:
 	green.cylinder(at(11.45, 0.76, 1.65), 0.05, 0.045, 0.3, 8, Color(0.6, 0.7, 1.0))
 	ch.cylinder(at(11.0, 0.76, 1.7), 0.035, 0.04, 0.1, 8, Color.WHITE)
 	# Calendar on the wall and a shelf of key boards.
-	kit.b("calendar").box(at(11.995, 1.25, 3.7), Vector3(0.008, 0.6, 0.4), Color.WHITE, FULL, Vector2.ONE, MeshFactory.NX)
+	kit.b("calendar").box(at(11.96, 1.25, 3.7), Vector3(0.008, 0.6, 0.4), Color.WHITE, FULL, Vector2.ONE, MeshFactory.NX)
 	dark.box(at(11.93, 1.5, 1.3), Vector3(0.12, 0.5, 0.7))
 	for i in 6:
 		ch.box(at(11.86, 1.82 - (i / 3) * 0.2, 1.08 + (i % 3) * 0.22), Vector3(0.01, 0.07, 0.006))

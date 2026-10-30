@@ -75,6 +75,7 @@ var _storage_hinge: Node3D
 
 func _ready() -> void:
 	_build_shell()
+	_dress_walls()
 	_build_entrance()
 	_build_booth()
 	_build_checkout()
@@ -128,11 +129,14 @@ func set_interactable(id: String, active: bool, prompt := "") -> void:
 # --- layout -------------------------------------------------------------------
 
 func _build_shell() -> void:
+	# Floor tiles of 33 cm and ceiling tiles of 67 cm: whole numbers of them
+	# to each 4 m piece, so the grid runs on unbroken across the pieces.
 	for cx in range(-12, 12, 4):
 		for cz in range(0, 28, 4):
-			box(Vector3(cx + 2, -0.1, cz + 2), Vector3(4, 0.1, 4), "floor", Color.WHITE, 1.2, false, MeshFactory.PY)
-			box(Vector3(cx + 2, H, cz + 2), Vector3(4, 0.1, 4), "ceiling", Color.WHITE, 1.2, false, MeshFactory.NY)
-	var wall_m := Vector2(3.2, H)
+			box(Vector3(cx + 2, -0.1, cz + 2), Vector3(4, 0.1, 4), "floor", Color.WHITE, 4.0 / 3.0, false, MeshFactory.PY)
+			box(Vector3(cx + 2, H, cz + 2), Vector3(4, 0.1, 4), "ceiling", Color.WHITE, 4.0 / 3.0, false,
+				MeshFactory.NY).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
+	var wall_m := Vector2(2.0, H)
 	for cz in range(0, 28, 4):
 		box(Vector3(-12.15, 0, cz + 2), Vector3(0.3, H, 4), "wall", Color.WHITE, wall_m, true, MeshFactory.PX)
 		box(Vector3(12.15, 0, cz + 2), Vector3(0.3, H, 4), "wall", Color.WHITE, wall_m, true, MeshFactory.NX)
@@ -149,10 +153,21 @@ func _build_shell() -> void:
 	add_child(_storage_hinge)
 	box(Vector3(0.6, 0, 0), Vector3(1.2, 2.2, 0.06), "door", Color.WHITE, Vector2(1.2, 2.2), true, MeshFactory.ALL, _storage_hinge)
 	box(Vector3(1.05, 1.0, -0.06), Vector3(0.12, 0.03, 0.04), "chrome", Color.WHITE, 1.0, false, MeshFactory.ALL, _storage_hinge)
-	# Front wall with the glass doors at x -2..2.
-	for span: Vector2 in [Vector2(-12, -8), Vector2(-8, -4), Vector2(-4, -2), Vector2(2, 4), Vector2(4, 8), Vector2(8, 12)]:
-		box(Vector3((span.x + span.y) * 0.5, 0, -0.15), Vector3(span.y - span.x, H, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.PZ)
-	box(Vector3(0, 2.4, -0.15), Vector3(4, H - 2.4, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.PZ)
+	# Front wall with the glass doors at x -2..2 and the shop window at
+	# x 2.3..6.8. The street lamp outside throws shadows, so the front wall
+	# blocks light from both sides.
+	var front: Array[MeshInstance3D] = []
+	for span: Vector2 in [Vector2(-12, -8), Vector2(-8, -4), Vector2(-4, -2), Vector2(8, 12)]:
+		front.append(box(Vector3((span.x + span.y) * 0.5, 0, -0.15), Vector3(span.y - span.x, H, 0.3), "wall", Color.WHITE,
+			wall_m, true, MeshFactory.PZ))
+	front.append(box(Vector3(2.15, 0, -0.15), Vector3(0.3, H, 0.3), "wall", Color.WHITE, wall_m, true,
+		MeshFactory.PZ | MeshFactory.PX))
+	front.append(box(Vector3(7.4, 0, -0.15), Vector3(1.2, H, 0.3), "wall", Color.WHITE, wall_m, true,
+		MeshFactory.PZ | MeshFactory.NX))
+	front.append(box(Vector3(0, 2.4, -0.15), Vector3(4, H - 2.4, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.PZ))
+	_build_shop_window(front)
+	for mi in front:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 	# The left leaf hangs on a hinge at x = -2 and swings out to the street.
 	_front_hinge = Node3D.new()
 	_front_hinge.position = Vector3(-2.0, 0, 0)
@@ -191,8 +206,49 @@ func _build_shell() -> void:
 		Color.WHITE, Rect2(0, 0.45, 1, 0.1), Props.FULL)
 	clock.build(self, false)
 	# Posters.
-	box(Vector3(-6, 1.0, 27.98), Vector3(1.2, 1.5, 0.02), "poster_tomato", Color.WHITE, Vector2(1.2, 1.5), false, MeshFactory.NZ)
-	box(Vector3(-11.98, 1.1, 9.4), Vector3(0.02, 1.5, 1.2), "poster_bread", Color.WHITE, Vector2(1.2, 1.5), false, MeshFactory.PX)
+	box(Vector3(-6, 1.0, 27.955), Vector3(1.2, 1.5, 0.02), "poster_tomato", Color.WHITE, Vector2(1.2, 1.5), false, MeshFactory.NZ)
+	box(Vector3(-11.955, 1.1, 9.4), Vector3(0.02, 1.5, 1.2), "poster_bread", Color.WHITE, Vector2(1.2, 1.5), false, MeshFactory.PX)
+
+
+## Tiles and skirting on every wall face, the radiators, the fire board in
+## the back passage, the customers' notice board by the entrance.
+func _dress_walls() -> void:
+	Fittings.wall_run(self, Vector3(-12, 0, 0), Vector3(-12, 0, 28), Vector3.RIGHT)
+	Fittings.wall_run(self, Vector3(12, 0, 0), Vector3(12, 0, 28), Vector3.LEFT)
+	Fittings.wall_run(self, Vector3(-12, 0, 28), Vector3(8.32, 0, 28), Vector3.FORWARD)
+	Fittings.wall_run(self, Vector3(9.68, 0, 28), Vector3(12, 0, 28), Vector3.FORWARD)
+	Fittings.wall_run(self, Vector3(-12, 0, 0), Vector3(-2.04, 0, 0), Vector3.BACK)
+	Fittings.wall_run(self, Vector3(2.04, 0, 0), Vector3(2.3, 0, 0), Vector3.BACK)
+	Fittings.wall_run(self, Vector3(6.8, 0, 0), Vector3(12, 0, 0), Vector3.BACK)
+	Fittings.radiator(self, Vector3(-12, 0, 5.6), Vector3.RIGHT, 12)
+	Fittings.radiator(self, Vector3(12, 0, 6.4), Vector3.LEFT, 10)
+	Fittings.fire_board(self, Vector3(-9.6, 0.55, 28), Vector3.FORWARD)
+	Fittings.notice_board(self, Vector3(-12, 0, 3.4), Vector3.RIGHT)
+
+
+## The shop window between the doors and the guard booth: a tiled sill wall,
+## three panes in aluminium frames, a wide windowsill inside.
+func _build_shop_window(front: Array[MeshInstance3D]) -> void:
+	var x0 := 2.3
+	var x1 := 6.8
+	var w := x1 - x0
+	var cx := (x0 + x1) * 0.5
+	var sill := 0.9
+	var top := 2.8
+	front.append(box(Vector3(cx, 0, -0.15), Vector3(w, sill, 0.3), "kafel", Color.WHITE, Fittings.TILE_M, true,
+		MeshFactory.PZ))
+	box(Vector3(cx, 0, 0.012), Vector3(w, Fittings.SKIRT, 0.024), "paint", Fittings.SKIRT_COLOR, 0.6, false,
+		MeshFactory.PZ | MeshFactory.PY)
+	front.append(box(Vector3(cx, top, -0.15), Vector3(w, H - top, 0.3), "wall", Color.WHITE, Vector2(2.0, H), true,
+		MeshFactory.PZ | MeshFactory.NY))
+	box(Vector3(cx, sill - 0.04, 0.0), Vector3(w + 0.1, 0.04, 0.34), "formica", Color(0.85, 0.85, 0.8), 0.6, false)
+	box(Vector3(cx, sill, -0.2), Vector3(w, top - sill, 0.02), "white", Color(0.55, 0.62, 0.66, 0.14), 1.0, true,
+		MeshFactory.PZ).material_override = Mats.get_mat("white", Color(0.55, 0.62, 0.66, 0.14), Color.BLACK, Mats.GLASS)
+	var frame := Color(0.62, 0.63, 0.62)
+	for x: float in [x0 + 0.03, x0 + w / 3.0, x0 + w * 2.0 / 3.0, x1 - 0.03]:
+		box(Vector3(x, sill, -0.2), Vector3(0.06, top - sill, 0.1), "chrome", frame, 1.0, false)
+	for y: float in [sill, top - 0.06, 2.2]:
+		box(Vector3(cx, y, -0.2), Vector3(w, 0.06, 0.1), "chrome", frame, 1.0, false)
 
 
 func _build_entrance() -> void:
@@ -261,11 +317,14 @@ func _build_checkout() -> void:
 func _build_hall() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1988
-	# Three gondolas and two wall runs, in segments of 3.25 m.
+	# Three gondolas, each broken in the middle by a column of the building's
+	# 6 m grid (segments of 3.125 m), and two wall runs in segments of 3.25 m.
 	var sides := {-6.0: ["zamorozka", "bakaleya"], 0.0: ["bakaleya", "konservy"], 6.0: ["konservy", "moloko"]}
+	var seg_z := [12.0, 15.125, 18.75, 21.875]
 	for x: float in sides:
 		for k in 4:
-			Props.gondola(self, rng, Vector3(x, 0, 12.0 + k * 3.25 + 1.625), 3.25, sides[x], k == 0, k == 3)
+			Props.gondola(self, rng, Vector3(x, 0, seg_z[k] + 1.5625), 3.125, sides[x], k == 0 or k == 2, k == 1 or k == 3)
+		Fittings.column(self, Vector3(x, 0, 18.5), H, 0.45)
 	for k in 4:
 		Props.wall_shelf(self, rng, Vector3(-11.6, 0, 12.0 + k * 3.25 + 1.625), 3.25, 1.0, "zamorozka")
 		Props.wall_shelf(self, rng, Vector3(11.6, 0, 12.0 + k * 3.25 + 1.625), 3.25, -1.0, "moloko")
@@ -275,6 +334,12 @@ func _build_hall() -> void:
 	for s: Array in [[-3.0, "БАКАЛЕЯ"], [3.0, "КОНСЕРВЫ"], [8.85, "МОЛОКО"], [-8.85, "ЗАМОРОЗКА"]]:
 		Props.aisle_sign(self, Vector3(s[0], 2.45, 12.6), s[1], H)
 	Props.clutter(self, rng)
+	# Under the ceiling: three air ducts over the gondolas and one across,
+	# a tile fallen out of the grid over бакалея.
+	for x: float in [-6.0, 0.0, 6.0]:
+		Fittings.duct(self, x, 10.05, 25.6 if x == 0.0 else 27.85, H)
+	Fittings.duct_x(self, 10.3, -6.25, 6.25, H)
+	Fittings.fallen_tile(self, Vector3(-3.0, 0, 21.667), H)
 	# Freezer chests under cloths: aisle A (x -8.85) and aisle D (x 8.85).
 	for side in [["A", -8.85], ["D", 8.85]]:
 		for k in 4:
@@ -380,6 +445,7 @@ func _build_waypoints() -> void:
 func _build_street() -> void:
 	box(Vector3(0, -0.12, -8.0), Vector3(28, 0.1, 15.6), "rubber", Color(0.9, 0.9, 0.9), 2.0, false, MeshFactory.PY)
 	box(Vector3(0, -0.02, -1.2), Vector3(6, 0.1, 2.0), "wall", Color(0.45, 0.45, 0.45), 2.0, false, MeshFactory.PY | MeshFactory.NZ)
+	Fittings.street_lamp(self, Vector3(4.2, 0, -7.0), Vector3(4.4, 0, 1.2))
 	car = Node3D.new()
 	car.position = Vector3(-14.0, 0, -9.0)
 	add_child(car)

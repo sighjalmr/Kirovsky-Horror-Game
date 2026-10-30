@@ -66,6 +66,11 @@ class Tex:
         self.a[..., :3] = color[:3]
         self.a[..., 3] = 1.0 if len(color) < 4 else color[3]
         self.rng = np.random.default_rng(seed)
+        # Optional relief (0..1, high is raised) and roughness (0 glossy..1 matt)
+        # maps. A texture that fills `relief` gets its normal map from it instead of
+        # from the brightness; one that fills `rough` also gets <name>_r.png.
+        self.relief = None
+        self.rough = None
 
     # Value noise, seamless, 0..1. `scale` is the size of the biggest blobs in px.
     def noise(self, scale, octaves=4, persist=0.5, w=None, h=None):
@@ -209,8 +214,23 @@ class Tex:
             img = img.convert("RGB")
         path = os.path.join(OUT, name + ".png")
         img.save(path, optimize=True)
+        write_import(path, IMPORT.format(name=name))
+        if self.relief is not None:
+            HEIGHTS[name] = self.relief
+        if self.rough is not None:
+            rp = os.path.join(OUT, name + "_r.png")
+            Image.fromarray((np.clip(self.rough, 0, 1) * 255 + 0.5).astype(np.uint8), "L").save(rp, optimize=True)
+            write_import(rp, IMPORT.format(name=name + "_r"))
+
+
+HEIGHTS = {}
+
+
+def write_import(path, text):
+    """Import settings for a new PNG; an existing .import keeps its uid."""
+    if not os.path.exists(path + ".import"):
         with open(path + ".import", "w") as f:
-            f.write(IMPORT.format(name=name))
+            f.write(text)
 
 
 def rgb8(c):
@@ -234,117 +254,313 @@ def T(w, h, color, name):
 
 # --- surfaces -----------------------------------------------------------------
 
-def floor(name):
-    """Soviet ceramic floor: 4×4 tiles of 30 cm in a checkerboard, terrazzo
-    specks, bevelled edges, dirty grout, chipped corners, cracks, grime."""
-    t = T(512, 512, (0.2, 0.19, 0.16), name)
-    grout = t.noise(40, 3)
-    t.shade(grout, 0.7, 1.15)
-    fine = t.noise(8, 3)
-    for ty in range(4):
-        for tx in range(4):
-            light = (tx + ty) % 2 == 0
-            v = (t.rng.random() - 0.5) * 0.06
-            base = np.array((0.66 + v, 0.62 + v, 0.53 + v) if light else (0.42 + v, 0.4 + v, 0.36 + v))
-            x, y = tx * 128 + 3, ty * 128 + 3
-            t.rect(x, y, 122, 122, base)
-            t.mul(0.93 + fine * 0.12, (x, y, 122, 122))
-            # Terrazzo chips: small dark and light flecks.
-            for _ in range(260):
-                px, py = x + t.rng.integers(2, 118), y + t.rng.integers(2, 118)
-                s = t.rng.integers(1, 4)
-                c = base * (0.55 + t.rng.random() * 0.25) if t.rng.random() < 0.65 else np.minimum(base * 1.3, 1)
-                t.rect(px, py, s, s, c)
-            t.bevel(x, y, 122, 122, 4, np.minimum(base * 1.25, 1), base * 0.55, 0.5)
-            if t.rng.random() < 0.35:  # chipped corner
-                cx = x + (0 if t.rng.random() < 0.5 else 110)
-                cy = y + (0 if t.rng.random() < 0.5 else 110)
-                img, d = t.layer()
-                d.polygon([(cx, cy), (cx + 12, cy + 1), (cx + 3, cy + 10)], fill=rgb8((0.22, 0.2, 0.17)))
-                t.over(img)
-    t.cracks(4, 40, (0.14, 0.13, 0.11), 2, 0.7)
-    t.shade(t.noise(256, 4), 0.78, 1.06)
-    t.stain(t.noise(160, 4), 0.6, (0.27, 0.23, 0.17), 0.5)
-    t.stain(t.noise(30, 3), 0.75, (0.22, 0.2, 0.16), 0.3)
-    t.grain(0.015)
-    t.save(name)
+def grime(t, scale):
+    """Dirt that does not look like clouds: broad noise broken up by fine
+    noise, so the stain edges fray."""
+    n = t.noise(scale, 6, 0.6) * 0.75 + t.noise(max(3, scale / 8), 3) * 0.25
+    n -= n.min()
+    return n / max(n.max(), 1e-6)
 
 
-def wall(name):
-    """Whitewash above, oil-painted green panel below with chips and scuffs,
-    a dark dividing stripe, a brown skirting board on the floor."""
-    t = T(512, 512, (0.72, 0.71, 0.65), name)
-    top = (0, 0, 512, 272)
-    t.shade(t.noise(200, 5), 0.82, 1.05, top)
-    t.stain(t.noise(120, 4), 0.62, (0.52, 0.45, 0.32), 0.55, top)
-    # Water streaks running down from the ceiling.
+def smooth(x):
+    x = np.clip(x, 0, 1)
+    return x * x * (3 - 2 * x)
+
+
+def tile_grid(t, cols, rows, gap, bevel, tilt=0.0, ox=0, oy=0):
+    """Per-pixel tile index, distance to the tile edge (px) and a relief map:
+    grout at 0, tile faces at ~1 with rounded edges and each tile sitting a
+    little crooked. The grid may be offset (ox, oy px) and wraps round."""
+    yy, xx = np.mgrid[0:t.h, 0:t.w].astype(np.float32)
+    tw, th = t.w / cols, t.h / rows
+    gx, gy = (xx - ox) % t.w, (yy - oy) % t.h
+    ix, iy = (gx // tw).astype(int), (gy // th).astype(int)
+    lx, ly = gx - ix * tw, gy - iy * th
+    d = np.minimum(np.minimum(lx, tw - 1 - lx), np.minimum(ly, th - 1 - ly)) - gap * 0.5
+    idx = iy * cols + ix
+    sx = t.rng.normal(0, tilt, cols * rows).astype(np.float32)
+    sy = t.rng.normal(0, tilt, cols * rows).astype(np.float32)
+    lift = t.rng.normal(0, tilt * 4, cols * rows).astype(np.float32)
+    face = 1.0 + sx[idx] * (lx / tw - 0.5) + sy[idx] * (ly / th - 0.5) + lift[idx]
+    h = np.where(d < 0, 0.0, face * (0.55 + 0.45 * smooth(d / max(bevel, 1e-3))))
+    return idx, d, h.astype(np.float32)
+
+
+def scuffs(t, count, region, color, opacity, width=(1, 3), length=(6, 26), angle=None):
+    """Black heel and trolley-wheel marks: short curved strokes."""
     img, d = t.layer()
-    for _ in range(14):
-        x = t.rng.random() * 512
-        ln = 40 + t.rng.random() * 200
-        for k in range(int(ln)):
-            a = int(90 * (1 - k / ln))
-            d.point((x + np.sin(k * 0.05) * 2, k), fill=(120, 105, 80, a))
-    t.over(img, 1.0, 1.2)
-    t.rect(0, 272, 512, 12, (0.12, 0.19, 0.15))
-    t.rect(0, 284, 512, 204, (0.21, 0.36, 0.28))
-    paint = (0, 284, 512, 204)
-    t.shade(t.noise(90, 4), 0.85, 1.12, paint)
-    # Gloss streaks of the brush.
-    t.lines(220, 60, (0.3, 0.46, 0.37), 1, 0.25, paint, 0.0, 0.1)
-    # Chips down to the plaster, with a dark rim.
-    chips = t.blob_mask(7, 2, 9, (0, 290, 512, 190), 1.2) > 0.35
-    rim = blurred(chips.astype(np.float32), 1.0) > 0.08
-    t.mix((0.14, 0.2, 0.16), (rim & ~chips) * 0.6, paint)
-    t.mix((0.55, 0.53, 0.46), chips * 0.85, paint)
-    # Scuffs from trolleys and boots near the floor.
-    t.lines(60, 50, (0.07, 0.09, 0.08), 2, 0.45, (0, 420, 480, 60), 0.0, 0.25)
-    t.rect(0, 488, 512, 24, (0.28, 0.18, 0.11))
-    t.rect(0, 488, 512, 3, (0.42, 0.3, 0.19))
-    t.shade(t.noise(40, 3), 0.85, 1.1, (0, 488, 512, 24))
+    x0, y0, w, h = region
+    for _ in range(count):
+        px, py = x0 + t.rng.random() * w, y0 + t.rng.random() * h
+        a = t.rng.random() * np.pi * 2 if angle is None else angle + (t.rng.random() - 0.5) * 0.3
+        ln = length[0] + t.rng.random() * (length[1] - length[0])
+        bend = (t.rng.random() - 0.5) * 0.12
+        pts = []
+        for k in range(8):
+            pts.append((px, py))
+            a += bend
+            px += np.cos(a) * ln / 8
+            py += np.sin(a) * ln / 8
+        c = rgb8(color)[:3] + (int(60 + t.rng.random() * 195),)
+        d.line(pts, fill=c, width=int(t.rng.integers(width[0], width[1] + 1)), joint="curve")
+    t.over(img, opacity, 1.1)
+    return np.asarray(img, np.float32)[..., 3] / 255.0
+
+
+def floor(name):
+    """Soviet ceramic floor, 1.2 m square: 4×4 tiles of 30 cm in a checkerboard
+    of cream and dark brown-grey, grout gone black with mop water, each tile a
+    shade off its neighbour and set a little crooked, terrazzo flecks, worn
+    matt where people walk and glossy where it was mopped, heel marks, chipped
+    corners, a cracked tile."""
+    t = T(512, 512, (0.13, 0.12, 0.1), name)
+    idx, d, h = tile_grid(t, 4, 4, 4.0, 5.0, 0.05)
+    tiles = d >= 0
+    light = ((idx % 4 + idx // 4) % 2 == 0)
+    bv = t.rng.normal(0, 0.035, 16).astype(np.float32)[idx][..., None]
+    cream = np.array((0.68, 0.64, 0.55), np.float32)
+    dark = np.array((0.36, 0.33, 0.3), np.float32)
+    col = np.where(light[..., None], cream, dark) * (1 + bv)
+    # Clay body: mottled, with fine pores.
+    col = col * (0.92 + 0.1 * t.noise(24, 4)[..., None]) * (0.97 + 0.05 * t.noise(4, 2)[..., None])
+    grout = np.array((0.16, 0.15, 0.13), np.float32) * (0.8 + 0.4 * t.noise(16, 3)[..., None])
+    t.a[..., :3] = np.where(tiles[..., None], col, grout)
+    # Terrazzo flecks.
+    fl = t.rng.random((512, 512)) < 0.012
+    fl = blurred(fl.astype(np.float32), 0.6) > 0.18
+    tone = t.noise(3, 1)
+    t.mix((0.2, 0.19, 0.17), fl & tiles & (tone < 0.55), None)
+    t.mix((0.85, 0.82, 0.76), (fl & tiles & (tone >= 0.55)) * 0.7, None)
+    # Edges darker where dirt sits, a lighter worn rim on the light tiles.
+    edge = np.clip(1 - d / 7.0, 0, 1) * tiles
+    t.mul(1 - edge * 0.25)
+    # Chipped corners and a cracked tile.
+    chips = np.zeros((512, 512), np.float32)
+    yy, xx = np.mgrid[0:512, 0:512].astype(np.float32)
+    for _ in range(5):
+        cx, cy = t.rng.integers(0, 4) * 128 + (2 if t.rng.random() < 0.5 else 126), t.rng.integers(0, 4) * 128 + (2 if t.rng.random() < 0.5 else 126)
+        r = 5 + t.rng.random() * 7
+        chips = np.maximum(chips, np.clip(1.5 - np.hypot(xx - cx, yy - cy) / r - t.noise(6, 2) * 0.6, 0, 1))
+    chip = chips > 0.5
+    t.mix((0.2, 0.18, 0.15), chip * 0.9)
+    h = np.where(chip, h * 0.35, h)
+    crack = np.zeros((512, 512), np.float32)
+    # Traffic: a broad trodden lane worn matt and greyed, dirt in low spots.
+    lane = t.noise(256, 3)
+    wear = smooth((lane - 0.45) / 0.4)
+    t.mix((0.42, 0.4, 0.36), wear * 0.18 * tiles)
+    dirt = grime(t, 90)
+    t.stain(dirt, 0.6, (0.25, 0.21, 0.16), 0.4)
+    t.shade(t.noise(200, 4), 0.86, 1.05)
+    marks = scuffs(t, 30, (0, 0, 512, 512), (0.05, 0.05, 0.05), 0.4, (2, 4), (10, 40))
+    # Gloss: mopped streaks in one direction, the lane dull, grout matt.
+    mop = blurred(t.noise(48, 3), 1.0).astype(np.float32)
+    mop = np.asarray(Image.fromarray(mop, "F").resize((512, 64), Image.BICUBIC).resize((512, 512), Image.BICUBIC))
+    r = 0.22 + 0.22 * wear + 0.18 * mop + 0.25 * (dirt > 0.62)
+    r = np.where(tiles & ~chip, r, 0.85)
+    r = np.clip(r + marks * 0.3 + crack * 0.4, 0.08, 1)
+    t.relief = h
+    t.rough = r
     t.grain(0.012)
     t.save(name)
 
 
-def ceiling(name):
-    """Suspended ceiling: fissured mineral tiles of 60 cm in a T-bar grid, a leak."""
-    t = T(512, 512, (0.64, 0.63, 0.59), name)
-    t.shade(t.noise(64, 4), 0.9, 1.04)
+def wall(name):
+    """Upper wall over the tiles, 1.6 m square: whitewash on lumpy plaster,
+    roller marks, hairline cracks, grey dust bloom and brown water streaks
+    running down from the ceiling (top of the texture)."""
+    t = T(512, 512, (0.74, 0.73, 0.67), name)
+    lump = t.noise(64, 5)
+    t.shade(lump, 0.9, 1.04)
+    t.shade(t.noise(220, 4), 0.8, 1.04)
+    # Roller marks: faint vertical bands.
+    band = np.asarray(Image.fromarray(t.noise(40, 2, w=512, h=8), "F").resize((512, 512), Image.BICUBIC))
+    t.shade(band, 0.96, 1.02)
+    t.stain(grime(t, 140), 0.62, (0.5, 0.47, 0.4), 0.4)
+    # Water streaks and a ceiling-line leak.
     img, d = t.layer()
-    for _ in range(2600):  # fissures: short wormy dents
+    for _ in range(9):
+        x = t.rng.random() * 512
+        ln = 40 + t.rng.random() * 320
+        w = 1 + t.rng.random() * 4
+        ph = t.rng.random() * 9
+        for k in range(int(ln)):
+            a = int(90 * (1 - k / ln) ** 1.5 * (0.6 + 0.4 * np.sin(k * 0.11 + ph)))
+            xo = x + np.sin(k * 0.03 + ph) * 3
+            d.line([(xo, k), (xo + w * (1 - k / ln * 0.6), k)], fill=(115, 95, 65, a))
+    t.over(img, 1.0, 1.4)
+    leak = np.clip(1 - (np.mgrid[0:512, 0:512][0] / 60.0), 0, 1) * t.noise(80, 3)
+    t.mix((0.5, 0.42, 0.3), leak * 0.6)
+    t.cracks(1, 60, (0.42, 0.41, 0.37), 1, 0.35)
+    crack = blurred((np.asarray(t.a[..., 0]) < 0.45).astype(np.float32), 0.5)
+    # Flaking whitewash showing grey plaster.
+    flake = t.blob_mask(10, 3, 14, None, 1.4) > 0.4
+    t.mix((0.52, 0.51, 0.47), flake * 0.8)
+    t.relief = lump * 0.6 + flake * -0.25 - crack * 0.4
+    t.rough = np.full((512, 512), 0.9, np.float32)
+    t.grain(0.012)
+    t.save(name)
+
+
+def kafel(name):
+    """Glazed wall tiles, 15 cm, 4×4 to the texture (60 cm square): off-white
+    with a green-grey cast, crazing in the glaze, grime in the grout, a few
+    chipped corners, a cracked tile and one replaced in a whiter shade."""
+    t = T(512, 512, (0.3, 0.3, 0.28), name)
+    idx, d, h = tile_grid(t, 4, 4, 3.0, 4.0, 0.04)
+    tiles = d >= 0
+    v = t.rng.normal(0, 0.02, 16).astype(np.float32)
+    base = np.array((0.74, 0.77, 0.7), np.float32)
+    col = base * (1 + v[idx][..., None])
+    odd = t.rng.integers(0, 16)
+    col = np.where((idx == odd)[..., None], np.array((0.82, 0.83, 0.8), np.float32), col)
+    col = col * (0.96 + 0.05 * t.noise(60, 3)[..., None])
+    grout = np.array((0.55, 0.54, 0.49), np.float32) * (0.85 + 0.25 * t.noise(12, 3)[..., None])
+    t.a[..., :3] = np.where(tiles[..., None], col, grout)
+    t.mul(1 - np.clip(1 - d / 6.0, 0, 1) * tiles * 0.12)
+    # Crazing: a web of hairlines in the glaze.
+    img, dr = t.layer()
+    for _ in range(260):
+        x, y = t.rng.random() * 512, t.rng.random() * 512
+        a = t.rng.random() * np.pi * 2
+        pts = [(x, y)]
+        for _ in range(5):
+            a += (t.rng.random() - 0.5) * 1.4
+            x, y = x + np.cos(a) * 6, y + np.sin(a) * 6
+            pts.append((x, y))
+        dr.line(pts, fill=(120, 118, 105, 255), width=1)
+    t.over(img, 0.05)
+    t.cracks(1, 30, (0.25, 0.24, 0.2), 1, 0.8)
+    yy, xx = np.mgrid[0:512, 0:512].astype(np.float32)
+    chip = np.zeros((512, 512), bool)
+    for _ in range(4):
+        cx, cy = t.rng.integers(0, 4) * 128 + 3, t.rng.integers(0, 4) * 128 + 3
+        chip |= (np.hypot(xx - cx, yy - cy) + t.noise(5, 2) * 5) < 9
+    t.mix((0.62, 0.58, 0.5), chip * 0.9)
+    t.stain(grime(t, 100), 0.62, (0.45, 0.42, 0.33), 0.3)
+    marks = scuffs(t, 10, (0, 380, 512, 132), (0.15, 0.15, 0.13), 0.25, (2, 4), (30, 90), 0.0)
+    h = np.where(chip, h * 0.4, h)
+    t.relief = h
+    t.rough = np.where(tiles & ~chip, 0.12 + 0.12 * t.noise(80, 3) + marks * 0.3, 0.9)
+    t.grain(0.01)
+    t.save(name)
+
+
+def concrete(name):
+    """Plastered concrete of a column, 1.2 m square, painted oil-white:
+    trowel waves, pinholes, a grey band rubbed by trolleys low down."""
+    t = T(512, 512, (0.7, 0.7, 0.66), name)
+    wave = t.noise(90, 5)
+    t.shade(wave, 0.88, 1.05)
+    pores = (t.rng.random((512, 512)) < 0.004)
+    pores = blurred(pores.astype(np.float32), 0.7) > 0.15
+    t.mix((0.35, 0.35, 0.32), pores * 0.6)
+    t.stain(grime(t, 150), 0.6, (0.48, 0.45, 0.38), 0.35)
+    rows = np.mgrid[0:512, 0:512][0].astype(np.float32)
+    low = smooth((rows - 400) / 80) * t.noise(30, 3)
+    t.mix((0.3, 0.3, 0.28), low * 0.5)
+    marks = scuffs(t, 30, (0, 400, 512, 112), (0.08, 0.08, 0.08), 0.35, (2, 5), (30, 120), 0.0)
+    chips = t.blob_mask(6, 2, 10, None, 1.3) > 0.4
+    t.mix((0.5, 0.49, 0.45), chips * 0.8)
+    t.relief = wave * 0.7 - pores * 0.4 - chips * 0.3
+    t.rough = np.clip(0.55 + 0.2 * t.noise(60, 3) + chips * 0.3 + marks * 0.2, 0, 1)
+    t.grain(0.012)
+    t.save(name)
+
+
+def galv(name):
+    """Galvanised sheet steel of the air duct, dulled with age: rolling
+    streaks, a folded seam, grey dust settled on top, oily fingerprints."""
+    t = T(512, 512, (0.5, 0.52, 0.53), name)
+    streak = np.asarray(Image.fromarray(t.noise(20, 3, w=512, h=16), "F").resize((512, 512), Image.BICUBIC))
+    t.shade(streak, 0.9, 1.06)
+    t.shade(t.noise(200, 4), 0.82, 1.05)
+    t.shade(t.noise(6, 2), 0.97, 1.03)
+    t.rect(0, 250, 512, 4, (0.36, 0.37, 0.38))
+    t.rect(0, 254, 512, 2, (0.68, 0.7, 0.7))
+    dust = grime(t, 80)
+    t.stain(dust, 0.6, (0.5, 0.49, 0.46), 0.4)
+    seam = np.zeros(512, np.float32)
+    seam[250:256] = 0.8
+    t.relief = streak * 0.2 + seam[:, None]
+    t.rough = np.clip(0.3 + streak * 0.2 + (dust > 0.55) * 0.4, 0, 1)
+    t.grain(0.01)
+    t.save(name)
+
+
+def ceiling(name):
+    """Suspended ceiling, 1.2 m square: 2×2 fissured mineral tiles of 60 cm in
+    a white T-bar grid, each tile a shade off, one sagging and water-stained
+    with a brown tide line, fly specks, grey dust along the bars."""
+    t = T(512, 512, (0.66, 0.65, 0.61), name)
+    yy, xx = np.mgrid[0:512, 0:512].astype(np.float32)
+    lx, ly = xx % 256, yy % 256
+    d = np.minimum(np.minimum(lx, 255 - lx), np.minimum(ly, 255 - ly))
+    idx = (yy // 256) * 2 + xx // 256
+    v = t.rng.normal(0, 0.025, 4).astype(np.float32)
+    t.a[..., :3] *= (1 + v[idx.astype(int)])[..., None]
+    t.shade(t.noise(64, 4), 0.9, 1.04)
+    img, dr = t.layer()
+    for _ in range(3200):  # fissures: short wormy dents
         x, y = t.rng.random() * 512, t.rng.random() * 512
         a = t.rng.random() * np.pi
         ln = 2 + t.rng.random() * 7
         pts = [(x, y), (x + np.cos(a) * ln * 0.5, y + np.sin(a) * ln * 0.5 + t.rng.random()),
                (x + np.cos(a) * ln, y + np.sin(a) * ln)]
-        d.line(pts, fill=(95, 93, 87, 200), width=1)
-    for _ in range(1500):
-        x, y = t.rng.random() * 512, t.rng.random() * 512
-        d.point((x, y), fill=(80, 80, 75, 220))
-    t.over(img)
-    for k in (0, 256):
-        t.rect(k, 0, 8, 512, (0.74, 0.74, 0.72))
-        t.rect(0, k, 512, 8, (0.74, 0.74, 0.72))
-        t.rect(k + 8, 0, 2, 512, (0.38, 0.38, 0.36))
-        t.rect(0, k + 8, 512, 2, (0.38, 0.38, 0.36))
-    yy, xx = np.mgrid[0:512, 0:512]
-    dd = np.sqrt((xx - 370) ** 2 + (yy - 380) ** 2) + t.noise(40, 3) * 30
-    ring = np.exp(-((dd - 70) / 6) ** 2) * 0.5 + (dd < 70) * 0.18
-    t.mix((0.5, 0.41, 0.26), ring)
+        dr.line(pts, fill=(255, 255, 255, 255), width=1)
+    fis = np.asarray(img, np.float32)[..., 3] / 255
+    t.mix((0.37, 0.36, 0.33), fis * 0.75)
+    pin = t.rng.random((512, 512)) < 0.006
+    t.mix((0.3, 0.3, 0.28), pin * 0.8)
+    # Dust settles on the tile edges next to the bars.
+    t.mix((0.45, 0.44, 0.4), np.clip(1 - (d - 5) / 10, 0, 1) * 0.35)
+    bar = d < 5
+    t.mix((0.78, 0.78, 0.75), bar)
+    t.mix((0.35, 0.35, 0.33), (d >= 5) & (d < 6.5))
+    # The leak: tide rings and a sag in the bottom-right tile.
+    dd = np.sqrt((xx - 380) ** 2 + (yy - 384) ** 2) + t.noise(40, 3) * 30
+    ring = np.exp(-((dd - 70) / 5) ** 2) * 0.55 + np.exp(-((dd - 48) / 4) ** 2) * 0.3 + (dd < 70) * 0.2
+    t.mix((0.48, 0.38, 0.22), ring * (~bar))
+    h = np.where(bar, 1.0, 0.75) - fis * 0.25 - pin * 0.3
+    h = h - np.where(idx == 3, np.clip(1 - dd / 120, 0, 1) * 0.35, 0)
+    t.relief = h.astype(np.float32)
+    t.rough = np.where(bar, 0.4, 0.95).astype(np.float32)
     t.grain(0.01)
     t.save(name)
 
 
 def painted_metal(name, base, rust=0.72):
-    """Painted sheet steel: scratches, rubbed edges, rust spots and runs."""
+    """Painted sheet steel: brushed paint with drips, scratches through to
+    primer, rubbed edges, chips with rust, rust runs."""
     t = T(512, 512, base, name)
+    brush = np.asarray(Image.fromarray(t.noise(30, 3, w=512, h=32), "F").resize((512, 512), Image.BICUBIC))
     t.shade(t.noise(200, 5), 0.86, 1.06)
-    t.shade(t.noise(12, 3), 0.96, 1.03)
-    t.lines(140, 50, np.minimum(np.array(base) * 1.5 + 0.1, 1), 1, 0.5)
-    t.lines(40, 20, (0.2, 0.2, 0.2), 1, 0.4)
-    r = t.noise(70, 4)
-    t.stain(r, rust, (0.45, 0.25, 0.12), 0.8)
-    t.stain(r, rust + 0.12, (0.25, 0.12, 0.06), 0.8)
+    t.shade(brush, 0.95, 1.04)
+    t.shade(t.noise(12, 3), 0.97, 1.02)
+    img, d = t.layer()
+    for _ in range(90):
+        x, y = t.rng.random() * 512, t.rng.random() * 512
+        a = (t.rng.random() - 0.5) * 0.6 + (0 if t.rng.random() < 0.6 else np.pi / 2)
+        ln = 8 + t.rng.random() * 40
+        d.line([(x, y), (x + np.cos(a) * ln, y + np.sin(a) * ln)], fill=(255, 255, 255, int(80 + t.rng.random() * 175)),
+               width=1)
+    scr = np.asarray(img, np.float32)[..., 3] / 255
+    t.mix(np.minimum(np.array(base) * 1.15 + 0.05, 1), scr * 0.3)
+    chips = t.blob_mask(22, 1.5, 6, None, 1.3) > 0.45
+    rim = blurred(chips.astype(np.float32), 1.2) > 0.05
+    t.mix(np.array(base) * 0.6, (rim & ~chips) * 0.5)
+    t.mix((0.36, 0.2, 0.1), chips)
+    r = grime(t, 50)
+    t.stain(r, rust + 0.04, (0.45, 0.25, 0.12), 0.6)
+    t.stain(r, rust + 0.14, (0.25, 0.12, 0.06), 0.7)
+    # Rust runs down from the chips.
+    run = np.zeros((512, 512), np.float32)
+    ch = chips.astype(np.float32)
+    for k in range(1, 40, 2):
+        run = np.maximum(run, np.roll(ch, k, 0) * (1 - k / 40))
+    t.mix((0.42, 0.26, 0.14), run * 0.35 * t.noise(6, 2))
+    t.relief = 0.7 + brush * 0.1 - scr * 0.15 - chips * 0.45 + rim * 0.05
+    t.rough = np.clip(0.42 + 0.1 * brush + scr * 0.2 + chips * 0.4 + (r > rust) * 0.35, 0, 1)
     t.grain(0.012)
     t.save(name)
 
@@ -681,6 +897,65 @@ def sign(name, text):
     t.bevel(0, 0, 512, 128, 6, (0.85, 0.35, 0.25), (0.3, 0.05, 0.03), 0.9)
     t.text((256, 66), text, 64 if len(text) < 9 else 56, (0.96, 0.94, 0.86))
     t.grain(0.01)
+    t.save(name)
+
+
+def notice(name):
+    """«Уголок покупателя» (512×384, mapped once): a varnished board with the
+    title painted on, pinned sheets of typed rules, the complaints book on a
+    string, a licence under glass."""
+    t = T(512, 384, (0.5, 0.33, 0.2), name)
+    grain = np.asarray(Image.fromarray(t.noise(30, 4, w=512, h=24), "F").resize((512, 384), Image.BICUBIC))
+    t.shade(grain, 0.8, 1.1)
+    t.bevel(0, 0, 512, 384, 10, (0.7, 0.5, 0.32), (0.22, 0.13, 0.07), 0.9)
+    t.rect(20, 18, 472, 54, (0.62, 0.1, 0.07))
+    t.text((256, 46), "УГОЛОК ПОКУПАТЕЛЯ", 34, (0.96, 0.92, 0.78), rough=0.25)
+    sheets = [(28, 92, 140, 196, "ПРАВИЛА\nторговли\nв магазинах\nсамообслуживания"),
+              (182, 92, 148, 120, "РЕЖИМ РАБОТЫ\n8.00 — 21.00\nперерыв\n13.00 — 14.00"),
+              (182, 224, 148, 128, "Телефоны\nвышестоящих\nорганизаций"),
+              (344, 92, 140, 160, "КНИГА\nжалоб и\nпредложений\nнаходится у\nдиректора")]
+    for x, y, w, h, txt in sheets:
+        tone = 0.86 + t.rng.random() * 0.06
+        t.rect(x + 3, y + 4, w, h, (0.12, 0.08, 0.05), 0.5)
+        t.rect(x, y, w, h, (tone, tone * 0.97, tone * 0.86))
+        t.text((x + w / 2, y + 16), txt.split("\n")[0], 15, (0.12, 0.1, 0.1), anchor="mt")
+        img, d = t.layer()
+        for k, ln in enumerate(txt.split("\n")[1:]):
+            d.text((x + w / 2, y + 38 + k * 17), ln, font=font(12, False, True), fill=(40, 36, 34, 255), anchor="mt")
+        for k in range(int((h - 50 - len(txt.split("\n")) * 17) / 9)):  # typed lines
+            yy = y + 50 + len(txt.split("\n")) * 17 + k * 9
+            if yy < y + h - 8:
+                d.line([(x + 10, yy), (x + 10 + (w - 20) * (0.6 + 0.4 * t.rng.random()), yy)], fill=(70, 66, 60, 200))
+        t.over(img)
+        t.rect(x + w / 2 - 3, y + 3, 6, 6, (0.75, 0.72, 0.6))
+        t.stain(t.noise(30, 3), 0.7, (0.6, 0.5, 0.3), 0.3, (x, y, w, h))
+    # Licence in a frame.
+    t.rect(344, 266, 140, 92, (0.3, 0.3, 0.3))
+    t.rect(350, 272, 128, 80, (0.82, 0.8, 0.7))
+    t.text((414, 290), "РАЗРЕШЕНИЕ", 12, (0.3, 0.1, 0.1))
+    t.rect(370, 320, 40, 20, (0.4, 0.2, 0.55), 0.5)
+    t.grain(0.01)
+    t.save(name)
+
+
+def fire_board(name):
+    """Fire board (512×512, mapped once on a 1.2 m panel): red paint over
+    plywood, white stencil «ПОЖАРНЫЙ ЩИТ», painted outlines where the tools
+    hang, chips and dust."""
+    t = T(512, 512, (0.58, 0.08, 0.06), name)
+    t.shade(t.noise(120, 5), 0.8, 1.06)
+    t.bevel(0, 0, 512, 512, 8, (0.75, 0.2, 0.15), (0.25, 0.03, 0.02), 0.8)
+    t.text((256, 44), "ПОЖАРНЫЙ ЩИТ", 40, (0.92, 0.9, 0.84), rough=0.3)
+    t.text((256, 486), "№ 2   тел. 01", 26, (0.92, 0.9, 0.84), rough=0.3)
+    img, d = t.layer()
+    d.rectangle((40, 90, 120, 460), outline=(235, 230, 215, 140), width=3)
+    d.rectangle((380, 90, 470, 300), outline=(235, 230, 215, 140), width=3)
+    t.over(img)
+    chips = t.blob_mask(14, 2, 7, None, 1.3) > 0.4
+    t.mix((0.62, 0.55, 0.42), chips)
+    t.stain(grime(t, 80), 0.62, (0.3, 0.12, 0.08), 0.4)
+    t.rough = np.clip(0.45 + chips * 0.4, 0, 1).astype(np.float32)
+    t.grain(0.012)
     t.save(name)
 
 
@@ -1056,7 +1331,7 @@ def basket(name):
 SIGNS = {"sign_bakaleya": "БАКАЛЕЯ", "sign_konservy": "КОНСЕРВЫ", "sign_moloko": "МОЛОКО", "sign_zamorozka": "ЗАМОРОЗКА"}
 
 ALL = {
-    "floor": floor, "wall": wall, "ceiling": ceiling,
+    "floor": floor, "wall": wall, "ceiling": ceiling, "kafel": kafel, "concrete": concrete, "galv": galv,
     "metal": lambda n: painted_metal(n, (0.36, 0.39, 0.42)),
     "paint": lambda n: painted_metal(n, (0.52, 0.58, 0.56), 0.76),
     "pegboard": pegboard, "labels": labels, "tags": tags, "locker": locker, "cloth": cloth,
@@ -1088,7 +1363,7 @@ ALL = {
     "leather": leather, "torch": torch, "chrome": chrome, "blood": blood, "basket": basket,
     "fabric": lambda n: plain(n, (0.82, 0.82, 0.82), 60, 0.1),
     "white": lambda n: plain(n, (0.9, 0.9, 0.9), 30, 0.04, 64),
-    "exit": exit_sign,
+    "exit": exit_sign, "notice": notice, "fire_board": fire_board,
 }
 for _k, _v in SIGNS.items():
     ALL[_k] = (lambda text: lambda n: sign(n, text))(_v)
@@ -1099,7 +1374,8 @@ for _k, _v in SIGNS.items():
 # map: dark grout, cracks, weave and grain read as dents. The number is the
 # depth; the second one blurs the height first (pixels) for soft materials.
 NORMALS = {
-    "floor": (3.0, 1.0), "wall": (0.7, 1.5), "ceiling": (1.5, 1.0), "metal": (1.2, 1.0), "paint": (1.2, 1.0),
+    "floor": (6.0, 1.0), "wall": (1.2, 1.2), "ceiling": (2.0, 0.8), "metal": (2.0, 0.8), "paint": (2.0, 0.8),
+    "kafel": (6.0, 0.8), "concrete": (1.5, 1.0), "galv": (1.5, 0.8),
     "pegboard": (3.0, 0.8), "locker": (1.5, 1.0), "cloth": (1.5, 0.7), "enamel": (0.8, 1.0), "frozen": (2.0, 1.5),
     "wood": (2.5, 0.8), "formica": (0.8, 1.0), "door": (1.5, 1.0), "cardboard": (1.5, 1.0), "skin": (0.8, 1.2),
     "coat": (3.0, 0.7), "guard_wool": (3.0, 0.7), "trousers": (2.5, 0.7), "knit": (4.0, 0.8),
@@ -1112,8 +1388,11 @@ NORMALS = {
 
 def normal_map(name):
     depth, soft = NORMALS[name]
-    img = np.asarray(Image.open(os.path.join(OUT, name + ".png")).convert("RGB"), np.float32) / 255
-    h = blurred(img @ np.array([0.3, 0.59, 0.11], np.float32), soft)
+    if name in HEIGHTS:
+        h = blurred(HEIGHTS[name], soft)
+    else:
+        img = np.asarray(Image.open(os.path.join(OUT, name + ".png")).convert("RGB"), np.float32) / 255
+        h = blurred(img @ np.array([0.3, 0.59, 0.11], np.float32), soft)
     scale = h.shape[1] / 512 * depth * 4
     dx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) * 0.5 * scale
     drow = (np.roll(h, -1, 0) - np.roll(h, 1, 0)) * 0.5 * scale
@@ -1121,8 +1400,7 @@ def normal_map(name):
     n /= np.linalg.norm(n, axis=-1, keepdims=True)
     path = os.path.join(OUT, name + "_n.png")
     Image.fromarray((n * 127.5 + 127.5).clip(0, 255).astype(np.uint8), "RGB").save(path, optimize=True)
-    with open(path + ".import", "w") as f:
-        f.write(IMPORT.format(name=name + "_n").replace("compress/mode=0", "compress/mode=0\ncompress/normal_map=1"))
+    write_import(path, IMPORT.format(name=name + "_n").replace("compress/mode=0", "compress/mode=0\ncompress/normal_map=1"))
 
 
 if __name__ == "__main__":

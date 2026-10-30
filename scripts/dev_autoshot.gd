@@ -6,7 +6,8 @@ extends Node
 ## the post, the lockers, the tills, the lit hall, the dark with the flashlight,
 ## Kovpak with his carton, the fuse panel, the «Волга» at the doors, the morning,
 ## the killer, his attack, the death) saving a screenshot of each step, then quits.
-## Add --handshot to take only the close-ups of the hand with the torch.
+## Add --handshot to take only the close-ups of the hand with the torch, or
+## --storeshot for views of the building itself (walls, columns, ducts, window).
 
 var main: Node
 var out_dir := ""
@@ -20,6 +21,10 @@ func _ready() -> void:
 	var night: NightOne = main.night
 	if "--handshot" in OS.get_cmdline_user_args():
 		await _hand_shots(p, store, night)
+		get_tree().quit()
+		return
+	if "--storeshot" in OS.get_cmdline_user_args():
+		await _store_shots(p, store, night)
 		get_tree().quit()
 		return
 	_place(p, Vector3(9.4, 0, 2.6), Vector3(-1, 0, 0.05))
@@ -131,6 +136,32 @@ func _hand_shots(p: Player, store: Store, night: NightOne) -> void:
 	await _shot("h4_lowering")
 	await _wait(0.8)
 	await _shot("h5_off")
+
+
+func _store_shots(p: Player, store: Store, night: NightOne) -> void:
+	night.kovpak.visible = false
+	night.tamara.visible = false
+	var views := [
+		["s1_window", Vector3(-1.5, 0, 5.0), Vector3(0.7, 0, -1), 0.05],
+		["s2_aisle", Vector3(-3.0, 0, 11.2), Vector3(0, 0, 1), 0.12],
+		["s3_column", Vector3(-4.2, 0, 16.2), Vector3(-0.6, 0, 1), 0.2],
+		["s4_back", Vector3(-6.5, 0, 25.6), Vector3(-0.55, 0, 1), 0.0],
+		["s5_entrance", Vector3(-6.5, 0, 6.5), Vector3(-1, 0, -0.5), 0.0],
+		["s6_ceiling", Vector3(-3.0, 0, 18.5), Vector3(0, 0, 1), 0.55],
+	]
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(0.8)
+		await _shot(v[0])
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in [views[0], views[2], views[3]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(0.8)
+		await _shot(v[0] + "_dark")
 
 
 func _place(p: Player, pos: Vector3, dir: Vector3) -> void:
