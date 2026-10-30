@@ -52,6 +52,7 @@ var time_scale := 1.0
 
 var _timeline: Array = []
 var _chase_music: AudioStreamPlayer
+var _heart: AudioStreamPlayer
 var _lit := 1.0
 var _flash := 0.0
 var _morning := false
@@ -470,21 +471,37 @@ func _on_caught() -> void:
 	var tw := create_tween().set_parallel()
 	tw.tween_property(player, "rotation:y", player.rotation.y + angle_difference(player.rotation.y, atan2(-to.x, -to.z)), 0.25)
 	tw.tween_property(player.head, "rotation:x", deg_to_rad(8.0), 0.25)
+	Sfx.play_2d(self, "attack_sting", -2.0)
+	_heart = Sfx.play_2d(self, "heartbeat", -4.0, "Master", 1.7)
 	killer.play_attack(_on_hit)
 
 
 func _on_hit(i: int) -> void:
 	var p := player.global_position
-	Sfx.play_3d(view, "stab", p + Vector3(0, 1.2, 0), 2.0, randf_range(0.85, 1.05))
+	Sfx.play_3d(view, "chop", p + Vector3(0, 1.2, 0), 2.0, randf_range(0.95, 1.05))
 	_flash = 1.0
 	store.spawn_blood(p + Vector3(randf_range(-0.6, 0.6), 0, randf_range(-0.6, 0.6)), 0.3 + i * 0.15)
 	player.hit(i)
-	if i == 2:
-		player.die(killer.global_position)
-		var pool := store.spawn_blood(p, 0.2)
-		create_tween().tween_property(pool, "scale", Vector3(9, 1, 9), 4.0).set_ease(Tween.EASE_OUT)
-		chasing = false
-		_show_death()
+	if i < 2:
+		Sfx.play_2d(self, "hurt", -3.0, Sfx.BUS, randf_range(0.97, 1.03))
+		return
+	player.die(killer.global_position)
+	var pool := store.spawn_blood(p, 0.2)
+	create_tween().tween_property(pool, "scale", Vector3(9, 1, 9), 4.0).set_ease(Tween.EASE_OUT)
+	chasing = false
+	Sfx.play_2d(self, "death_scream", -2.0)
+	# He goes down: the hall goes dull as through cotton wool, the ears ring,
+	# the pulse slows and stops.
+	var tw := create_tween()
+	tw.tween_interval(0.65)
+	tw.tween_callback(func() -> void:
+		Sfx.play_3d(view, "bodyfall", p + Vector3(0, 0.2, 0), 2.0)
+		Sfx.muffle(true)
+		Sfx.play_2d(self, "ringing", -14.0, "Master"))
+	tw.tween_property(_heart, "pitch_scale", 0.55, 4.0)
+	tw.parallel().tween_property(_heart, "volume_db", -40.0, 5.0).set_ease(Tween.EASE_IN)
+	tw.tween_callback(_heart.stop)
+	_show_death()
 
 
 func _show_death() -> void:

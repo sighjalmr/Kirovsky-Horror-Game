@@ -295,7 +295,7 @@ func _animate(speed: float, delta: float) -> void:
 	_stride += speed * delta
 	if _stride > 0.85:
 		_stride = 0.0
-		_steps.pitch_scale = randf_range(0.85, 1.0)
+		_steps.pitch_scale = randf_range(0.95, 1.03)
 		_steps.play()
 	_keys_t -= delta
 	if _keys_t <= 0.0 and state == State.PATROL and speed > 0.0:
@@ -310,12 +310,21 @@ func _face(point: Vector3, weight: float) -> void:
 	rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), clampf(weight, 0.0, 1.0))
 
 
-## Three cleaver blows. Each `hit` fires on contact.
+## Three cleaver blows, his breathing heavy and close. Each `hit` fires on
+## contact; the swing whooshes as the arm comes down.
 func play_attack(hit: Callable) -> void:
 	var arm: Node3D = parts.arm_r
+	var breath := Sfx.play_3d(self, "killer_breath", global_position + Vector3(0, 1.7, 0), 0.0, 1.0, 10.0)
+	breath.unit_size = 2.0
 	var tw := create_tween()
 	for i in 3:
 		tw.tween_property(arm, "rotation:x", 2.8, 0.22).set_trans(Tween.TRANS_QUAD)
+		tw.tween_callback(func() -> void:
+			Sfx.play_3d(self, "swing", global_position + Vector3(0, 1.6, 0), -2.0, randf_range(0.93, 1.07)))
 		tw.tween_property(arm, "rotation:x", 0.7, 0.12).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 		tw.tween_callback(hit.bind(i))
 		tw.tween_interval(0.18)
+	# He stands over the body a while, getting his breath back.
+	tw.tween_interval(3.0)
+	tw.tween_property(breath, "volume_db", -60.0, 5.0)
+	tw.tween_callback(breath.queue_free)
