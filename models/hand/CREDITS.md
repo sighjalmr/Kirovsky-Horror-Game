@@ -1,14 +1,14 @@
 # Рука Гордеева
 
-Модель правой руки с костями, фото-текстура кожи, карты рельефа и шероховатости,
-позы пальцев — из открытого проекта **Godot XR Tools**
+Модель правой руки с костями, фото-текстура кожи, карты рельефа и шероховатости —
+из открытого проекта **Godot XR Tools**
 (https://github.com/GodotVR/godot-xr-tools, папка `addons/godot-xr-tools/hands`).
 
 | Файл | Откуда | Лицензия |
 |---|---|---|
 | `Hand_Nails_R.gltf` | `hands/model/Hand_Nails_R.gltf` | CC0 (общественное достояние, указано в самом файле) |
 | `caucasian_baseColor.png`, `hands_normal.png`, `hands_occlusionRoughnessMetallic.png` | `hands/textures/` | MIT, © 2018–2023 Bastiaan Olij and Contributors |
-| `Grip Shaft.res`, `Grip.res` | `hands/animations/right/` | MIT, © 2018–2023 Bastiaan Olij and Contributors |
+| `../torch_hand/torch_hand.glb` | наша сборка (`tools/build_torch_hand.py`): эта рука, согнутая вокруг фонарика, фонарик и рукав сделаны нами | CC0 для руки, наше для остального |
 | `hand_skin.png` | наша переработка `caucasian_baseColor.png` (`tools/make_hand_skin.py`): кожа бледнее и старше | MIT, как исходник |
 
 Текст лицензии MIT:
