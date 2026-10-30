@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Synthesises every sound of «Кировский: Закрытие» into sounds/*.wav
 (44.1 kHz, 16 bit, mono) by physical-ish modelling: struck metal as decaying
-modal partials, footsteps as heel and toe impacts on tile, the fluorescent
-ballast as mains harmonics with buzz. Loops are seamless. Each WAV is a plain
+modal partials, the fluorescent ballast as mains harmonics with buzz, the
+horror stings as sawing violin sections. Footsteps and the blows are built from
+real recordings by tools/make_foley.py. Loops are seamless. Each WAV is a plain
 file: replace it with a field recording of the same name and the game uses it.
 
     python3 tools/make_sounds.py            # all sounds
@@ -21,7 +22,7 @@ import numpy as np
 SR = 44100
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "sounds")
-LOOPS = {"hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd"}
+LOOPS = {"hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd", "heartbeat", "killer_breath"}
 
 IMPORT = """[remap]
 
@@ -184,29 +185,6 @@ def whirr(name):
     save(name, x, 0.45)
 
 
-def step(name, heavy=False):
-    """A shoe on ceramic tile: heel strike, body thump, toe roll, a little grit.
-    Rubber boots: duller strike, more weight, a soft squeak."""
-    g = Gen(name)
-    t = g.t(0.45)
-    x = np.zeros_like(t)
-    heel = band(g.noise(0.03), 700 if heavy else 1200, 5000 if heavy else 9000) * env(g.t(0.03), 0.0005, 0.006 if heavy else 0.004)
-    place(x, heel * (0.7 if heavy else 1.0), 0.0)
-    thump_f = g.rng.uniform(60, 80) if heavy else g.rng.uniform(95, 130)
-    x += modal(t, [(thump_f, 0.05 if heavy else 0.03, 1.2 if heavy else 0.6)])
-    # Tile resonance.
-    x += modal(t, [(g.rng.uniform(1700, 2300), 0.012, 0.15), (g.rng.uniform(3200, 3900), 0.008, 0.1)])
-    toe_at = g.rng.uniform(0.06, 0.09) if not heavy else g.rng.uniform(0.09, 0.12)
-    toe = band(g.noise(0.04), 900, 7000) * env(g.t(0.04), 0.002, 0.01)
-    place(x, toe * 0.45, toe_at)
-    grit = band(g.noise(0.08), 4000, 12000) * env(g.t(0.08), 0.01, 0.025)
-    place(x, grit * 0.2, toe_at - 0.01)
-    if heavy:
-        sq = np.sin(2 * np.pi * np.cumsum(np.linspace(900, 1300, int(0.06 * SR))) / SR) * env(g.t(0.06), 0.01, 0.02)
-        place(x, sq * 0.08, toe_at + 0.02)
-    save(name, x, 0.85)
-
-
 def phone(name):
     """Soviet desk phone: an electromechanical bell, the hammer beating two
     gongs at 25 Hz for 0.8 s, then 3.2 s of silence (the Russian cadence)."""
@@ -272,43 +250,121 @@ def cloth(name):
     save(name, x, 0.8)
 
 
+def strings(t, notes, start, length, bend=0.0, trem=0.0, voices=3, seed=0):
+    """A violin section sawing: detuned sawtooth voices with vibrato and bow
+    noise, a hard bow attack, pitch bending by `bend` octaves over the note."""
+    rng = np.random.default_rng(seed)
+    out = np.zeros_like(t)
+    on = (t >= start) & (t < start + length)
+    tt = t[on] - start
+    e = np.minimum(tt / 0.012, 1) * np.minimum((length - tt) / 0.05, 1)
+    if trem:
+        e *= 0.6 + 0.4 * np.sin(2 * np.pi * trem * tt) ** 2
+    for f in notes:
+        for v in range(voices):
+            fr = f * 2 ** (bend * tt / length) * (1 + rng.uniform(-0.006, 0.006))
+            fr *= 1 + 0.006 * np.sin(2 * np.pi * rng.uniform(5.0, 6.5) * tt + rng.uniform(0, 6))
+            ph = 2 * np.pi * np.cumsum(fr) / SR
+            saw = sum(np.sin(k * ph) / k for k in range(1, int(9000 / f) + 1))
+            out[on] += saw * e / voices
+    bow = band(rng.standard_normal(len(t)), 2000, 8000) * 0.15
+    out += bow * np.where(on, 1.0, 0.0) * np.abs(out).max(initial=0) * 0.4
+    return out
+
+
 def stinger(name):
-    """Horror sting: a sub hit, a cluster of low brass that swells, a bowed
-    metal screech over it, all decaying into a long tail."""
+    """The killer has seen you: a sub hit and three shrieking violin stabs,
+    sliding down a little like the shower scene, over a low brass cluster
+    that swells and dies away."""
     g = Gen(name)
     t = g.t(4.0)
-    x = modal(t, [(38, 1.2, 1.5), (55, 0.8, 0.8)])
-    swell = np.minimum(t / 0.25, 1) * np.exp(-t / 1.6)
+    x = modal(t, [(36, 1.2, 1.6), (52, 0.8, 0.8)])
+    x += band(g.noise(4.0), 60, 3000) * env(t, 0.002, 0.08) * 0.8
+    for k, at in enumerate((0.0, 0.32, 0.64)):
+        x += strings(t, (1318.5, 1396.9, 1975.5), at, 0.28, bend=-0.12, seed=k) * 0.55
+    swell = np.minimum(t / 0.3, 1) * np.exp(-t / 1.6)
     for f in (73.4, 77.8, 110.0, 116.5, 155.6):
         ph = 2 * np.pi * np.cumsum(f * (1 + 0.004 * np.sin(2 * np.pi * 5.3 * t + f))) / SR
-        saw = sum(np.sin(k * ph) / k for k in range(1, 14))
-        x += saw * swell * 0.25
-    bowed = band(g.noise(4.0), 1100, 1400, soft=0.08) + band(g.noise(4.0), 2600, 2900, soft=0.08)
-    x += norm(bowed, 0.6) * np.minimum(t / 0.6, 1) * np.exp(-t / 1.2)
-    x = band(x, 25, 14000)
-    save(name, x, 0.9)
+        x += sum(np.sin(k * ph) / k for k in range(1, 14)) * swell * 0.22
+    x = band(x, 25, 15000)
+    save(name, x, 0.92)
 
 
-def stab(name):
-    """A cleaver blow: the whoosh, a wet heavy thud, bone crunch, a squelch."""
+def attack_sting(name):
+    """He has you: a slam, then the strings climb screaming in tremolo over a
+    scraping of bowed metal and a low cluster, for as long as the blows fall."""
     g = Gen(name)
-    t = g.t(0.7)
-    x = np.zeros_like(t)
-    tw = g.t(0.12)
-    whoosh = band(g.noise(0.12), 300, 3000) * np.sin(np.pi * tw / 0.12) ** 3
-    place(x, whoosh * 0.4, 0.0)
-    hit = 0.11
-    x += modal(t, [(62, 0.07, 1.4), (95, 0.05, 0.7)], hit)
-    crunch = np.zeros(int(0.12 * SR))
-    idx = g.rng.integers(0, len(crunch), 90)
-    crunch[idx] = g.rng.standard_normal(90)
-    crunch = band(crunch, 300, 3500) * env(g.t(0.12), 0.002, 0.04) * 6
-    place(x, crunch, hit)
-    tq = g.t(0.35)
-    sq = band(g.noise(0.35), 150, 900) * env(tq, 0.01, 0.1)
-    sq *= 1 + 0.8 * np.sin(2 * np.pi * (14 + 30 * tq) * tq)
-    place(x, sq * 0.8, hit + 0.02)
+    t = g.t(5.0)
+    x = modal(t, [(32, 1.6, 2.0), (47, 1.0, 1.0), (71, 0.6, 0.4)])
+    x += band(g.noise(5.0), 40, 6000) * env(t, 0.001, 0.15) * 1.2
+    x += strings(t, (1046.5, 1108.7, 1568.0, 1661.2), 0.0, 3.6, bend=0.6, trem=11.0, voices=4, seed=7) * 0.5
+    for f in (55.0, 58.3, 82.4, 87.3):
+        ph = 2 * np.pi * np.cumsum(f * (1 + 0.005 * np.sin(2 * np.pi * 4.1 * t + f))) / SR
+        x += sum(np.sin(k * ph) / k for k in range(1, 18)) * np.minimum(t / 0.2, 1) * np.exp(-t / 2.2) * 0.25
+    scrape = band(g.noise(5.0), 2300, 2700, soft=0.08) + band(g.noise(5.0), 3700, 4300, soft=0.08)
+    scrape *= 1 + 0.6 * np.sin(2 * np.pi * (3 + 2 * t) * t)
+    x += norm(scrape, 0.35) * np.minimum(t / 0.4, 1) * np.exp(-t / 2.0)
+    x *= np.minimum((5.0 - t) / 1.2, 1)
+    x = band(x, 25, 15000)
     save(name, x, 0.95)
+
+
+def swing(name):
+    """The cleaver coming down through the air, rising to the blow."""
+    g = Gen(name)
+    d = 0.22
+    tt = g.t(d)
+    x = np.zeros_like(tt)
+    for lo, hi, a in ((250, 900, 1.0), (900, 2600, 0.6), (2600, 6000, 0.25)):
+        x += band(g.noise(d), lo, hi) * a
+    shape = np.sin(np.pi * np.minimum(tt / 0.17, 1) * 0.5) ** 3 * np.minimum((d - tt) / 0.05, 1)
+    save(name, x * shape, 0.7)
+
+
+def heartbeat(name):
+    """Your own pulse in your ears, 80 beats a minute (play faster for fear):
+    the low lub and the softer dub, felt more than heard. Loops."""
+    g = Gen(name)
+    period = 0.75
+    t = g.t(period * 3)
+    x = np.zeros_like(t)
+    for k in range(3):
+        for off, f, a in ((0.0, 52, 1.0), (0.26, 64, 0.6)):
+            beat = modal(g.t(0.3), [(f, 0.07, a), (f * 2.1, 0.03, a * 0.3)])
+            beat *= np.minimum(g.t(0.3) / 0.012, 1)
+            place(x, beat, k * period + off + 0.01)
+    save(name, band(x, 25, 400), 0.9)
+
+
+def ringing(name):
+    """The ringing in the ears after the blow, slowly fading."""
+    g = Gen(name)
+    t = g.t(7.0)
+    x = np.sin(2 * np.pi * 5100 * t) + 0.6 * np.sin(2 * np.pi * 5113 * t) + 0.25 * np.sin(2 * np.pi * 3170 * t)
+    x += band(g.noise(7.0), 4500, 6000) * 0.15
+    x *= np.minimum(t / 0.05, 1) * np.exp(-t / 2.5)
+    save(name, x, 0.35)
+
+
+def killer_breath(name):
+    """Him, close: heavy breathing through an open mouth, a wet rasp in the
+    throat on every breath out. Loops."""
+    g = Gen(name)
+    t = g.t(4.5)
+    x = np.zeros_like(t)
+    for k, at in enumerate((0.05, 1.55, 3.05)):
+        di, de = g.rng.uniform(0.5, 0.6), g.rng.uniform(0.7, 0.8)
+        ti = g.t(di)
+        inh = band(g.noise(di), 900, 1500, soft=0.25) + band(g.noise(di), 2200, 3200, soft=0.25) * 0.6
+        place(x, inh * np.sin(np.pi * ti / di) ** 1.5 * 0.45, at)
+        te = g.t(de)
+        ph = 2 * np.pi * np.cumsum(g.rng.uniform(88, 100) * (1 - 0.1 * te / de)) / SR
+        voiced = sum(np.sin(j * ph) / j ** 1.2 for j in range(1, 30))
+        exh = band(g.noise(de), 350, 700, soft=0.3) + band(g.noise(de), 1100, 1700, soft=0.3) * 0.6 + \
+            band(voiced, 300, 2500) * 0.08
+        exh *= 1 + 0.7 * np.sin(2 * np.pi * g.rng.uniform(35, 50) * te)  # the rasp
+        place(x, exh * np.sin(np.pi * te / de) ** 1.2, at + di + 0.05)
+    save(name, band(x, 120, 6000), 0.8)
 
 
 def drone(name):
@@ -490,12 +546,10 @@ def lock(name):
 ALL = {
     "engine": engine, "knock": knock, "cans": cans, "lock": lock, "crowd": crowd,
     "hum": hum, "click": click, "whirr": whirr, "phone": phone, "compressor": compressor, "room": room,
-    "cloth": cloth, "stinger": stinger, "stab": stab, "drone": drone, "chime": chime, "breath": breath,
-    "clank": clank, "keys": keys, "pickup": pickup,
+    "cloth": cloth, "stinger": stinger, "drone": drone, "chime": chime, "breath": breath,
+    "clank": clank, "keys": keys, "pickup": pickup, "attack_sting": attack_sting, "swing": swing,
+    "heartbeat": heartbeat, "ringing": ringing, "killer_breath": killer_breath,
 }
-for _i in range(1, 5):
-    ALL["step_%d" % _i] = lambda n: step(n)
-    ALL["heavy_step_%d" % _i] = lambda n: step(n, True)
 
 
 if __name__ == "__main__":
