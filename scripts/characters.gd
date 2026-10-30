@@ -90,34 +90,13 @@ static func build_killer() -> Person:
 	return p
 
 
-## Heavy Soviet spectacles: a dark tortoiseshell top bar over thin
-## metal rims, a bridge across the nose and temples back to the ears.
-## Built round the eyes, which sit 0.085 m above the head bone.
+## Classic Soviet horn-rimmed spectacles (models/glasses, built by
+## tools/build_glasses.py), set on the nose: the lens centres level with the
+## eyes, 0.09 m above the head bone, the front of the frame just ahead of the face.
 static func glasses() -> Node3D:
-	var k := MeshBuilder.Kit.new()
-	k.ao = false
-	var top := k.b("leather", Color(0.16, 0.11, 0.08))
-	var rim := k.b("chrome", Color(0.55, 0.5, 0.45))
-	var lens := k.b("white", Color(0.85, 0.9, 0.9, 0.12), Color.BLACK, Mats.GLASS)
-	const Y := 0.09
-	const Z := -0.128
-	for side: float in [-1.0, 1.0]:
-		var cx := side * 0.033
-		# The lens plane turns a little round the face.
-		var xf := Props.rot(Vector3.UP, -side * 0.12, Vector3(cx, Y, Z))
-		top.box(xf * Props.at(0, 0.013, 0), Vector3(0.054, 0.009, 0.006))
-		rim.box(xf * Props.at(0, -0.019, 0), Vector3(0.05, 0.003, 0.003))
-		rim.box(xf * Props.at(-0.026, -0.018, 0), Vector3(0.003, 0.033, 0.003))
-		rim.box(xf * Props.at(0.026, -0.018, 0), Vector3(0.003, 0.033, 0.003))
-		lens.box(xf * Props.at(0, -0.017, 0), Vector3(0.05, 0.031, 0.002))
-		# Temple: from the outer corner of the frame back over the ear.
-		var a := Vector3(side * 0.062, Y + 0.012, Z + 0.01)
-		var b := Vector3(side * 0.074, Y + 0.008, -0.02)
-		var mid := (a + b) * 0.5
-		var temple := Transform3D(Basis.looking_at(b - a, Vector3.UP), mid)
-		top.box(temple, Vector3(0.004, 0.006, a.distance_to(b)))
-	rim.box(Props.at(0, Y + 0.004, Z - 0.003), Vector3(0.018, 0.004, 0.004))
-	return _built(k)
+	var g: Node3D = (load("res://models/glasses/glasses.glb") as PackedScene).instantiate()
+	g.position = Vector3(0, 0.085, -0.128)
+	return g
 
 
 ## A carton held against the chest in both arms (Kovpak's night visit).

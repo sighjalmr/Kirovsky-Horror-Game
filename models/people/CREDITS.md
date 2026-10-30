@@ -22,7 +22,7 @@ Changes: textures scaled from 2048 to 1024 px and saved as JPEG/PNG
 `anims/` were cut from m/f_walk_neutral_01, m_walk_slow_01, m_run_neutral_01,
 m/f_idle_neutral_01, m_idle_breathe_01, m/f_gestic_talk_neutral_01,
 f_sit_chair_idle_neutral_01 and m_hold_bag_idle / f_hold_bag_idle_01 by
-`tools/make_people_anims.gd`. Kovpak's spectacles, the hats, bags, the scarf and the cleaver are the
+`tools/make_people_anims.gd`. Kovpak's spectacles (tools/build_glasses.py), the hats, bags, the scarf and the cleaver are the
 game's own (scripts/characters.gd).
 
 Citation asked for by the authors: M. Gonzalez-Franco et al., "The Rocketbox
