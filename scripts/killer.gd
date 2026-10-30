@@ -31,7 +31,7 @@ static var blind := false
 var state := State.INACTIVE
 var store: Store
 var player: Player
-var parts: Dictionary
+var body: Person
 var suspicion := 0.0
 ## Told to go: he finishes any chase, then walks out through the storage door.
 var leaving := false
@@ -45,7 +45,6 @@ var _repath_t := 0.0
 var _stuck_t := 0.0
 var _keys_t := 6.0
 var _stride := 0.0
-var _anim := 0.0
 var _steps: AudioStreamPlayer3D
 
 
@@ -65,9 +64,8 @@ func _ready() -> void:
 	cs.shape = cap
 	cs.position.y = 0.95
 	add_child(cs)
-	parts = Characters.build_killer()
-	add_child(parts.root)
-	(parts.arm_r as Node3D).rotation.x = 0.35
+	body = Characters.build_killer()
+	add_child(body)
 	visible = false
 	_steps = AudioStreamPlayer3D.new()
 	_steps.stream = Sfx.get_stream("heavy_step")
@@ -86,6 +84,8 @@ func activate(pos: Vector3) -> void:
 	global_position = pos
 	visible = true
 	leaving = false
+	body.aim("Bip01 R UpperArm", Vector3.ZERO, 0.0)
+	body.aim("Bip01 R Forearm", Vector3.ZERO, 0.0)
 	suspicion = 0.0
 	state = State.PATROL
 	_wait = 1.5
@@ -290,8 +290,16 @@ func _move(speed: float, delta: float) -> void:
 
 
 func _animate(speed: float, delta: float) -> void:
-	_anim += delta * speed * 3.0
-	Characters.walk(parts, _anim, clampf(speed / PATROL_SPEED, 0.0, 1.5), false)
+	# Captured gaits, sped up or slowed to his pace: a creeping walk on
+	# patrol, a brisk one when he heads for a noise, a run in a chase.
+	if speed <= 0.05:
+		body.play("breathe")
+	elif speed <= PATROL_SPEED + 0.1:
+		body.play("prowl", speed / 0.95)
+	elif speed < CHASE_SPEED - 0.4:
+		body.play("walk", speed / 1.4)
+	else:
+		body.play("run", speed / 3.4)
 	_stride += speed * delta
 	if _stride > 0.85:
 		_stride = 0.0
@@ -310,12 +318,22 @@ func _face(point: Vector3, weight: float) -> void:
 	rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), clampf(weight, 0.0, 1.0))
 
 
-## Three cleaver blows. Each `hit` fires on contact.
+## Three cleaver blows. Each `hit` fires on contact. The captured body
+## keeps breathing; the right arm is swung over it by hand: up behind the
+## head, then down and forward through Gordeev.
 func play_attack(hit: Callable) -> void:
-	var arm: Node3D = parts.arm_r
+	body.play("breathe")
 	var tw := create_tween()
+	tw.tween_method(_swing, 1.0, 0.0, 0.3).set_trans(Tween.TRANS_QUAD)
 	for i in 3:
-		tw.tween_property(arm, "rotation:x", 2.8, 0.22).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(arm, "rotation:x", 0.7, 0.12).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+		if i > 0:
+			tw.tween_method(_swing, 1.0, 0.0, 0.22).set_trans(Tween.TRANS_QUAD)
+		tw.tween_method(_swing, 0.0, 1.0, 0.12).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 		tw.tween_callback(hit.bind(i))
 		tw.tween_interval(0.18)
+
+
+## 0: the cleaver raised over his head; 1: the blow landed, arm out in front.
+func _swing(t: float) -> void:
+	body.aim("Bip01 R UpperArm", Vector3(0.3, 1.0, 0.35).lerp(Vector3(0.1, -0.15, -1.0), t))
+	body.aim("Bip01 R Forearm", Vector3(-0.1, 1.0, 0.1).lerp(Vector3(-0.15, -0.7, -1.0), t))
