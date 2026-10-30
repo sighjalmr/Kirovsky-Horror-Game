@@ -16,8 +16,9 @@ import bpy, bmesh, math, sys, json, os
 from mathutils import Vector, Matrix, Quaternion
 
 ARGS = json.loads(sys.argv[sys.argv.index("--") + 1]) if "--" in sys.argv else {}
-P = dict(a=55, px=-0.04, py=0.058, pz=0.0, slide=0.02, roll=75, pitch=-3, yaw=30, arm=[0.6, -0.6, -0.5], loc=[0.17, 0.36, -0.155], cuff=-0.012, arm_mix=0.4,
+P = dict(a=55, px=-0.039, py=0.04, lever_open=0.0015, pz=0.0, slide=0.02, roll=75, pitch=-3, yaw=30, arm=[0.6, -0.6, -0.5], loc=[0.17, 0.36, -0.155], cuff=-0.012, arm_mix=0.4,
          out="/tmp/torch_hand.png", res=[960, 540], samples=24, export="", sleeve_dir=[0.0, -1.0, 0.0])
+P.update(ARGS)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HAND = os.path.join(ROOT, "models/hand/")
 
@@ -179,7 +180,7 @@ def lever(name):
         t = k / n
         y = 0.036 - t * 0.078
         hx, hz = shell(y)
-        x = hx + 0.0012 + 0.0085 * t ** 1.4
+        x = hx + 0.0012 + P["lever_open"] * t ** 1.4
         row = []
         for sx, sz in ((0, -w), (0, w), (th, w), (th, -w)):
             row.append(bm.verts.new((x + sx, y, sz)))
@@ -346,30 +347,30 @@ def set_curl(bones, angs):
 for f, bones in chains.items():
     tip = "%s_Tip_R" % f
     allv = verts_of(bones + [tip])
-    ratio = RATIO if f != "Thumb" else P.get("thumb_ratio", (0.4, 0.8, 0.6))
-    hi = 100.0 if f != "Thumb" else P.get("thumb_max", 60.0)
-    t, last = -5.0, -5.0
-    while t <= hi:
-        set_curl(bones, [t * r for r in ratio])
-        if penetration(allv) < 0.0008:
-            break
-        last = t
-        t += 2.0
-    angs = [last * r for r in ratio]
+    if f == "Thumb":
+        angs = [0.0, 0.0, 0.0]
+        log[f] = angs
+        continue
+    # Search the knuckle and middle joint angles (the end joint bends with
+    # the middle one, about 2/3 as much, as it does in a real finger) for the
+    # tightest curl at which no part of the finger is inside the shell or the
+    # lever: the finger ends up wrapped round the torch, resting on it.
+    tipv = verts_of([bones[2], tip])
+    best, angs = -1.0, [0.0, 0.0, 0.0]
+    for pa in range(0, 101, 5):
+        for ia in range(0, 106, 5):
+            cand = [float(pa), float(ia), ia * 0.67]
+            set_curl(bones, cand)
+            d = penetration(allv)
+            if d < 0.0004:
+                continue
+            # the finger has to end resting on the torch, its last joint on
+            # the shell or the lever, not curled up in the air beside it
+            dd = penetration(tipv)
+            score = pa + ia + (300.0 if dd < 0.003 else 0.0)
+            if score > best:
+                best, angs = score, cand
     set_curl(bones, angs)
-    if f != "Thumb":
-        # the outer joints keep closing until they touch as well
-        for k in (0, 1, 2):
-            idx = verts_of([bones[k]] if k == 0 else bones[k:] + [tip])
-            g = angs[k]
-            while g < 100.0:
-                angs[k] = g + 2.0
-                set_curl(bones, angs)
-                if penetration(idx) < 0.0008:
-                    angs[k] = g
-                    break
-                g += 2.0
-            set_curl(bones, angs)
     log[f] = [round(x) for x in angs]
 print("POSE", json.dumps(log))
 
@@ -406,6 +407,50 @@ if P.get("thumb_top", True):
         dy = math.sqrt(max(1e-6, ln * ln - dxz * dxz))
         aim(bone, Vector((q.x, h.y + dy, q.z)))
 
+
+def lay_thumb(r):
+    tinv = torch.matrix_world.inverted() @ arm.matrix_world
+    for bone, drop in (("Thumb_Proximal_R", 0.0), ("Thumb_Distal_R", 0.004)):
+        pb = arm.pose.bones[bone]
+        h = tinv @ pb.head
+        rad = r - drop
+        q = Vector((rad * math.cos(ang), 0, rad * math.sin(ang)))
+        dxz = math.hypot(q.x - h.x, q.z - h.z)
+        dy = math.sqrt(max(1e-6, pb.length ** 2 - dxz * dxz))
+        aim(bone, Vector((q.x, h.y + dy, q.z)))
+
+
+if P.get("thumb_top", True):
+    # lift the thumb off the shell until no part of it is inside
+    while penetration(verts_of(chains["Thumb"] + ["Thumb_Tip_R"])) < 0.0005 and tr_ < 0.06:
+        tr_ += 0.001
+        lay_thumb(tr_)
+    print("THUMB_R", round(tr_, 3))
+
+any_owner = {}
+for v in skin.data.vertices:
+    for g in v.groups:
+        if g.weight > 0.15:
+            any_owner.setdefault(vg_names[g.group], []).append(v.index)
+for f, bones in chains.items():
+    idx = sum((any_owner.get(b, []) for b in bones + ["%s_Tip_R" % f]), [])
+    _d = penetration(idx)
+    print("DIAG", f, round(_d * 1000, 2), "mm")
+    _worst_all = min(globals().get("_worst_all", 1.0), _d)
+print("DIAG palm", round(penetration(sum((any_owner.get(b, []) for b in ["Wrist_R", "Palm_R"] + [x + "_Metacarpal_R" for x in ("Index", "Middle", "Ring", "Little", "Thumb")]), [])) * 1000, 2), "mm")
+# and the other way round: no corner of the shell or the lever inside the skin
+_dg = bpy.context.evaluated_depsgraph_get()
+_skin_tree = BVHTree.FromObject(skin, _dg)
+_to_skin = skin.matrix_world.inverted() @ torch.matrix_world
+_worst = 1.0
+for o in (body, lv):
+    for v in o.data.vertices:
+        loc, nrm, _, dist = _skin_tree.find_nearest(_to_skin @ v.co, 0.05)
+        if loc is not None and ((_to_skin @ v.co) - loc).dot(nrm) < 0:
+            _worst = min(_worst, -dist)
+print("DIAG torch-in-skin", round(_worst * 1000, 2), "mm")
+if min(_worst, _worst_all) < 0 and P["export"]:
+    sys.exit("skin and torch overlap, not exporting")
 # --------------------------------------------------------------- sleeve ----
 # Wool coat sleeve from the wrist towards the elbow, with soft folds bunched
 # up near the cuff.
