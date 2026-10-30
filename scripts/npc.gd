@@ -93,7 +93,7 @@ func _process(delta: float) -> void:
 	_stride += speed * delta
 	if _stride > STEP:
 		_stride = 0.0
-		_steps.pitch_scale = randf_range(0.9, 1.05)
+		_steps.pitch_scale = randf_range(0.96, 1.04)
 		_steps.play()
 
 
