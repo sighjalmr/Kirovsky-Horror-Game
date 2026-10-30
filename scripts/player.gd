@@ -20,8 +20,8 @@ const STICK_SENS := 2.4
 const PITCH_LIMIT := deg_to_rad(80.0)
 const FLASHLIGHT_NOISE := 9.0
 const RUN_NOISE := 7.0
-const HAND_POS := Vector3(0.16, -0.15, -0.36)
-const HAND_ROT := Vector3(deg_to_rad(8.0), deg_to_rad(25.0), 0.0)
+const HAND_POS := Vector3(0.17, -0.135, -0.36)
+const HAND_ROT := Vector3(deg_to_rad(-3.0), deg_to_rad(30.0), deg_to_rad(-75.0))
 const HAND_REACH := 0.55
 
 var controllable := false
@@ -212,31 +212,29 @@ func hit(i: int) -> void:
 ## lights of its own.
 func _build_hand() -> void:
 	hand = TorchHand.new()
-	# Thumb along the top towards the lens, four fingers round the body, the
-	# torch across the palm; the forearm bends away down to the frame's edge.
-	hand.diagonal = 40.0
-	hand.roll = -30.0
-	hand.arm_dir = Vector3(0.7, -0.6, 0.4)
+	# The torch is rolled so the thumb is on top and the fingers under it on
+	# the lever, turned a little towards the middle of the view so its side
+	# shows; the beam itself is aimed at the middle (see flashlight below).
 	hand.position = HAND_POS
 	hand.rotation = HAND_ROT
 	camera.add_child(hand)
 	# Light bouncing back from the beam picks out the fist and the torch.
 	_spill = OmniLight3D.new()
-	_spill.position = Vector3(-0.2, 0.25, -0.15)
+	_spill.position = HAND_POS + Vector3(-0.15, 0.2, -0.12)
 	_spill.omni_range = 0.6
 	_spill.light_energy = 0.25
 	_spill.light_color = Color(1.0, 0.92, 0.75)
 	_spill.visible = false
-	hand.add_child(_spill)
+	camera.add_child(_spill)
 	# A faint fill so the fist does not turn into a black blot against a lit
 	# room; too short to reach the shelves.
 	var fill := OmniLight3D.new()
-	fill.position = Vector3(-0.15, 0.2, 0.15)
+	fill.position = HAND_POS + Vector3(-0.12, 0.18, 0.12)
 	fill.omni_range = 0.45
 	fill.light_energy = 0.25
 	fill.light_color = Color(0.75, 0.8, 0.75)
 	fill.light_specular = 0.2
-	hand.add_child(fill)
+	camera.add_child(fill)
 
 
 ## Held steady in front of the eyes (no sway or bob), pulled back from walls.
