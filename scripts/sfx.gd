@@ -1,15 +1,18 @@
 class_name Sfx
 extends RefCounted
 
-## Sounds live in res://sounds/*.wav (44.1 kHz, 16 bit), synthesised by
-## tools/make_sounds.py. Any file can be swapped for a field recording of the
-## same name. Footsteps have four takes each and play in random order.
-## Everything plays through the "Hall" bus, which adds the echo of the big
-## empty tiled hall.
+## Sounds live in res://sounds/*.wav (44.1 kHz, 16 bit). tools/make_sounds.py
+## synthesises the hall and the stings; tools/make_foley.py builds footsteps and
+## the cleaver blows from real recordings (sounds/src/CREDITS.md). Any file can be
+## swapped for a field recording of the same name. Sounds with several takes play
+## them in random order. Everything plays through the "Hall" bus, which adds the
+## echo of the big empty tiled hall; what plays in Gordeev's head (pulse,
+## ringing) goes straight to "Master" so the muffle after a blow spares it.
 
-const LOOPS := ["hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd"]
-const TAKES := {"step": 4, "heavy_step": 4}
+const LOOPS := ["hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd", "heartbeat", "killer_breath"]
+const TAKES := {"step": 12, "run": 6, "creep": 6, "heavy_step": 6, "chop": 3, "hurt": 3}
 const BUS := "Hall"
+const MUFFLE_FX := 1  # the low-pass on the Hall bus
 
 static var _cache: Dictionary = {}
 
@@ -46,9 +49,11 @@ static func _load(id: String) -> AudioStreamWAV:
 
 
 ## Creates the "Hall" bus once: a long, dark reverb like a tiled supermarket
-## at night, and a gentle compressor so the stinger does not clip.
+## at night, a low-pass for the muffled hearing of a man going down, and a
+## gentle compressor so the stinger does not clip.
 static func setup_buses() -> void:
 	if AudioServer.get_bus_index(BUS) != -1:
+		muffle(false)
 		return
 	AudioServer.add_bus()
 	var i := AudioServer.bus_count - 1
@@ -64,13 +69,17 @@ static func setup_buses() -> void:
 	rv.dry = 0.9
 	rv.wet = 0.22
 	AudioServer.add_bus_effect(i, rv)
+	var lp := AudioEffectLowPassFilter.new()
+	lp.cutoff_hz = 500.0
+	AudioServer.add_bus_effect(i, lp)
+	AudioServer.set_bus_effect_enabled(i, MUFFLE_FX, false)
 	var comp := AudioEffectCompressor.new()
 	comp.threshold = -10.0
 	comp.ratio = 3.0
 	AudioServer.add_bus_effect(0, comp)
 
 
-static func play_3d(parent: Node, id: String, pos: Vector3, volume_db := 0.0, pitch := 1.0, max_dist := 24.0) -> void:
+static func play_3d(parent: Node, id: String, pos: Vector3, volume_db := 0.0, pitch := 1.0, max_dist := 24.0) -> AudioStreamPlayer3D:
 	var p := AudioStreamPlayer3D.new()
 	p.stream = get_stream(id)
 	p.volume_db = volume_db
@@ -82,13 +91,23 @@ static func play_3d(parent: Node, id: String, pos: Vector3, volume_db := 0.0, pi
 	p.global_position = pos
 	p.finished.connect(p.queue_free)
 	p.play()
+	return p
 
 
-static func play_2d(parent: Node, id: String, volume_db := 0.0) -> void:
+## Everything in the hall sounds as through cotton wool: after the last blow.
+static func muffle(on: bool) -> void:
+	var i := AudioServer.get_bus_index(BUS)
+	if i != -1:
+		AudioServer.set_bus_effect_enabled(i, MUFFLE_FX, on)
+
+
+static func play_2d(parent: Node, id: String, volume_db := 0.0, bus := BUS, pitch := 1.0) -> AudioStreamPlayer:
 	var p := AudioStreamPlayer.new()
 	p.stream = get_stream(id)
 	p.volume_db = volume_db
-	p.bus = BUS
+	p.pitch_scale = pitch
+	p.bus = bus
 	parent.add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
+	return p

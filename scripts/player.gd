@@ -148,8 +148,11 @@ func _physics_process(delta: float) -> void:
 	_stride += moved * delta
 	if _stride > (0.95 if running else 0.7):
 		_stride = 0.0
-		_steps.pitch_scale = randf_range(0.92, 1.08)
-		_steps.volume_db = -4.0 if running else (-19.0 if crouching else -11.0)
+		# Recorded steps: walking, running (harder heel, scuff) or creeping (toe first).
+		var gait := "run" if running else ("creep" if crouching else "step")
+		_steps.stream = Sfx.get_stream(gait)
+		_steps.pitch_scale = randf_range(0.97, 1.03)
+		_steps.volume_db = {"run": -5.0, "creep": -13.0, "step": -10.0}[gait]
 		_steps.play()
 
 	_noise_t -= delta
