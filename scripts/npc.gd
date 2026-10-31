@@ -4,26 +4,38 @@ extends Node3D
 ## Somebody who walks through the store on a script: the director, the
 ## cashier, the loader. No collision and no senses; they follow the points
 ## they are given, turn to face whom they speak to and carry what they carry.
+## The body is a photographed, motion-captured Person (see Characters.CAST).
 
 signal arrived
 
 const STEP := 0.72
 
-var parts: Dictionary
+var body: Person
+## What they do standing still: "idle", "talk", "sit".
+var pose := "idle":
+	set(v):
+		pose = v
+		# The captured sitting is on a chair; the cashier's stool is higher.
+		body.position.y = 0.12 if v == "sit" else 0.0
+		if not walking:
+			body.play(v)
 var speed := 1.25
 var walking := false
 
 var _path := PackedVector3Array()
 var _i := 0
-var _anim := 0.0
 var _stride := 0.0
 var _steps: AudioStreamPlayer3D
 var _carry := false
+var _box: Node3D
 
 
-func setup(look: Dictionary) -> Npc:
-	parts = Characters.build_person(look)
-	add_child(parts.root)
+func setup(role: String) -> Npc:
+	body = Characters.build(role)
+	add_child(body)
+	_box = Characters.carton()
+	_box.visible = false
+	add_child(_box)
 	_steps = AudioStreamPlayer3D.new()
 	_steps.stream = Sfx.get_stream("step")
 	_steps.bus = Sfx.BUS
@@ -53,9 +65,13 @@ func look_at_point(p: Vector3) -> void:
 ## Both arms round a carton in front of the chest.
 func carry(on: bool) -> void:
 	_carry = on
-	(parts.box as Node3D).visible = on
-	for a: Node3D in [parts.arm_l, parts.arm_r]:
-		a.rotation.x = -1.15 if on else 0.0
+	_box.visible = on
+	if body.bag:
+		body.bag.visible = not on
+	for side: String in ["L", "R"]:
+		var x := -1.0 if side == "L" else 1.0
+		body.aim("Bip01 %s UpperArm" % side, Vector3(x * 0.25, -0.75, -0.6), 1.0 if on else 0.0)
+		body.aim("Bip01 %s Forearm" % side, Vector3(-x * 0.35, 0.1, -1.0), 1.0 if on else 0.0)
 
 
 func _process(delta: float) -> void:
@@ -81,12 +97,10 @@ func _process(delta: float) -> void:
 		_steps.play()
 
 
-func _animate(v: float, delta: float) -> void:
-	_anim += delta * v * 3.4
-	var amount := clampf(v / 1.2, 0.0, 1.2)
-	var s := sin(_anim) * 0.5 * amount
-	(parts.leg_l as Node3D).rotation.x = s
-	(parts.leg_r as Node3D).rotation.x = -s
-	if not _carry:
-		(parts.arm_l as Node3D).rotation.x = -s * 0.6
-		(parts.arm_r as Node3D).rotation.x = s * 0.6
+func _animate(v: float, _delta: float) -> void:
+	# The captured walk covers about 1.3 m a second; a slower or quicker
+	# pace plays it slower or quicker so the feet do not slide.
+	if v > 0.05:
+		body.play("walk", v / (1.2 if body.woman else 1.3))
+	else:
+		body.play(pose)
