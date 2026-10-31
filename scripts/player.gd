@@ -91,7 +91,7 @@ func _ready() -> void:
 	_whirr = AudioStreamPlayer3D.new()
 	_whirr.stream = Sfx.get_stream("whirr")
 	_whirr.bus = Sfx.BUS
-	_whirr.volume_db = -24.0
+	_whirr.volume_db = WHIRR_DB
 	_whirr.max_distance = 6.0
 	_whirr.unit_size = 1.0
 	add_child(_whirr)
@@ -165,7 +165,7 @@ func _physics_process(delta: float) -> void:
 			_noise_t = 0.4
 	if flashlight_on:
 		# The dynamo pulses as he works the lever; the fist itself stays still.
-		flashlight.light_energy = 9.0 + sin(_t * 37.0) * 0.6 + sin(_t * 6.0) * 0.9
+		flashlight.light_energy = _torch_light(delta)
 
 
 func _set_flashlight(on: bool) -> void:
@@ -175,10 +175,57 @@ func _set_flashlight(on: bool) -> void:
 	flashlight.visible = on
 	_spill.visible = on
 	hand.set_lit(on)
+	_torch_sound(on)
+
+
+## The «жучок» heard (tools/make_torch_sound.py): the first squeeze from rest,
+## then steady pumping in a loop, and on letting go the lever springing open and
+## the flywheel running down. Quiet, close by in his right hand.
+const WHIRR_DB := -18.0
+var _torch_t := 0.0
+var _torch_start: AudioStreamPlayer3D
+var _whirr_fade: Tween
+
+
+func _torch_sound(on: bool) -> void:
+	if _whirr_fade:
+		_whirr_fade.kill()
+	if is_instance_valid(_torch_start):
+		_torch_start.stop()
+		_torch_start.queue_free()
+	_torch_t = 0.0
 	if on:
-		_whirr.play()
-	else:
 		_whirr.stop()
+		_torch_start = _torch_one_shot("torch_on")
+		return
+	if _whirr.playing:
+		_whirr_fade = create_tween()
+		_whirr_fade.tween_property(_whirr, "volume_db", -60.0, 0.03)
+		_whirr_fade.tween_callback(_whirr.stop)
+	_torch_one_shot("torch_off")
+
+
+func _torch_one_shot(id: String) -> AudioStreamPlayer3D:
+	var p := Sfx.play_3d(self, id, _whirr.global_position, WHIRR_DB, 1.0, _whirr.max_distance)
+	p.unit_size = _whirr.unit_size
+	return p
+
+
+## Bulb brightness follows the flywheel speed of the squeezes being heard; the
+## loop takes over from the first squeeze, fading in under its tail.
+func _torch_light(delta: float) -> float:
+	_torch_t += delta
+	var b: float
+	if _torch_t < DynamoCurve.START_LEN:
+		b = DynamoCurve.at(DynamoCurve.START, _torch_t)
+	else:
+		if not _whirr.playing:
+			_whirr.volume_db = -40.0
+			_whirr.play()
+			_whirr_fade = create_tween()
+			_whirr_fade.tween_property(_whirr, "volume_db", WHIRR_DB, 0.04)
+		b = DynamoCurve.at(DynamoCurve.LOOP, _whirr.get_playback_position())
+	return 10.0 * (0.45 + 0.55 * b)
 
 
 ## Height the killer looks for: the head, lower when crouching or sitting.
