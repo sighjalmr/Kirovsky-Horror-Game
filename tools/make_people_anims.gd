@@ -37,11 +37,25 @@ func _init() -> void:
 				keep = path.get_slice(":", 1) in ["Bip01", "Bip01 Pelvis"]
 			if not keep:
 				anim.remove_track(i)
+		# The captured walks and runs carry the body forward through the clip
+		# and jump back at the loop: take that travel out (Npc and Killer move
+		# the person themselves) and keep it as the clip's natural speed, so
+		# the game can play the clip at the pace the feet really cover.
+		var speed := 0.0
+		var root := anim.find_track(NodePath("Skeleton3D:Bip01"), Animation.TYPE_POSITION_3D)
+		if root >= 0:
+			var n := anim.track_get_key_count(root)
+			var first: Vector3 = anim.track_get_key_value(root, 0)
+			var travel: Vector3 = anim.track_get_key_value(root, n - 1) - first
+			travel.y = 0.0
+			speed = travel.length() / anim.length
+			for k in n:
+				var t := anim.track_get_key_time(root, k) / anim.length
+				anim.track_set_key_value(root, k, (anim.track_get_key_value(root, k) as Vector3) - travel * t)
+		anim.set_meta("speed", speed)
 		anim.loop_mode = Animation.LOOP_LINEAR
-		anim.optimize(0.01, 0.01, 0.01)
-		anim.compress()
 		ResourceSaver.save(anim, "res://models/people/anims/%s.res" % key)
-		print(key, ": ", anim.length, " s, ", anim.get_track_count(), " tracks")
+		print(key, ": ", anim.length, " s, ", anim.get_track_count(), " tracks, ", speed, " m/s")
 		src.free()
 	body.free()
 	quit()
