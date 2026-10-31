@@ -22,13 +22,14 @@ const RENDER_H := 1080
 
 const FOG_LIT := Color("6f7671")
 const FOG_DARK := Color("0d0f0e")
+const DAY_AIR := Color("d8dad4")
 
 enum Phase { TITLE, PLAY, DEAD, END }
 
 ## The last signed round, kept across a scene reload after death.
 static var checkpoint: Dictionary = {}
 static var _resume := false
-## "night1" or "day1"; survives the reload between chapters.
+## "night1", "day1" or "night2"; survives the reload between chapters.
 static var chapter := "night1"
 ## What night one turned up, handed on to the day. Starting the day from the
 ## title screen counts every clue as found.
@@ -78,10 +79,12 @@ func _ready() -> void:
 	add_child(hud)
 	if "--daytest" in OS.get_cmdline_user_args():
 		chapter = "day1"
+	if "--night2" in OS.get_cmdline_user_args():
+		chapter = "night2"
 	if chapter == "day1":
 		_ready_day()
 		return
-	night = NightOne.new(self)
+	night = NightTwo.new(self) if chapter == "night2" else NightOne.new(self)
 	add_child(night)
 	night.build_timeline()
 	night.update_notebook()
@@ -95,7 +98,8 @@ func _ready() -> void:
 		if a.begins_with("--autoshot="):
 			shot_dir = a.get_slice("=", 1)
 	if "--nighttest" in OS.get_cmdline_user_args():
-		add_child(load("res://scripts/dev_nighttest.gd").new().with(self))
+		var test := "res://scripts/dev_night2test.gd" if chapter == "night2" else "res://scripts/dev_nighttest.gd"
+		add_child(load(test).new().with(self))
 		return
 	if shot_dir != "":
 		var dev: Node = load("res://scripts/dev_autoshot.gd").new()
@@ -105,11 +109,15 @@ func _ready() -> void:
 		return
 	hud.fade.color.a = 1.0
 	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ",
-		"Свердловск, октябрь 1988\n\nНочь первая. Пятница, 14 октября\n\n\n" +
+		"Свердловск, октябрь 1988\n\n%s\n\n\n" % _night_name() +
 		"Мышь — смотреть      W / A / S / D — идти\n" +
 		"Shift — бег (шумно)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
-		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену\n2 — сразу к дню первому")
+		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая")
+
+
+func _night_name() -> String:
+	return "Ночь вторая. Понедельник, 17 октября" if chapter == "night2" else "Ночь первая. Пятница, 14 октября"
 
 
 ## Day one: the lights on, people in the hall, no killer and no rounds.
@@ -120,10 +128,9 @@ func _ready_day() -> void:
 	day = DayOne.new(self, night_clues)
 	add_child(day)
 	hud.clock.text = _fmt(minutes)
-	env.fog_depth_end = 16.0
+	_day_look()
 	player.global_position = Vector3(-0.3, 0, 1.0)
 	player.face(Vector3(0.15, 0, 1))
-	post.set_shader_parameter("grain", 0.06)
 	if "--daytest" in OS.get_cmdline_user_args():
 		add_child(load("res://scripts/dev_daytest.gd").new().with(self))
 		return
@@ -132,6 +139,27 @@ func _ready_day() -> void:
 		"Суббота, 15 октября 1988, 12:40\nУниверсам «Кировский», Сиреневый бульвар, 2\n\n\n" +
 		"Выходной. Гордеев пришёл как покупатель.\nТамара Ивановна сидит на второй кассе.\n\n" +
 		"E — поговорить      цифры или мышь — выбрать вопрос\nTab — блокнот\n\nНажмите E, чтобы войти")
+
+
+## Daytime: a busy shop at noon, plainly and evenly lit, no fog and no murk.
+## The night keeps its fog, green grade and heavy grain.
+func _day_look() -> void:
+	env.fog_enabled = false
+	env.background_color = DAY_AIR
+	env.ambient_light_color = Color(0.93, 0.94, 0.9)
+	env.ambient_light_energy = 0.95
+	env.tonemap_exposure = 1.15
+	for row in store.rows:
+		for l: OmniLight3D in row.lights:
+			l.light_energy = 1.6
+			l.omni_range = 8.5
+	post.set_shader_parameter("grain", 0.025)
+	post.set_shader_parameter("vignette", 0.18)
+	post.set_shader_parameter("saturation", 0.88)
+	post.set_shader_parameter("shadow_tint", Color(0.03, 0.03, 0.03))
+	post.set_shader_parameter("highlight_tint", Color(1.0, 0.99, 0.95))
+	post.set_shader_parameter("halation", 0.15)
+	post.set_shader_parameter("fringe", 0.3)
 
 
 # --- setup ----------------------------------------------------------------------
@@ -348,10 +376,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.TITLE and event.is_action_pressed("interact"):
 		_start()
 	elif phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
-			and (event as InputEventKey).physical_keycode == KEY_2:
-		_go_to("day1", {})
-	elif phase == Phase.END and night and event.is_action_pressed("interact"):
+			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3]:
+		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2"}[(event as InputEventKey).physical_keycode]
+		if to != chapter:
+			_go_to(to, {})
+	elif phase == Phase.END and night and chapter == "night1" and event.is_action_pressed("interact"):
 		_go_to("day1", night.clues.duplicate())
+	elif phase == Phase.END and day and event.is_action_pressed("interact"):
+		_go_to("night2", {})
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook"):
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
@@ -362,7 +394,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
 		get_tree().reload_current_scene()
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
-		_go_to("night1", {})
+		_go_to("night2" if chapter == "night2" and phase == Phase.DEAD else "night1", {})
 
 
 ## Reloads the scene into another chapter.
@@ -549,6 +581,10 @@ func end_shift() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
+	if chapter == "night2":
+		hud.show_title("06:00. КОНЕЦ ВТОРОЙ НОЧИ",
+			"%s\n\nДальше: день второй, разговор с Ринатом (в работе).\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+		return
 	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
 		"%s\n\nE: дальше, день первый\nR: сыграть ночь ещё раз" % night.summary())
 
@@ -564,7 +600,7 @@ func end_day() -> void:
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 1.0)
 	hud.show_title("КОНЕЦ ДНЯ ПЕРВОГО",
-		"%s\n\nДальше: ночь вторая.\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
+		"%s\n\nE: дальше, ночь вторая\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
 
 
 func _fmt(m: float) -> String:

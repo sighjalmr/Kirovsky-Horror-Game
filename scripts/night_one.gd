@@ -458,7 +458,7 @@ func interact(id: String) -> bool:
 func _journal() -> void:
 	var hud: Hud = main.hud
 	Sfx.play_3d(main.view, "pickup", main.player.global_position, -8.0)
-	if not clues.page:
+	if clues.has("page") and not clues.page:
 		_find_clue("page", CLUE_PAGE)
 		return
 	var r := current_round()
@@ -504,8 +504,13 @@ func _find_clue(key: String, text: String) -> void:
 	clues[key] = true
 	main.hud.say(text, -1.0, true)
 	if not clues.values().has(false):
-		main.hud.say("Записал в блокнот. " + FINAL_ENTRY)
+		main.hud.say("Записал в блокнот. " + final_entry())
 	update_notebook()
+
+
+## What the notebook says once every clue of the night is found.
+func final_entry() -> String:
+	return FINAL_ENTRY
 
 
 func clue_count() -> int:
@@ -674,7 +679,7 @@ func restore_state(d: Dictionary) -> void:
 			store.switch_off(i, true)
 	if kovpak_state == "prologue":
 		kovpak_state = "none"
-	if kovpak_state == "done" and not clues.invoice:
+	if kovpak_state == "done" and clues.has("invoice") and not clues.invoice:
 		store.show_invoice()
 	if kovpak_state == "none" and main.minutes >= Main.clock(1, 50):
 		main.after(2.0, _kovpak_visit)

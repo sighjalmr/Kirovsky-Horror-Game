@@ -49,6 +49,9 @@ FX = {
     # Said aloud into the phone at the post: more of the hall around him.
     "aloud": "highpass=f=110,acompressor=threshold=-18dB:ratio=3:attack=5:release=150,"
              "aecho=0.8:0.4:45|90|140:0.18|0.12|0.07",
+    # A voice down the line of the post telephone: narrow band, a little crackle.
+    "phone": "highpass=f=380,lowpass=f=3200,acompressor=threshold=-22dB:ratio=4:attack=3:release=80,"
+             "aecho=0.6:0.2:8:0.1",
     # Shouted through the plate glass of the front door from the street.
     "glass": "highpass=f=180,lowpass=f=2800,acompressor=threshold=-18dB:ratio=3:attack=5:release=150,"
              "aecho=0.8:0.3:30|70:0.15|0.08",
