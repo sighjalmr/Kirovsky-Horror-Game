@@ -23,6 +23,9 @@ var title: Label
 var title_sub: Label
 var note: Label
 var choices: ColorRect
+var memo: ColorRect
+
+var _memo_text: Label
 
 var _choice_box: VBoxContainer
 var _choice_title: Label
@@ -88,6 +91,48 @@ func _ready() -> void:
 	_choice_box.size = Vector2(1028, 380)
 	_choice_box.add_theme_constant_override("separation", 6)
 	choices.add_child(_choice_box)
+
+	# A sheet of squared school paper, slightly askew: notes left in the post.
+	memo = ColorRect.new()
+	memo.color = Color(0.86, 0.84, 0.76, 0.98)
+	memo.position = Vector2(480, 30)
+	memo.size = Vector2(960, 1020)
+	memo.pivot_offset = memo.size * 0.5
+	memo.rotation = deg_to_rad(-1.2)
+	memo.visible = false
+	add_child(memo)
+	for i in 46:
+		var line := ColorRect.new()
+		line.color = Color(0.45, 0.55, 0.7, 0.18)
+		line.position = Vector2(0, 30 + i * 23)
+		line.size = Vector2(960, 1)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		memo.add_child(line)
+	_memo_text = Label.new()
+	_memo_text.position = Vector2(56, 34)
+	_memo_text.size = Vector2(848, 960)
+	_memo_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_memo_text.add_theme_font_size_override("font_size", 25)
+	_memo_text.add_theme_color_override("font_color", Color(0.12, 0.16, 0.38))
+	memo.add_child(_memo_text)
+
+
+## Shows a handwritten note until E (or a click) puts it away.
+func read_memo(text: String) -> void:
+	_memo_text.text = text
+	memo.modulate.a = 0.0
+	memo.visible = true
+	create_tween().tween_property(memo, "modulate:a", 1.0, 0.5)
+	var t := 0.0
+	while true:
+		await get_tree().process_frame
+		t += get_process_delta_time()
+		if t > 0.8 and (Input.is_action_just_pressed("interact") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)):
+			break
+	var tw := create_tween()
+	tw.tween_property(memo, "modulate:a", 0.0, 0.4)
+	await tw.finished
+	memo.visible = false
 
 
 ## A list of answers to pick with the mouse or the number keys; returns the
