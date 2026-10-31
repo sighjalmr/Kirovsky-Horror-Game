@@ -26,7 +26,7 @@ const DAY_AIR := Color("d8dad4")
 ## The first time Gordeev runs out of breath.
 const G_WINDED := "Сердце колотится в горле. Мне не тридцать лет, долго я не пробегу."
 
-enum Phase { TITLE, PLAY, DEAD, END }
+enum Phase { TITLE, CUT, PLAY, DEAD, END }
 
 ## The last signed round, kept across a scene reload after death.
 static var checkpoint: Dictionary = {}
@@ -87,6 +87,10 @@ func _ready() -> void:
 		chapter = "day1"
 	if "--night2" in OS.get_cmdline_user_args():
 		chapter = "night2"
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--cut="):
+			chapter = a.get_slice("=", 1)
+			get_tree().create_timer(2.0).timeout.connect(_start)
 	if chapter == "day1":
 		_ready_day()
 		return
@@ -418,6 +422,9 @@ func _go_to(ch: String, clues: Dictionary, answers: Array) -> void:
 
 
 func _start() -> void:
+	phase = Phase.CUT
+	hud.hide_title()
+	await _cutscenes()
 	checkpoint = {}
 	start_now()
 	if day:
@@ -426,6 +433,31 @@ func _start() -> void:
 	hud.fade_to(0.0, 2.0)
 	hud.hide_title()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## The story cutscenes before this chapter (Cutscene.BEFORE), one after
+## another; the store underneath stops drawing meanwhile.
+func _cutscenes() -> void:
+	var list: Array = Cutscene.BEFORE.get(chapter, [])
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--cutonly="):  # dev: just this one
+			list = [a.get_slice("=", 1)]
+	if list.is_empty():
+		return
+	hud.clock.visible = false
+	hud.fade.color.a = 0.0
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	view.audio_listener_enable_3d = false
+	for k: String in list:
+		var cs := Cutscene.new(self, k)
+		add_child(cs)
+		await cs.finished
+	view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	view.audio_listener_enable_3d = true
+	hud.clock.visible = true
+	hud.fade.color.a = 1.0
+	if "--cutshots" in " ".join(OS.get_cmdline_user_args()):
+		get_tree().quit()
 
 
 ## Starts the shift at once (also used by the dev screenshot run).

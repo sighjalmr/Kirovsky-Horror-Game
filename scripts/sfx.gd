@@ -9,7 +9,8 @@ extends RefCounted
 ## echo of the big empty tiled hall; what plays in Gordeev's head (pulse,
 ## ringing) goes straight to "Master" so the muffle after a blow spares it.
 
-const LOOPS := ["hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd", "heartbeat", "killer_breath"]
+const LOOPS := ["hum", "whirr", "phone", "compressor", "drone", "room", "engine", "crowd", "heartbeat", "killer_breath",
+	"rain", "rain_car", "engine_drive"]
 const TAKES := {"step": 12, "run": 6, "creep": 6, "heavy_step": 6, "chop": 3, "hurt": 3}
 const BUS := "Hall"
 const MUFFLE_FX := 1  # the low-pass on the Hall bus
