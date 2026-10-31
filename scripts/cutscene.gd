@@ -499,7 +499,7 @@ func _night_one() -> void:
 	var kovpak := Npc.new().setup("kovpak")
 	ext.add_child(kovpak)
 	kovpak.global_position = Vector3(0.6, Exterior.PORCH, 1.2)
-	kovpak.rotation.y = PI
+	kovpak.rotation.y = 0.0  # faces the glass and the street
 	kovpak.pose = "idle"
 	_black.color.a = 1.0
 	fade(0.0, 2.5)
@@ -568,7 +568,7 @@ func _day_one() -> void:
 		var n := Npc.new().setup(["shopper", "shopper_man", "shopper2", "shopper", "shopper_man"][i])
 		ext.add_child(n)
 		n.global_position = Vector3(-1.2 - i * 0.05, Exterior.PORCH, -0.8 - i * 0.65)
-		n.rotation.y = 0.0 if i % 2 == 0 else 0.25  # facing the doors
+		n.rotation.y = PI if i % 2 == 0 else PI - 0.25  # facing the doors (+Z)
 		n.pose = "idle"
 	caption("Суббота, 15 октября 1988 года, 12:30", 4.5)
 	say(D1_DAY)
@@ -590,7 +590,7 @@ func _night_two() -> void:
 	ext.add_child(koles)
 	var kp := Vector3(1.9, Exterior.PORCH, -3.8)
 	koles.global_position = kp
-	koles.rotation.y = PI
+	koles.rotation.y = 0.0  # facing the street, watching for the car
 	koles.pose = "idle"
 	# His «Космос»: an ember at the fingers that glows up as he draws on it.
 	var ember := OmniLight3D.new()
