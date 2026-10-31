@@ -205,8 +205,20 @@ func set_prompt(text: String) -> void:
 	prompt.text = text
 
 
+## Long notebooks (night two carries the earlier findings over) get a smaller
+## hand so the page never runs off the bottom of the sheet.
 func set_notebook(text: String) -> void:
 	notebook_text.text = text
+	var size := 27
+	while size > 18:
+		var per_line := int(notebook_text.size.x / (size * 0.5))
+		var lines := 0
+		for l in text.split("\n"):
+			lines += maxi(1, ceili(float(l.length()) / per_line))
+		if lines * size * 1.38 <= notebook_text.size.y:
+			break
+		size -= 1
+	notebook_text.add_theme_font_size_override("font_size", size)
 
 
 func fade_to(alpha: float, time: float) -> void:

@@ -8,8 +8,6 @@ extends Node3D
 
 signal arrived
 
-const STEP := 0.72
-
 var body: Person
 ## What they do standing still: "idle", "talk", "sit".
 var pose := "idle":
@@ -24,7 +22,6 @@ var walking := false
 
 var _path := PackedVector3Array()
 var _i := 0
-var _stride := 0.0
 var _steps: AudioStreamPlayer3D
 var _carry := false
 var _box: Node3D
@@ -43,6 +40,7 @@ func setup(role: String) -> Npc:
 	_steps.unit_size = 3.0
 	_steps.volume_db = -8.0
 	add_child(_steps)
+	body.footfall.connect(_on_footfall)
 	return self
 
 
@@ -88,19 +86,22 @@ func _process(delta: float) -> void:
 		return
 	var dir := to.normalized()
 	global_position += dir * minf(speed * delta, to.length())
+	# Up or down steps (the porch outside): climb at half the walking pace.
+	global_position.y = move_toward(global_position.y, _path[_i].y, speed * delta * 0.5)
 	rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), clampf(delta * 8.0, 0.0, 1.0))
 	_animate(speed, delta)
-	_stride += speed * delta
-	if _stride > STEP:
-		_stride = 0.0
-		_steps.pitch_scale = randf_range(0.96, 1.04)
-		_steps.play()
 
 
 func _animate(v: float, _delta: float) -> void:
-	# The captured walk covers about 1.3 m a second; a slower or quicker
-	# pace plays it slower or quicker so the feet do not slide.
+	# The captured walk plays at the rate that matches the pace, so the feet
+	# stay planted; each footfall of the clip sounds a step.
 	if v > 0.05:
-		body.play("walk", v / (1.2 if body.woman else 1.3))
+		body.play("walk", v)
 	else:
 		body.play(pose)
+
+
+func _on_footfall() -> void:
+	if walking:
+		_steps.pitch_scale = randf_range(0.96, 1.04)
+		_steps.play()

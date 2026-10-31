@@ -1,7 +1,10 @@
 class_name Killer
 extends CharacterBody3D
 
-## The maniac. An ordinary man with keys to the storage door: no powers,
+## The maniac: участковый Колесников out of uniform, in a knitted hat with a
+## scarf over his face (see the plot on the concept page). With women he uses
+## a cord; on Gordeev he uses the cleaver from the meat counter, so that the
+## blame falls on Ринат the butcher. An ordinary man with keys to the storage door: no powers,
 ## he sees only what light shows him and hears what Gordeev does.
 ## In the dark he notices Gordeev only at arm's length; the flashlight and
 ## lit rows give him away from far off. Noise (the whirr, running, lifting
@@ -44,7 +47,6 @@ var _lost_t := 0.0
 var _repath_t := 0.0
 var _stuck_t := 0.0
 var _keys_t := 6.0
-var _stride := 0.0
 var _steps: AudioStreamPlayer3D
 
 
@@ -66,6 +68,7 @@ func _ready() -> void:
 	add_child(cs)
 	body = Characters.build_killer()
 	add_child(body)
+	body.footfall.connect(_on_footfall)
 	visible = false
 	_steps = AudioStreamPlayer3D.new()
 	_steps.stream = Sfx.get_stream("heavy_step")
@@ -290,21 +293,17 @@ func _move(speed: float, delta: float) -> void:
 
 
 func _animate(speed: float, delta: float) -> void:
-	# Captured gaits, sped up or slowed to his pace: a creeping walk on
-	# patrol, a brisk one when he heads for a noise, a run in a chase.
+	# Captured gaits at his pace, the feet planted: a creeping walk on
+	# patrol, a brisk one when he heads for a noise, a run in a chase. The
+	# boots sound on each footfall of the clip.
 	if speed <= 0.05:
 		body.play("breathe")
 	elif speed <= PATROL_SPEED + 0.1:
-		body.play("prowl", speed / 0.95)
+		body.play("prowl", speed)
 	elif speed < CHASE_SPEED - 0.4:
-		body.play("walk", speed / 1.4)
+		body.play("walk", speed)
 	else:
-		body.play("run", speed / 3.4)
-	_stride += speed * delta
-	if _stride > 0.85:
-		_stride = 0.0
-		_steps.pitch_scale = randf_range(0.95, 1.03)
-		_steps.play()
+		body.play("run", speed)
 	_keys_t -= delta
 	if _keys_t <= 0.0 and state == State.PATROL and speed > 0.0:
 		_keys_t = randf_range(8.0, 16.0)
@@ -346,3 +345,8 @@ func play_attack(hit: Callable) -> void:
 func _swing(t: float) -> void:
 	body.aim("Bip01 R UpperArm", Vector3(0.3, 1.0, 0.35).lerp(Vector3(0.1, -0.15, -1.0), t))
 	body.aim("Bip01 R Forearm", Vector3(-0.1, 1.0, 0.1).lerp(Vector3(-0.15, -0.7, -1.0), t))
+
+
+func _on_footfall() -> void:
+	_steps.pitch_scale = randf_range(0.95, 1.03)
+	_steps.play()
