@@ -139,18 +139,15 @@ func _ready() -> void:
 	_phone.unit_size = 8.0
 	main.world.add_child(_phone)
 	_phone.global_position = main.store.phone_pos
-	kovpak = _person({"coat": "dublyonka", "collar": "fur", "face": "face_kovpak", "hat": "fur", "bag": "briefcase",
-		"trousers": "trousers", "skin": Color(0.95, 0.82, 0.78)})
-	tamara = _person({"coat": "woman_coat", "coat_tint": Color(1.5, 1.45, 1.4), "collar": "fur", "face": "face_tamara", "hat": "scarf", "woman": true,
-		"bag": "handbag", "skin": Color(0.95, 0.85, 0.8)})
-	vasya = _person({"coat": "quilted", "long": false, "face": "face_vasya", "hat": "cap", "trousers": "guard_wool",
-		"boots": "rubber", "skin": Color(0.85, 0.72, 0.66)})
+	kovpak = _person("kovpak")
+	tamara = _person("tamara")
+	vasya = _person("vasya")
 	main.store.add_interactable("talk_kovpak", Vector3.ZERO, "Спросить про Нину", 1.6, false, false)
 	main.store.add_interactable("talk_tamara", Vector3.ZERO, "Спросить про седьмое октября", 1.6, false, false)
 
 
-func _person(look: Dictionary) -> Npc:
-	var n := Npc.new().setup(look)
+func _person(role: String) -> Npc:
+	var n := Npc.new().setup(role)
 	main.world.add_child(n)
 	n.visible = false
 	n.global_position = main.store.street

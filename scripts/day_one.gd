@@ -81,17 +81,12 @@ func _ready() -> void:
 		it.active = false
 	# Tamara on her stool at till 2, the queue on the customer side, Эдик
 	# leaning by the doors with a bag of jeans.
-	tamara = _person({"coat": "smock", "collar": "fabric", "face": "face_tamara", "hat": "perm",
-		"hat_tint": Color(0.75, 0.45, 0.32), "woman": true, "long": false, "skin": Color(0.95, 0.85, 0.8)}, TILL, PI * 0.5)
-	shopper = _person({"coat": "woman_coat", "coat_tint": Color(0.8, 1.1, 1.0), "collar": "fur", "face": "face_shopper",
-		"hat": "scarf", "woman": true, "bag": "handbag", "skin": Color(0.9, 0.8, 0.76)}, QUEUE[0], -PI * 0.5)
-	_person({"coat": "dublyonka", "coat_tint": Color(0.7, 0.7, 0.7), "face": "face_vasya", "hat": "cap",
-		"skin": Color(0.88, 0.76, 0.7)}, QUEUE[1], 0.0)
-	_person({"coat": "coat", "face": "face_shopper", "hat": "perm", "hat_tint": Color(0.3, 0.25, 0.22), "woman": true,
-		"bag": "handbag", "skin": Color(0.92, 0.82, 0.78)}, QUEUE[2], 0.0)
-	edik = _person({"coat": "jacket", "coat_tint": Color(2.4, 1.9, 1.6), "collar": "jacket", "long": false, "face": "face_edik", "hat": "hair",
-		"hat_tint": Color(0.28, 0.2, 0.15), "trousers": "denim", "bag": "handbag", "skin": Color(0.92, 0.8, 0.74)},
-		EDIK, 0.93)
+	tamara = _person("tamara_day", TILL, PI * 0.5)
+	tamara.pose = "sit"
+	shopper = _person("shopper", QUEUE[0], -PI * 0.5)
+	_person("shopper_man", QUEUE[1], 0.0)
+	_person("shopper2", QUEUE[2], 0.0)
+	edik = _person("edik", EDIK, 0.93)
 	store.add_interactable("talk_tamara_day", TILL + Vector3(0.25, 0, -0.95), "Поговорить с Тамарой Ивановной", 1.9, false)
 	store.add_interactable("talk_edik", EDIK, "Заговорить с Эдиком", 1.6, false)
 	store.set_interactable("door_front", true, "Уйти домой")
@@ -104,8 +99,8 @@ func _ready() -> void:
 	update_notebook()
 
 
-func _person(look: Dictionary, pos: Vector3, yaw: float) -> Npc:
-	var n := Npc.new().setup(look)
+func _person(role: String, pos: Vector3, yaw: float) -> Npc:
+	var n := Npc.new().setup(role)
 	main.world.add_child(n)
 	n.global_position = pos
 	n.rotation.y = yaw
