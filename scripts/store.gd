@@ -62,12 +62,20 @@ var storage_inside := Vector3(9.0, 0, 29.6)
 var street := Vector3(-1.0, 0, -4.0)
 var storage_open := false
 var front_open := false
+## The duty light over the exit and the lamp in the guard booth; somebody at
+## the panel can put them out too (night two).
+var duty_on := true
 var car: Node3D
 
 var _car_lights: Array[SpotLight3D] = []
 var _engine: AudioStreamPlayer3D
 var _front_hinge: Node3D
 var _invoice: Node3D
+var _booth_lamp: OmniLight3D
+var _duty_light: OmniLight3D
+var _bag_strap: MeshInstance3D
+var _token: Node3D
+var _butt: Node3D
 
 var _patrol_ids: Array[int] = []
 var _storage_hinge: Node3D
@@ -261,7 +269,7 @@ func _build_entrance() -> void:
 	# Locker № 31 (row 3, column 7) stands ajar: a dark hole and the door swung out,
 	# a strap of Nina's bag hanging over the edge.
 	box(Vector3(-7.75, 0.62, 0.553), Vector3(0.46, 0.46, 0.006), "white", Color(0.02, 0.02, 0.02), 1.0, false, MeshFactory.PZ)
-	box(Vector3(-7.62, 0.5, 0.57), Vector3(0.03, 0.14, 0.01), "leather", Color.WHITE, 1.0, false)
+	_bag_strap = box(Vector3(-7.62, 0.5, 0.57), Vector3(0.03, 0.14, 0.01), "leather", Color.WHITE, 1.0, false)
 	var hinge := Node3D.new()
 	hinge.position = Vector3(-8.0, 0.62, 0.57)
 	hinge.rotation.y = deg_to_rad(-35)
@@ -295,6 +303,7 @@ func _build_booth() -> void:
 	lamp.light_color = WARM_COLOR
 	lamp.light_specular = 0.5
 	add_child(lamp)
+	_booth_lamp = lamp
 	add_interactable("phone", Vector3(11.1, 0, 1.2), "Снять трубку", 1.3, false, false)
 	add_interactable("journal", Vector3(10.9, 0, 2.6), "Журнал обходов", 1.3, false)
 	add_interactable("chair", Vector3(10.2, 0, 2.2), "Сесть на стул и ждать", 0.9, false)
@@ -394,6 +403,7 @@ func _build_rows() -> void:
 	duty.light_color = Color(0.75, 0.9, 0.75)
 	duty.light_specular = 0.4
 	add_child(duty)
+	_duty_light = duty
 
 
 func _add_row(title: String, rect: Rect2, points: Array[Vector3], color: Color) -> void:
@@ -515,7 +525,7 @@ func _build_panel() -> void:
 
 func is_lit(pos: Vector3) -> bool:
 	var p := Vector2(pos.x, pos.z)
-	if booth_rect.has_point(p) or duty_rect.has_point(p):
+	if duty_on and (booth_rect.has_point(p) or duty_rect.has_point(p)):
 		return true
 	for row in rows:
 		if row.lit and row.rect.has_point(p):
@@ -684,6 +694,90 @@ func show_invoice() -> void:
 func hide_invoice() -> void:
 	_invoice.visible = false
 	set_interactable("invoice", false)
+
+
+## Night two: the cellar door in the back passage, by the fuse panel, with a brand-new padlock,
+## and two things that turn up on the floor after the killer has gone: the
+## brass token of locker 31 on its cord by the storage door, a cigarette end
+## by the cellar door.
+func add_cellar() -> void:
+	var x := -1.95
+	var kit := MeshBuilder.Kit.new()
+	var frame := kit.b("paint", Color(0.4, 0.3, 0.25))
+	for dx: float in [-0.5, 0.5]:
+		frame.box(Props.at(x + dx, 0, 27.97), Vector3(0.07, 2.1, 0.05))
+	frame.box(Props.at(x, 2.06, 27.97), Vector3(1.07, 0.07, 0.05))
+	kit.b("metal", Color(0.42, 0.45, 0.4)).box(Props.at(x, 0.02, 27.975), Vector3(0.93, 2.03, 0.04))
+	var stencil := kit.b("white", Color(0.9, 0.88, 0.8))
+	stencil.box(Props.at(x, 1.55, 27.95), Vector3(0.5, 0.012, 0.003))
+	stencil.box(Props.at(x, 1.47, 27.95), Vector3(0.5, 0.012, 0.003))
+	# The hasp, and the padlock hanging from it, new and bright.
+	var steel := kit.b("chrome", Color(0.9, 0.9, 0.88))
+	steel.box(Props.at(x + 0.38, 1.0, 27.94), Vector3(0.16, 0.035, 0.02))
+	steel.box(Props.at(x + 0.43, 0.9, 27.925), Vector3(0.012, 0.09, 0.012))
+	kit.b("chrome", Color(1.0, 0.85, 0.5)).box(Props.at(x + 0.43, 0.84, 27.925), Vector3(0.065, 0.075, 0.025))
+	kit.build(self)
+	var sign := Label3D.new()
+	sign.text = "ПОДВАЛ"
+	sign.font_size = 48
+	sign.pixel_size = 0.0025
+	sign.modulate = Color(0.85, 0.83, 0.75)
+	sign.position = Vector3(x, 1.75, 27.93)
+	sign.rotation.y = PI
+	sign.shaded = true
+	add_child(sign)
+	add_interactable("cellar", Vector3(x, 0, 27.3), "Осмотреть дверь в подвал", 1.4)
+	_token = Node3D.new()
+	var t := MeshBuilder.Kit.new()
+	t.b("chrome", Color(1.2, 0.9, 0.5)).cylinder(Props.at(8.3, 0.002, 26.9), 0.032, 0.032, 0.005, 16)
+	t.b("rubber", Color(0.1, 0.1, 0.1)).box(Props.at(8.3, 0.0075, 26.9), Vector3(0.03, 0.001, 0.014))
+	var cord := t.b("cloth", Color(0.75, 0.6, 0.45))
+	for k in 7:
+		cord.box(Props.rot(Vector3.UP, 0.8 * k, Vector3(8.3 + cos(k * 0.9) * 0.08, 0.003, 26.9 - 0.08 - sin(k * 1.1) * 0.08)),
+			Vector3(0.007, 0.005, 0.11))
+	t.build(_token, false)
+	_token.visible = false
+	add_child(_token)
+	add_interactable("token", Vector3(8.3, 0, 26.9), "Поднять с пола", 1.3, true, false)
+	_butt = Node3D.new()
+	var b := MeshBuilder.Kit.new()
+	b.b("white", Color(0.95, 0.93, 0.88)).cylinder(Props.rot(Vector3.BACK, PI * 0.5, Vector3(x - 0.3, 0.005, 27.5)), 0.005, 0.005, 0.03, 8)
+	b.b("rubber", Color(0.2, 0.2, 0.2)).cylinder(Props.rot(Vector3.BACK, PI * 0.5, Vector3(x - 0.27, 0.005, 27.5)), 0.005, 0.005, 0.008, 8)
+	b.build(_butt, false)
+	_butt.visible = false
+	add_child(_butt)
+	add_interactable("butt", Vector3(x - 0.3, 0, 27.5), "Посмотреть, что на полу", 1.2, true, false)
+
+
+func show_floor_finds() -> void:
+	_token.visible = true
+	_butt.visible = true
+	set_interactable("token", true)
+	set_interactable("butt", true)
+
+
+func take_token() -> void:
+	_token.visible = false
+	set_interactable("token", false)
+
+
+func take_butt() -> void:
+	_butt.visible = false
+	set_interactable("butt", false)
+
+
+## Locker 31 emptied: Nina's bag is gone with its strap.
+func empty_locker31() -> void:
+	_bag_strap.visible = false
+
+
+## The duty light and the booth lamp go out (or come back) at the panel.
+func set_duty(on: bool, instant := false) -> void:
+	duty_on = on
+	if not instant:
+		Sfx.play_3d(self, "click", Vector3(-0.5, 1.3, 27.8), -4.0, 0.85)
+	_duty_light.visible = on
+	_booth_lamp.visible = on
 
 
 ## Floor path between two points through the aisle waypoints.

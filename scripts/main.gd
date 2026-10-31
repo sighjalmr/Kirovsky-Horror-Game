@@ -29,7 +29,7 @@ enum Phase { TITLE, PLAY, DEAD, END }
 ## The last signed round, kept across a scene reload after death.
 static var checkpoint: Dictionary = {}
 static var _resume := false
-## "night1" or "day1"; survives the reload between chapters.
+## "night1", "day1" or "night2"; survives the reload between chapters.
 static var chapter := "night1"
 ## What night one turned up, handed on to the day. Starting the day from the
 ## title screen counts every clue as found.
@@ -79,10 +79,12 @@ func _ready() -> void:
 	add_child(hud)
 	if "--daytest" in OS.get_cmdline_user_args():
 		chapter = "day1"
+	if "--night2" in OS.get_cmdline_user_args():
+		chapter = "night2"
 	if chapter == "day1":
 		_ready_day()
 		return
-	night = NightOne.new(self)
+	night = NightTwo.new(self) if chapter == "night2" else NightOne.new(self)
 	add_child(night)
 	night.build_timeline()
 	night.update_notebook()
@@ -96,7 +98,8 @@ func _ready() -> void:
 		if a.begins_with("--autoshot="):
 			shot_dir = a.get_slice("=", 1)
 	if "--nighttest" in OS.get_cmdline_user_args():
-		add_child(load("res://scripts/dev_nighttest.gd").new().with(self))
+		var test := "res://scripts/dev_night2test.gd" if chapter == "night2" else "res://scripts/dev_nighttest.gd"
+		add_child(load(test).new().with(self))
 		return
 	if shot_dir != "":
 		var dev: Node = load("res://scripts/dev_autoshot.gd").new()
@@ -106,11 +109,15 @@ func _ready() -> void:
 		return
 	hud.fade.color.a = 1.0
 	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ",
-		"Свердловск, октябрь 1988\n\nНочь первая. Пятница, 14 октября\n\n\n" +
+		"Свердловск, октябрь 1988\n\n%s\n\n\n" % _night_name() +
 		"Мышь — смотреть      W / A / S / D — идти\n" +
 		"Shift — бег (шумно)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
-		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену\n2 — сразу к дню первому")
+		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая")
+
+
+func _night_name() -> String:
+	return "Ночь вторая. Понедельник, 17 октября" if chapter == "night2" else "Ночь первая. Пятница, 14 октября"
 
 
 ## Day one: the lights on, people in the hall, no killer and no rounds.
@@ -369,10 +376,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.TITLE and event.is_action_pressed("interact"):
 		_start()
 	elif phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
-			and (event as InputEventKey).physical_keycode == KEY_2:
-		_go_to("day1", {})
-	elif phase == Phase.END and night and event.is_action_pressed("interact"):
+			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3]:
+		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2"}[(event as InputEventKey).physical_keycode]
+		if to != chapter:
+			_go_to(to, {})
+	elif phase == Phase.END and night and chapter == "night1" and event.is_action_pressed("interact"):
 		_go_to("day1", night.clues.duplicate())
+	elif phase == Phase.END and day and event.is_action_pressed("interact"):
+		_go_to("night2", {})
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook"):
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
@@ -383,7 +394,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
 		get_tree().reload_current_scene()
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
-		_go_to("night1", {})
+		_go_to("night2" if chapter == "night2" and phase == Phase.DEAD else "night1", {})
 
 
 ## Reloads the scene into another chapter.
@@ -570,6 +581,10 @@ func end_shift() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
+	if chapter == "night2":
+		hud.show_title("06:00. КОНЕЦ ВТОРОЙ НОЧИ",
+			"%s\n\nДальше: день второй, разговор с Ринатом (в работе).\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+		return
 	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
 		"%s\n\nE: дальше, день первый\nR: сыграть ночь ещё раз" % night.summary())
 
@@ -585,7 +600,7 @@ func end_day() -> void:
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 1.0)
 	hud.show_title("КОНЕЦ ДНЯ ПЕРВОГО",
-		"%s\n\nДальше: ночь вторая.\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
+		"%s\n\nE: дальше, ночь вторая\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
 
 
 func _fmt(m: float) -> String:

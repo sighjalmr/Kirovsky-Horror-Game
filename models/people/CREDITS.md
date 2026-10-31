@@ -16,13 +16,17 @@ library's `Assets/Animations`.
 | shopper | woman2 | Adults/Female_Adult_14 |
 | shopper | man1 | Adults/Male_Adult_02 |
 | the killer | killer | Adults/Male_Adult_20 (clothes dyed black) |
+| Колесников, участковый | kolesnikov | Professions/Police_Male_01 (redressed, see below) |
 
 Changes: textures scaled from 2048 to 1024 px and saved as JPEG/PNG
 (specular maps dropped); the killer's body texture darkened; the clips in
 `anims/` were cut from m/f_walk_neutral_01, m_walk_slow_01, m_run_neutral_01,
 m/f_idle_neutral_01, m_idle_breathe_01, m/f_gestic_talk_neutral_01,
 f_sit_chair_idle_neutral_01 and m_hold_bag_idle / f_hold_bag_idle_01 by
-`tools/make_people_anims.gd`. Kovpak's spectacles (tools/build_glasses.py), the hats, bags, the scarf and the cleaver are the
+`tools/make_people_anims.gd`. Колесников's uniform was repainted by `tools/make_kolesnikov.py` (foreign
+insignia painted out, Soviet shoulder boards and sleeve shield painted in,
+darker trousers, goatee shaved to a moustache); his peaked cap is the game's
+own. Kovpak's spectacles (tools/build_glasses.py), the hats, bags, the scarf and the cleaver are the
 game's own (scripts/characters.gd).
 
 Citation asked for by the authors: M. Gonzalez-Franco et al., "The Rocketbox

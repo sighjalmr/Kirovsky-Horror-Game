@@ -23,6 +23,10 @@ func _ready() -> void:
 		await _hand_shots(p, store, night)
 		get_tree().quit()
 		return
+	if night is NightTwo:
+		await _night2_shots(p, store, night)
+		get_tree().quit()
+		return
 	if "--storeshot" in OS.get_cmdline_user_args():
 		await _store_shots(p, store, night)
 		get_tree().quit()
@@ -162,6 +166,49 @@ func _store_shots(p: Player, store: Store, night: NightOne) -> void:
 		p.head.rotation.x = v[3]
 		await _wait(0.8)
 		await _shot(v[0] + "_dark")
+
+
+## Night two (--night2 --autoshot=DIR): the участковый at the post, his
+## question, the bag out of locker 31, the cellar door, the token on the
+## floor, the post gone dark.
+func _night2_shots(p: Player, store: Store, night: NightTwo) -> void:
+	_place(p, Vector3(9.4, 0, 2.6), Vector3(-1, 0, 0.1))
+	await _wait(3.0)
+	await _shot("n2_01_handover")
+	while not main.hud.choices.visible:
+		await get_tree().process_frame
+	_place(p, Vector3(8.0, 0, 3.6), Vector3(-1, 0, 0.25))
+	p.head.rotation.x = 0.1
+	await _wait(1.0)
+	await _shot("n2_02_question")
+	main.hud.chosen.emit(1)
+	await _wait(0.5)
+	p.head.rotation.x = 0.0
+	_place(p, Vector3(-6.0, 0, 3.4), Vector3(-0.6, 0, -1))
+	while not night.clues.seizure:
+		await get_tree().process_frame
+	await _wait(0.6)
+	await _shot("n2_03_locker31")
+	main.time_scale = 6.0
+	while night.koles_state != "gone":
+		await get_tree().process_frame
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	_place(p, Vector3(-2.5, 0, 25.6), Vector3(0.3, 0, 1))
+	p.head.rotation.x = -0.12
+	await _wait(1.5)
+	await _shot("n2_04_cellar")
+	store.show_floor_finds()
+	_place(p, Vector3(8.15, 0, 26.2), Vector3(0.1, 0, 1))
+	p.head.rotation.x = -0.9
+	await _wait(1.5)
+	await _shot("n2_05_token")
+	p.head.rotation.x = -0.1
+	store.set_duty(false)
+	_place(p, Vector3(3.5, 0, 6.5), Vector3(0.75, 0, -0.65))
+	await _wait(1.5)
+	await _shot("n2_06_dark_post")
 
 
 func _place(p: Player, pos: Vector3, dir: Vector3) -> void:
