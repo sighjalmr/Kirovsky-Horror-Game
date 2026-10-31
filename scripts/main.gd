@@ -384,7 +384,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_go_to("day1", night.clues.duplicate())
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
 		_go_to("night2", {})
-	elif phase == Phase.PLAY and event.is_action_pressed("notebook"):
+	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible:
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
 		get_tree().paused = open
@@ -415,6 +415,13 @@ func _start() -> void:
 	hud.fade_to(0.0, 2.0)
 	hud.hide_title()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if chapter == "night1":
+		# The previous guard's note in the round journal: how not to be seen.
+		get_tree().paused = true
+		await get_tree().create_timer(1.2).timeout
+		await hud.read_memo(NightOne.MEMO)
+		get_tree().paused = false
+		hud.say(NightOne.G_MEMO)
 
 
 ## Starts the shift at once (also used by the dev screenshot run).
