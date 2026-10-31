@@ -23,6 +23,8 @@ const RENDER_H := 1080
 const FOG_LIT := Color("6f7671")
 const FOG_DARK := Color("0d0f0e")
 const DAY_AIR := Color("d8dad4")
+## The first time Gordeev runs out of breath.
+const G_WINDED := "Сердце колотится в горле. Мне не тридцать лет, долго я не пробегу."
 
 enum Phase { TITLE, PLAY, DEAD, END }
 
@@ -34,6 +36,10 @@ static var chapter := "night1"
 ## What night one turned up, handed on to the day. Starting the day from the
 ## title screen counts every clue as found.
 static var night_clues: Dictionary = {}
+## The questions put to Tamara Ivanovna on day one (DayOne.QUESTIONS ids),
+## handed on to night two together with night_clues. Night two started from
+## the title screen (night_clues empty) counts everything as known.
+static var day_answers: Array = []
 
 var phase := Phase.TITLE
 var minutes := START_MIN
@@ -111,7 +117,7 @@ func _ready() -> void:
 	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ",
 		"Свердловск, октябрь 1988\n\n%s\n\n\n" % _night_name() +
 		"Мышь — смотреть      W / A / S / D — идти\n" +
-		"Shift — бег (шумно)      C — пригнуться (тихо)\n" +
+		"Shift — бег (шумно и недолго: одышка)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
 		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая")
 
@@ -263,6 +269,7 @@ func _build_world() -> void:
 	player.global_position = Vector3(9.2, 0, 2.7)
 	player.face(Vector3.LEFT)
 	player.noise.connect(on_noise)
+	player.out_of_breath.connect(_on_winded)
 	killer = Killer.new()
 	world.add_child(killer)
 	killer.setup(store, player)
@@ -379,11 +386,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3]:
 		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2"}[(event as InputEventKey).physical_keycode]
 		if to != chapter:
-			_go_to(to, {})
+			_go_to(to, {}, [])
 	elif phase == Phase.END and night and chapter == "night1" and event.is_action_pressed("interact"):
-		_go_to("day1", night.clues.duplicate())
+		_go_to("day1", night.clues.duplicate(), [])
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
-		_go_to("night2", {})
+		_go_to("night2", night_clues.duplicate(), day.asked.duplicate())
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook"):
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
@@ -394,15 +401,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
 		get_tree().reload_current_scene()
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
-		_go_to("night2" if chapter == "night2" and phase == Phase.DEAD else "night1", {})
+		if chapter == "night2" and phase == Phase.DEAD:
+			_go_to("night2", night_clues, day_answers)
+		else:
+			_go_to("night1", {}, [])
 
 
 ## Reloads the scene into another chapter.
-func _go_to(ch: String, clues: Dictionary) -> void:
+func _go_to(ch: String, clues: Dictionary, answers: Array) -> void:
 	get_tree().paused = false
 	checkpoint = {}
 	chapter = ch
 	night_clues = clues
+	day_answers = answers
 	get_tree().reload_current_scene()
 
 
@@ -478,6 +489,15 @@ func on_noise(pos: Vector3, radius: float) -> void:
 		killer.hear(pos, radius)
 
 
+var _winded_said := false
+
+
+func _on_winded() -> void:
+	if not _winded_said and phase == Phase.PLAY:
+		_winded_said = true
+		hud.say(G_WINDED)
+
+
 func _on_spotted() -> void:
 	chasing = true
 	Sfx.play_2d(self, "stinger", -4.0)
@@ -543,7 +563,7 @@ func _show_death() -> void:
 	if not checkpoint.is_empty():
 		again = "R: продолжить с подписи в журнале (%s)\nN: начать ночь сначала" % _fmt(checkpoint.minutes)
 	hud.show_title("ГОРДЕЕВ НЕ ДОЖИЛ ДО УТРА",
-		"В 6:10 его нашли грузчики, у %s.\nУчастковый Колесников записал: несчастный случай на рабочем месте.\n\n%s" % [_where(player.global_position), again],
+		"В 6:10 его нашли грузчики, у %s. Рядом лежал топорик из мясного отдела.\nУчастковый Колесников в тот же день задержал мясника Рината. Дело закрыли за неделю.\n\n%s" % [_where(player.global_position), again],
 		Hud.RED)
 
 
