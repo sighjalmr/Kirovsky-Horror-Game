@@ -16,6 +16,9 @@ const ANIMS := ["walk_m", "walk_f", "prowl", "run", "idle_m", "idle_f", "breathe
 
 static var _lib: AnimationLibrary
 
+## A foot comes down (walking or running clips, twice a loop).
+signal footfall
+
 var who: String
 var woman := false
 var skeleton: Skeleton3D
@@ -28,6 +31,7 @@ var bag: Node3D
 ## bone index -> [direction (person space), weight 0..1]
 var _aims: Dictionary = {}
 var _model: Node3D
+var _phase := 0.0
 var _pending: Array[Node3D] = []
 
 
@@ -85,14 +89,17 @@ func _dress(mi: MeshInstance3D) -> void:
 
 
 ## Plays "walk", "idle", "talk", "sit", "bag", "run", "prowl" or "breathe",
-## the woman's version where there is one.
-func play(name_: String, speed := 1.0, blend := 0.35) -> void:
+## the woman's version where there is one. For a gait, `pace` is how fast the
+## person really moves (m/s): the clip runs at the rate its feet cover that
+## ground, so they plant on the floor instead of sliding.
+func play(name_: String, pace := 0.0, blend := 0.35) -> void:
 	var a := name_
 	for suffix: String in (["_f", "_m"] if woman else ["_m", "_f"]):
 		if (name_ + suffix) in ANIMS:
 			a = name_ + suffix
 			break
-	player.speed_scale = speed
+	var natural: float = (_library().get_animation(a) as Animation).get_meta("speed", 0.0)
+	player.speed_scale = clampf(pace / natural, 0.5, 1.8) if natural > 0.0 and pace > 0.0 else 1.0
 	if clip != name_:
 		clip = name_
 		player.play("p/" + a, blend)
@@ -153,6 +160,13 @@ func _fit_attachments() -> void:
 
 func _process(delta: float) -> void:
 	player.advance(delta)
+	# Two footfalls a loop: at the start and the middle of a gait clip.
+	var anim := player.get_animation(player.current_animation) if player.current_animation != "" else null
+	if anim and anim.get_meta("speed", 0.0) > 0.0:
+		var ph := fmod(player.current_animation_position / anim.length * 2.0, 1.0)
+		if ph < _phase:
+			footfall.emit()
+		_phase = ph
 	if _aims.is_empty():
 		return
 	# Parents before children: bone indices already run down the hierarchy.
