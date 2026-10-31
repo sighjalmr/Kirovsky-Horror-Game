@@ -1,7 +1,10 @@
 class_name Killer
 extends CharacterBody3D
 
-## The maniac. An ordinary man with keys to the storage door: no powers,
+## The maniac: участковый Колесников out of uniform, in a knitted hat with a
+## scarf over his face (see the plot on the concept page). With women he uses
+## a cord; on Gordeev he uses the cleaver from the meat counter, so that the
+## blame falls on Ринат the butcher. An ordinary man with keys to the storage door: no powers,
 ## he sees only what light shows him and hears what Gordeev does.
 ## In the dark he notices Gordeev only at arm's length; the flashlight and
 ## lit rows give him away from far off. Noise (the whirr, running, lifting

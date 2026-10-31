@@ -7,6 +7,8 @@ extends CharacterBody3D
 ## the lever is squeezed (held key) and its whirr is heard across the aisle.
 
 signal noise(pos: Vector3, radius: float)
+## Ran himself out of breath: no more running for a while.
+signal out_of_breath
 
 const WALK_SPEED := 1.7
 const RUN_SPEED := 3.4
@@ -20,6 +22,10 @@ const STICK_SENS := 2.4
 const PITCH_LIMIT := deg_to_rad(80.0)
 const FLASHLIGHT_NOISE := 9.0
 const RUN_NOISE := 7.0
+## Gordeev is near seventy: about nine seconds of running, then he is out of
+## breath and can only walk until he gets half of it back.
+const BREATH_RUN := 9.0
+const BREATH_BACK := 10.0
 const HAND_POS := Vector3(0.17, -0.135, -0.36)
 const HAND_ROT := Vector3(deg_to_rad(-3.0), deg_to_rad(30.0), deg_to_rad(-75.0))
 const HAND_REACH := 0.55
@@ -33,6 +39,9 @@ var force_flashlight := false  # dev screenshots
 var crouching := false
 ## On the chair at the post, waiting out the night.
 var sitting := false
+## 1 fresh, 0 out of breath.
+var breath := 1.0
+var winded := false
 var head: Node3D
 var camera: Camera3D
 var flashlight: SpotLight3D
@@ -44,6 +53,7 @@ var _pull := 0.0
 var _raise := 0.0
 
 var _whirr: AudioStreamPlayer3D
+var _pant: AudioStreamPlayer
 var _steps: AudioStreamPlayer3D
 var _bob := 0.0
 var _stride := 0.0
@@ -95,6 +105,11 @@ func _ready() -> void:
 	_whirr.max_distance = 6.0
 	_whirr.unit_size = 1.0
 	add_child(_whirr)
+	_pant = AudioStreamPlayer.new()
+	_pant.stream = Sfx.get_stream("heartbeat")
+	_pant.volume_db = -10.0
+	_pant.pitch_scale = 1.5
+	add_child(_pant)
 	_steps = AudioStreamPlayer3D.new()
 	_steps.stream = Sfx.get_stream("step")
 	_steps.bus = Sfx.BUS
@@ -124,8 +139,9 @@ func _physics_process(delta: float) -> void:
 			move = Input.get_vector("strafe_left", "strafe_right", "move_forward", "move_back")
 			if Input.is_action_just_pressed("crouch"):
 				crouching = not crouching
-			running = Input.is_action_pressed("run") and move.y < -0.1 and not crouching
+			running = Input.is_action_pressed("run") and move.y < -0.1 and not crouching and not winded
 	_set_flashlight(want_light and not dead)
+	_update_breath(running, delta)
 
 	var speed := RUN_SPEED if running else (BACK_SPEED if move.y > 0.1 else WALK_SPEED)
 	if crouching:
@@ -166,6 +182,26 @@ func _physics_process(delta: float) -> void:
 	if flashlight_on:
 		# The dynamo pulses as he works the lever; the fist itself stays still.
 		flashlight.light_energy = 9.0 + sin(_t * 37.0) * 0.6 + sin(_t * 6.0) * 0.9
+
+
+func _update_breath(running: bool, delta: float) -> void:
+	if running:
+		breath = maxf(0.0, breath - delta / BREATH_RUN)
+		if breath <= 0.0 and not winded:
+			winded = true
+			_pant.play()
+			out_of_breath.emit()
+	else:
+		breath = minf(1.0, breath + delta / BREATH_BACK)
+		if winded and breath >= 0.5:
+			winded = false
+	if not winded and _pant.playing:
+		_pant.volume_db = move_toward(_pant.volume_db, -40.0, delta * 15.0)
+		if _pant.volume_db <= -39.0:
+			_pant.stop()
+			_pant.volume_db = -10.0
+	if dead and _pant.playing:
+		_pant.stop()
 
 
 func _set_flashlight(on: bool) -> void:

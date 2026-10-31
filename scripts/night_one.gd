@@ -55,7 +55,7 @@ const G_LIGHT := "Свет гасят рядами, начиная с бакал
 const G_NINA := "Нина Лукина ушла со смены седьмого. В милиции сказали: уехала к матери. А её сумка до сих пор в камере хранения, ячейка тридцать один."
 const ROW_LINES := ["Бакалея.", "Консервы.", "Молочный.", "Заморозка. Лари под покрывалами, как под простынями.", "Задний проход.",
 	"Касса и вход. Остался дежурный свет над дверью и лампа на посту."]
-const G_DOOR := "Хлопнула дверь склада. Ключи от неё есть у троих, и я не из них."
+const G_DOOR := "Хлопнула дверь склада. Ключ от неё есть у Ковпака и у мясника. У меня нет."
 const G_COMPRESSORS := "Компрессоры ларей гудят всю ночь. Если какой-то замолчал, значит, рядом кто-то стоит."
 const G_FLICKER := "Бакалея мигнула. Сама она не включается: рубильник на щитке в заднем проходе."
 const G_LEFT_1 := "Хлопнула дверь склада. Ушёл? Или просто закрылся изнутри."
@@ -81,6 +81,7 @@ const R_SEALED := "Дверь склада заперта. На пломбе п�
 const R_TORN := "Дверь склада открыта настежь. Пломба сорвана, нитка висит. А Ковпак говорил, опечатано."
 const R_OPEN := "Дверь склада открыта. Из темноты тянет холодом холодильной камеры."
 const R_SHUT := "Дверь склада заперта изнутри. Кто-то закрыл её за собой."
+const R_KOVPAK_SHUT := "Дверь склада заперта. Ковпак запер её своим ключом, когда уносил коробку."
 const R_PANEL := "Электрощиток. Шесть рубильников, подписаны рукой Ковпака. Все опущены, как положено."
 const R_PANEL_WARM := "Рубильник бакалеи опущен, но ручка тёплая. Её держали минуту назад."
 const R_PANEL_AGAIN := "Щиток. Всё опущено."
@@ -114,6 +115,8 @@ var killer_phase := "before"
 ## prologue, none (not yet back), visit, done
 var kovpak_state := "prologue"
 var panel_warm := false
+## Who shut the storage door last: "" (still sealed or open), "killer", "kovpak".
+var door_shut_by := ""
 
 var kovpak: Npc
 var tamara: Npc
@@ -277,6 +280,7 @@ func _process(_delta: float) -> void:
 # --- the killer's comings and goings -------------------------------------------
 
 func _killer_in() -> void:
+	door_shut_by = ""
 	main.store.open_storage_door()
 	main.killer.activate(main.store.killer_spawn)
 	killer_phase = "in"
@@ -288,6 +292,7 @@ func _killer_leave() -> void:
 	main.killer.leave()
 	await main.killer.left
 	main.store.close_storage_door()
+	door_shut_by = "killer"
 	var final: bool = main.minutes > Main.clock(4, 0)
 	killer_phase = "gone" if final else "out"
 	main.hud.say(G_LEFT_2 if final else G_LEFT_1, -1.0, true)
@@ -347,6 +352,7 @@ func _kovpak_visit() -> void:
 	kovpak.walk(PackedVector3Array([store.killer_spawn]))
 	await kovpak.arrived
 	store.close_storage_door()
+	door_shut_by = "kovpak"
 	hud.say(G_BOX)
 	kovpak.walk(store.route(kovpak.global_position, Vector3(-0.4, 0, 1.6)))
 	await kovpak.arrived
@@ -402,7 +408,10 @@ func interact(id: String) -> bool:
 		"storage_door":
 			var r := current_round()
 			if not store.storage_open:
-				hud.say(R_SHUT if killer_phase in ["out", "gone"] else R_SEALED, -1.0, true)
+				if door_shut_by == "kovpak":
+					hud.say(R_KOVPAK_SHUT, -1.0, true)
+				else:
+					hud.say(R_SHUT if killer_phase in ["out", "gone"] else R_SEALED, -1.0, true)
 			elif not _talked.has("torn"):
 				_talked["torn"] = true
 				hud.say(R_TORN, -1.0, true)
@@ -659,7 +668,7 @@ func save_state() -> Dictionary:
 			lifted.append(id)
 	return {"clues": clues.duplicate(), "rounds": rounds.duplicate(true), "killer_phase": killer_phase,
 		"kovpak_state": kovpak_state, "panel_warm": panel_warm, "lifted": lifted, "talked": _talked.duplicate(),
-		"leaving": main.killer.leaving}
+		"leaving": main.killer.leaving, "door_shut_by": door_shut_by}
 
 
 func restore_state(d: Dictionary) -> void:
@@ -669,6 +678,7 @@ func restore_state(d: Dictionary) -> void:
 	killer_phase = d.killer_phase
 	kovpak_state = d.kovpak_state
 	panel_warm = d.panel_warm
+	door_shut_by = d.get("door_shut_by", "")
 	_talked = d.talked.duplicate()
 	_talked["kovpak_walk"] = true
 	_talked["tamara_walk"] = true
