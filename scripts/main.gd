@@ -22,6 +22,7 @@ const RENDER_H := 1080
 
 const FOG_LIT := Color("6f7671")
 const FOG_DARK := Color("0d0f0e")
+const DAY_AIR := Color("d8dad4")
 
 enum Phase { TITLE, PLAY, DEAD, END }
 
@@ -120,10 +121,9 @@ func _ready_day() -> void:
 	day = DayOne.new(self, night_clues)
 	add_child(day)
 	hud.clock.text = _fmt(minutes)
-	env.fog_depth_end = 16.0
+	_day_look()
 	player.global_position = Vector3(-0.3, 0, 1.0)
 	player.face(Vector3(0.15, 0, 1))
-	post.set_shader_parameter("grain", 0.06)
 	if "--daytest" in OS.get_cmdline_user_args():
 		add_child(load("res://scripts/dev_daytest.gd").new().with(self))
 		return
@@ -132,6 +132,27 @@ func _ready_day() -> void:
 		"Суббота, 15 октября 1988, 12:40\nУниверсам «Кировский», Сиреневый бульвар, 2\n\n\n" +
 		"Выходной. Гордеев пришёл как покупатель.\nТамара Ивановна сидит на второй кассе.\n\n" +
 		"E — поговорить      цифры или мышь — выбрать вопрос\nTab — блокнот\n\nНажмите E, чтобы войти")
+
+
+## Daytime: a busy shop at noon, plainly and evenly lit, no fog and no murk.
+## The night keeps its fog, green grade and heavy grain.
+func _day_look() -> void:
+	env.fog_enabled = false
+	env.background_color = DAY_AIR
+	env.ambient_light_color = Color(0.93, 0.94, 0.9)
+	env.ambient_light_energy = 0.95
+	env.tonemap_exposure = 1.15
+	for row in store.rows:
+		for l: OmniLight3D in row.lights:
+			l.light_energy = 1.6
+			l.omni_range = 8.5
+	post.set_shader_parameter("grain", 0.025)
+	post.set_shader_parameter("vignette", 0.18)
+	post.set_shader_parameter("saturation", 0.88)
+	post.set_shader_parameter("shadow_tint", Color(0.03, 0.03, 0.03))
+	post.set_shader_parameter("highlight_tint", Color(1.0, 0.99, 0.95))
+	post.set_shader_parameter("halation", 0.15)
+	post.set_shader_parameter("fringe", 0.3)
 
 
 # --- setup ----------------------------------------------------------------------
