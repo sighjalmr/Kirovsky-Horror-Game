@@ -9,6 +9,12 @@ extends Node3D
 ##   z 7–10   checkout line: three tills, касса № 2 in the middle
 ##   z 10–28  hall: four aisles. A (заморозка) and D (молочный) have covered
 ##            freezer chests, B (бакалея) and C (консервы) are shelves only.
+##
+## Two storeys. Over the middle of the hall (VOID) the building is open to the
+## roof at H2; all round it runs the first-floor gallery (промтовары), its
+## slab at H, with a parapet of stamped bronze panels. Upstairs is closed at
+## night and nobody goes up: it is only seen from the hall. The 1980s red
+## letters «КИРОВСКИЙ» hang on the back wall over the gallery.
 
 class LightRow:
 	var title: String
@@ -20,7 +26,14 @@ class LightRow:
 	var center: Vector3
 	var lit := true
 
-const H := 3.2  # ceiling height
+const H := 3.2  # ceiling height under the gallery
+const H2 := 7.0  # roof over the open hall and the gallery
+const SLAB := 0.3  # gallery floor slab: underside at H, floor at H + SLAB
+## Open to the roof over the gondolas: edges on the 2/3 m ceiling grid.
+const VOID := Rect2(-26.0 / 3.0, 12.0, 52.0 / 3.0, 12.0)
+const PANEL_H := 1.05  # parapet height above the gallery floor
+const UPPER_WALL := Color(0.52, 0.68, 0.66)  # teal profiled steel upstairs
+const COUNTER_TOP := Color(1.45, 0.66, 0.26)  # orange formica, like the photo
 const TUBE_COLOR := Color(0.79, 0.84, 0.65)
 const WARM_COLOR := Color(1.0, 0.78, 0.5)
 const CLUE_CHEST := "A3"
@@ -79,6 +92,8 @@ var _butt: Node3D
 
 var _patrol_ids: Array[int] = []
 var _storage_hinge: Node3D
+var _upper_lights: Array[OmniLight3D] = []
+var _upper_tube: ShaderMaterial
 
 
 func _ready() -> void:
@@ -88,6 +103,7 @@ func _ready() -> void:
 	_build_booth()
 	_build_checkout()
 	_build_hall()
+	_build_gallery()
 	_build_rows()
 	_build_waypoints()
 
@@ -142,12 +158,24 @@ func _build_shell() -> void:
 	for cx in range(-12, 12, 4):
 		for cz in range(0, 28, 4):
 			box(Vector3(cx + 2, -0.1, cz + 2), Vector3(4, 0.1, 4), "floor", Color.WHITE, 4.0 / 3.0, false, MeshFactory.PY)
-			box(Vector3(cx + 2, H, cz + 2), Vector3(4, 0.1, 4), "ceiling", Color.WHITE, 4.0 / 3.0, false,
-				MeshFactory.NY).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
+			box(Vector3(cx + 2, H2, cz + 2), Vector3(4, 0.1, 4), "ceiling", Color.WHITE, 4.0 / 3.0, false,
+				MeshFactory.NY)
+			for r: Rect2 in _minus(Rect2(cx, cz, 4, 4), VOID):
+				var c := r.get_center()
+				box(Vector3(c.x, H, c.y), Vector3(r.size.x, 0.1, r.size.y), "ceiling", Color.WHITE, 4.0 / 3.0, false,
+					MeshFactory.NY).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
+				box(Vector3(c.x, H + SLAB - 0.1, c.y), Vector3(r.size.x, 0.1, r.size.y), "floor", Color(0.85, 0.8, 0.74),
+					4.0 / 3.0, false, MeshFactory.PY)
 	var wall_m := Vector2(2.0, H)
 	for cz in range(0, 28, 4):
 		box(Vector3(-12.15, 0, cz + 2), Vector3(0.3, H, 4), "wall", Color.WHITE, wall_m, true, MeshFactory.PX)
 		box(Vector3(12.15, 0, cz + 2), Vector3(0.3, H, 4), "wall", Color.WHITE, wall_m, true, MeshFactory.NX)
+		box(Vector3(-12.15, H, cz + 2), Vector3(0.3, H2 - H, 4), "corrugated", UPPER_WALL, 1.2, false, MeshFactory.PX)
+		box(Vector3(12.15, H, cz + 2), Vector3(0.3, H2 - H, 4), "corrugated", UPPER_WALL, 1.2, false, MeshFactory.NX)
+	for cx in range(-12, 12, 4):
+		box(Vector3(cx + 2, H, 28.15), Vector3(4, H2 - H, 0.3), "corrugated", UPPER_WALL, 1.2, false, MeshFactory.NZ)
+		box(Vector3(cx + 2, H, -0.15), Vector3(4, H2 - H, 0.3), "corrugated", UPPER_WALL, 1.2, false,
+			MeshFactory.PZ).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 	# Back wall with the storage door gap at x 8.4–9.6.
 	for span: Vector2 in [Vector2(-12, -8), Vector2(-8, -4), Vector2(-4, 0), Vector2(0, 4), Vector2(4, 8.4), Vector2(9.6, 12)]:
 		box(Vector3((span.x + span.y) * 0.5, 0, 28.15), Vector3(span.y - span.x, H, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.NZ)
@@ -333,22 +361,22 @@ func _build_hall() -> void:
 	for x: float in sides:
 		for k in 4:
 			Props.gondola(self, rng, Vector3(x, 0, seg_z[k] + 1.5625), 3.125, sides[x], k == 0 or k == 2, k == 1 or k == 3)
-		Fittings.column(self, Vector3(x, 0, 18.5), H, 0.45)
+		Fittings.column(self, Vector3(x, 0, 18.5), H2, 0.45)
 	for k in 4:
 		Props.wall_shelf(self, rng, Vector3(-11.6, 0, 12.0 + k * 3.25 + 1.625), 3.25, 1.0, "zamorozka")
 		Props.wall_shelf(self, rng, Vector3(11.6, 0, 12.0 + k * 3.25 + 1.625), 3.25, -1.0, "moloko")
 	# Pyramids: three-litre juice jars in бакалея, tins of peas in консервы.
 	Props.pyramid(self, rng, Vector3(-1.6, 0, 16.0), "jar_juice", 4)
 	Props.pyramid(self, rng, Vector3(1.6, 0, 20.0), "peas", 6)
-	for s: Array in [[-3.0, "БАКАЛЕЯ"], [3.0, "КОНСЕРВЫ"], [8.85, "МОЛОКО"], [-8.85, "ЗАМОРОЗКА"]]:
-		Props.aisle_sign(self, Vector3(s[0], 2.45, 12.6), s[1], H)
+	for s: Array in [[-3.0, "БАКАЛЕЯ"], [3.0, "КОНСЕРВЫ"], [9.6, "МОЛОКО"], [-9.6, "ЗАМОРОЗКА"]]:
+		Props.aisle_sign(self, Vector3(s[0], 2.45, 12.6), s[1], _ceiling_at(s[0], 12.6))
 	Props.clutter(self, rng)
-	# Under the ceiling: three air ducts over the gondolas and one across,
-	# a tile fallen out of the grid over бакалея.
+	# Under the roof: three air ducts over the gondolas and one across; a
+	# tile fallen out of the gallery's ceiling grid over the tills.
 	for x: float in [-6.0, 0.0, 6.0]:
-		Fittings.duct(self, x, 10.05, 25.6 if x == 0.0 else 27.85, H)
-	Fittings.duct_x(self, 10.3, -6.25, 6.25, H)
-	Fittings.fallen_tile(self, Vector3(-3.0, 0, 21.667), H)
+		Fittings.duct(self, x, 0.6, 27.85, H2)
+	Fittings.duct_x(self, 10.3, -6.25, 6.25, H2)
+	Fittings.fallen_tile(self, Vector3(-3.0, 0, 10.333), H)
 	# Freezer chests under cloths: aisle A (x -8.85) and aisle D (x 8.85).
 	for side in [["A", -8.85], ["D", 8.85]]:
 		for k in 4:
@@ -378,13 +406,218 @@ func _build_chest(id: String, pos: Vector3, rng: RandomNumberGenerator) -> void:
 	add_interactable("chest_" + id, pos, "Поднять покрывало", 1.8)
 
 
+## The first-floor gallery round the open hall: the slab edge with its fascia,
+## the bronze parapet with a handrail, the four corner columns, and upstairs
+## the closed промтовары departments: shelving, orange counters, plants, red
+## department signs, the strip lights (dark at night). Nothing up there is
+## reachable; it is set dressing seen over the parapet.
+func _build_gallery() -> void:
+	var v := VOID
+	var y0 := H + SLAB
+	# Edges: [from, to, normal into the void].
+	var edges := [
+		[Vector2(v.position.x, v.position.y), Vector2(v.end.x, v.position.y), Vector2(0, 1)],
+		[Vector2(v.position.x, v.end.y), Vector2(v.end.x, v.end.y), Vector2(0, -1)],
+		[Vector2(v.position.x, v.position.y), Vector2(v.position.x, v.end.y), Vector2(1, 0)],
+		[Vector2(v.end.x, v.position.y), Vector2(v.end.x, v.end.y), Vector2(-1, 0)],
+	]
+	var kit := MeshBuilder.Kit.new()
+	var fascia := kit.b("paint", Color(0.86, 0.85, 0.8))
+	var dark := kit.b("paint", Color(0.2, 0.17, 0.14))
+	var rail := kit.b("chrome", Color(0.85, 0.8, 0.7))
+	for e: Array in edges:
+		var a: Vector2 = e[0]
+		var b: Vector2 = e[1]
+		var n: Vector2 = e[2]
+		var along := (b - a).normalized()
+		var length := a.distance_to(b) + 0.24
+		var yaw := atan2(along.x, along.y)  # local z runs along the edge
+		var mid := (a + b) * 0.5
+		var c := Vector3(mid.x - n.x * 0.06, 0, mid.y - n.y * 0.06)
+		var basis := Basis(Vector3.UP, yaw)
+		fascia.box(Transform3D(basis, c + Vector3(0, H - 0.32, 0)), Vector3(0.12, SLAB + 0.32, length))
+		dark.box(Transform3D(basis, c + Vector3(0, H - 0.34, 0)), Vector3(0.14, 0.02, length))
+		# Parapet: bronze panels towards the void, painted steel behind.
+		var p := Vector3(mid.x - n.x * 0.04, y0, mid.y - n.y * 0.04)
+		var face := MeshFactory.PX if (basis * Vector3.RIGHT).dot(Vector3(n.x, 0, n.y)) > 0.0 else MeshFactory.NX
+		kit.b("ornament").box(Transform3D(basis, p), Vector3(0.05, PANEL_H, length - 0.24), Color.WHITE, Props.NO_RECT,
+			Vector2(1.2, 1.2), face)
+		kit.b("paint", Color(0.5, 0.45, 0.38)).box(Transform3D(basis, p), Vector3(0.05, PANEL_H, length - 0.24),
+			Color.WHITE, Props.NO_RECT, Vector2(0.6, 0.6), MeshFactory.ALL & ~face)
+		rail.box(Transform3D(basis, p + Vector3(0, PANEL_H, 0)), Vector3(0.09, 0.05, length - 0.2))
+		var k := -length * 0.5 + 0.12 + 1.2
+		while k < length * 0.5 - 0.3:  # aluminium cover strips between the panels
+			rail.box(Transform3D(basis, p + basis * Vector3(0, 0, k)), Vector3(0.07, PANEL_H, 0.03))
+			k += 1.2
+	kit.build(self, false)
+	for x: float in [-8.85, 8.85]:
+		for z: float in [12.25, 23.95]:
+			Fittings.column(self, Vector3(x, 0, z), H, 0.45)
+	# «КИРОВСКИЙ» in red boxes on the back wall, and smaller on the front parapet.
+	_letters(Vector3(0, 5.55, 28.0), 0.8, PI)
+	_letters(Vector3(0, y0 + 0.28, v.position.y + 0.02), 0.42, 0.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1977
+	# Upstairs: wall shelving along the sides and the back, gondolas and long
+	# orange counters with plants in the front block.
+	for k in 4:
+		Props.wall_shelf(self, rng, Vector3(-11.6, y0, 12.0 + k * 3.0 + 1.5), 3.0, 1.0, "bakaleya")
+		Props.wall_shelf(self, rng, Vector3(11.6, y0, 12.0 + k * 3.0 + 1.5), 3.0, -1.0, "konservy")
+	for k in 4:
+		var n := Props.node(self, Vector3(-6.0 + k * 4.0, y0, 27.6), PI * 0.5)
+		Props.wall_shelf(n, rng, Vector3.ZERO, 3.6, 1.0, "moloko")
+	for z: float in [4.0, 7.5]:
+		for k in 4:
+			var n := Props.node(self, Vector3(-7.5 + k * 5.0, y0, z), PI * 0.5)
+			Props.gondola(n, rng, Vector3.ZERO, 3.5, ["bakaleya", "konservy"], true, true)
+	for x: float in [-5.0, 5.0]:
+		_counter(Vector3(x, y0, 10.6), 5.0, true)
+	for x: float in [-10.6, 10.6]:
+		_counter(Vector3(x, y0, 18.0), 7.0, false)
+	for p: Vector3 in [Vector3(-7.6, y0, 10.9), Vector3(0, y0, 10.9), Vector3(7.6, y0, 10.9),
+			Vector3(-9.3, y0, 13.0), Vector3(-9.3, y0, 23.0), Vector3(9.3, y0, 13.0), Vector3(9.3, y0, 23.0),
+			Vector3(-4.0, y0, 25.0), Vector3(4.0, y0, 25.0)]:
+		_plant(p, 1.6 + fmod(absf(p.x * 0.37 + p.z * 0.11), 0.6))
+	# Department signs hanging from the roof over the parapet.
+	_hang_sign(Vector3(0, 5.3, 11.4), "ПРОМТОВАРЫ", 0.0)
+	_hang_sign(Vector3(-9.9, 5.6, 18.0), "ТКАНИ", PI * 0.5)
+	_hang_sign(Vector3(9.9, 5.6, 18.0), "ПОСУДА", -PI * 0.5)
+	_hang_sign(Vector3(-6.0, 5.4, 25.2), "ГАЛАНТЕРЕЯ", PI)
+	# Strip lights under the roof: over the gallery and two long runs over the void.
+	_upper_tube = Mats.unique("white", Color(0.8, 0.8, 0.8), Color(0.02, 0.02, 0.02))
+	var pts: Array[Vector3] = []
+	for z: float in [2.0, 6.0, 10.0]:
+		for x: float in [-9.0, -3.0, 3.0, 9.0]:
+			pts.append(Vector3(x, 0, z))
+	for z: float in [14.0, 18.0, 22.0]:
+		pts.append(Vector3(-10.4, 0, z))
+		pts.append(Vector3(10.4, 0, z))
+		for x: float in [-3.0, 3.0]:
+			pts.append(Vector3(x, 0, z))
+	for x: float in [-8.0, 0.0, 8.0]:
+		pts.append(Vector3(x, 0, 26.0))
+	for p in pts:
+		Props.fixture(self, Vector3(p.x, H2 - 0.07, p.z), _upper_tube)
+	for p: Vector3 in [Vector3(-6, 0, 5), Vector3(6, 0, 5), Vector3(-10.4, 0, 18), Vector3(10.4, 0, 18),
+			Vector3(0, 0, 26), Vector3(0, 0, 18)]:
+		var l := OmniLight3D.new()
+		l.position = Vector3(p.x, H2 - 0.5, p.z)
+		l.omni_range = 9.0
+		l.light_energy = 1.1
+		l.light_color = TUBE_COLOR
+		l.light_specular = 0.3
+		l.visible = false
+		add_child(l)
+		_upper_lights.append(l)
+
+
+## Upstairs is closed at night: its lights go on only for the day episodes.
+func set_upper_lights(on: bool) -> void:
+	for l in _upper_lights:
+		l.visible = on
+	_upper_tube.set_shader_parameter("emission", TUBE_COLOR if on else Color(0.02, 0.02, 0.02))
+
+
+## The nine red boxes of «КИРОВСКИЙ», centred on `pos` (bottom edge), each
+## `size` square, the word reading along local +x of `yaw`.
+func _letters(pos: Vector3, size: float, yaw: float) -> void:
+	var kit := MeshBuilder.Kit.new()
+	var basis := Basis(Vector3.UP, yaw)
+	var gap := size * 0.1
+	var depth := size * 0.25
+	var w := 9.0 * size + 8.0 * gap
+	for i in 9:
+		var x := -w * 0.5 + size * 0.5 + i * (size + gap)
+		var xf := Transform3D(basis, pos + basis * Vector3(x, 0, depth * 0.5))
+		kit.b("kirovsky_letters").box(xf, Vector3(size, size, depth), Color.WHITE, Rect2(i / 9.0, 0, 1.0 / 9.0, 1),
+			Vector2.ONE, MeshFactory.PZ)
+		kit.b("paint", Color(0.55, 0.08, 0.05)).box(xf, Vector3(size, size, depth), Color.WHITE, Props.NO_RECT,
+			Vector2(0.6, 0.6), MeshFactory.ALL & ~MeshFactory.PZ & ~MeshFactory.NZ)
+	kit.build(self, false)
+
+
+## A long low counter (прилавок): white enamel front, orange formica top.
+func _counter(pos: Vector3, length: float, along_x: bool) -> void:
+	var kit := MeshBuilder.Kit.new()
+	var basis := Basis(Vector3.UP, PI * 0.5) if along_x else Basis.IDENTITY
+	var xf := Transform3D(basis, pos)
+	kit.b("enamel").box(xf, Vector3(0.9, 0.82, length), Color(0.95, 0.95, 0.92), Props.NO_RECT, Vector2(1.2, 0.82),
+		Props.SIDES)
+	kit.b("rubber").box(xf, Vector3(0.84, 0.08, length - 0.06), Color.WHITE, Props.NO_RECT, Vector2.ONE, Props.SIDES)
+	kit.b("formica").box(xf * Props.at(0, 0.82, 0), Vector3(0.98, 0.04, length + 0.06), COUNTER_TOP, Props.NO_RECT,
+		Vector2(0.5, 0.5))
+	kit.build(self, false)
+
+
+## A ficus or a monstera in a tub: the shops' pride, watered by the cashiers.
+func _plant(pos: Vector3, height: float) -> void:
+	var kit := MeshBuilder.Kit.new()
+	var r := RandomNumberGenerator.new()
+	r.seed = int(pos.x * 100.0 + pos.z * 7.0)
+	kit.b("paint", Color(0.55, 0.3, 0.18)).cylinder(Props.at(pos.x, pos.y, pos.z), 0.2, 0.26, 0.4, 12)
+	kit.b("rubber", Color(1.4, 1.1, 0.9)).cylinder(Props.at(pos.x, pos.y + 0.38, pos.z), 0.23, 0.23, 0.02, 12)
+	kit.b("wood", Color(0.4, 0.3, 0.22)).cylinder(Props.at(pos.x, pos.y + 0.38, pos.z), 0.025, 0.018, height - 0.5, 6)
+	var leaf := kit.b("white", Color(0.16, 0.32, 0.12))
+	for k in 22:
+		var t := r.randf_range(0.35, 1.0)
+		var a := r.randf() * TAU
+		var spread := 0.15 + 0.35 * (1.0 - absf(t - 0.6))
+		var c := pos + Vector3(cos(a) * spread, 0.4 + t * (height - 0.4), sin(a) * spread)
+		var b := Basis(Vector3.UP, a) * Basis(Vector3.RIGHT, r.randf_range(0.3, 1.1))
+		leaf.ellipsoid(Transform3D(b, c), Vector3(0.07, 0.012, 0.14), 6, 4)
+	kit.build(self, false)
+
+
+## A department sign, white on red, hanging from the roof on two rods.
+func _hang_sign(pos: Vector3, text: String, yaw: float) -> void:
+	var kit := MeshBuilder.Kit.new()
+	var basis := Basis(Vector3.UP, yaw)
+	kit.b("sign:" + text).box(Transform3D(basis, pos), Vector3(2.6, 0.64, 0.03), Color.WHITE, Props.FULL, Vector2.ONE,
+		MeshFactory.PZ | MeshFactory.NZ)
+	kit.b("paint", Color(0.4, 0.1, 0.07)).box(Transform3D(basis, pos + Vector3(0, -0.03, 0)), Vector3(2.66, 0.03, 0.04))
+	for dx: float in [-1.0, 1.0]:
+		kit.b("chrome").box(Transform3D(basis, pos + basis * Vector3(dx, 0.64, 0)), Vector3(0.012, H2 - pos.y - 0.64, 0.012))
+	kit.build(self, false)
+
+
+## Two chains from the roof down to a lamp hanging in the open hall.
+func _hang(p: Vector3, spread: float) -> void:
+	var kit := MeshBuilder.Kit.new()
+	for dz: float in [-spread, spread]:
+		kit.b("chrome", Color(0.6, 0.6, 0.6)).box(Props.at(p.x, p.y, p.z + dz), Vector3(0.01, H2 - p.y, 0.01))
+	kit.build(self, false)
+
+
+## Ceiling height over a floor point: the roof in the open hall, the gallery's underside elsewhere.
+func _ceiling_at(x: float, z: float) -> float:
+	return H2 if VOID.has_point(Vector2(x, z)) else H
+
+
+## What is left of rect `c` after cutting out `v`: up to four rects.
+static func _minus(c: Rect2, v: Rect2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if not c.intersects(v):
+		out.append(c)
+		return out
+	var i := c.intersection(v)
+	if i.position.y > c.position.y:
+		out.append(Rect2(c.position.x, c.position.y, c.size.x, i.position.y - c.position.y))
+	if i.end.y < c.end.y:
+		out.append(Rect2(c.position.x, i.end.y, c.size.x, c.end.y - i.end.y))
+	if i.position.x > c.position.x:
+		out.append(Rect2(c.position.x, i.position.y, i.position.x - c.position.x, i.size.y))
+	if i.end.x < c.end.x:
+		out.append(Rect2(i.end.x, i.position.y, c.end.x - i.end.x, i.size.y))
+	return out
+
+
 func _build_rows() -> void:
 	var lamp_z := [13.5, 17.0, 20.5, 24.0]
 	var hall := [
 		["Бакалея", Rect2(-5.5, 12, 5.0, 13), -3.0],
 		["Консервы", Rect2(0.5, 12, 5.0, 13), 3.0],
-		["Молочный", Rect2(6.5, 12, 4.7, 13), 8.85],
-		["Заморозка", Rect2(-11.2, 12, 4.7, 13), -8.85],
+		["Молочный", Rect2(6.5, 12, 4.7, 13), 9.6],
+		["Заморозка", Rect2(-11.2, 12, 4.7, 13), -9.6],
 	]
 	for h in hall:
 		var pts: Array[Vector3] = []
@@ -415,6 +648,8 @@ func _add_row(title: String, rect: Rect2, points: Array[Vector3], color: Color) 
 	var c := Vector3.ZERO
 	for p in points:
 		Props.fixture(self, Vector3(p.x, H - 0.07, p.z), row.tube_mat)
+		if VOID.has_point(Vector2(p.x, p.z)):  # hangs from the roof on two chains
+			_hang(Vector3(p.x, H - 0.07, p.z), 0.55)
 		var l := OmniLight3D.new()
 		l.position = Vector3(p.x, H - 0.35, p.z)
 		l.omni_range = 6.5

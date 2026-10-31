@@ -153,6 +153,7 @@ func _day_look() -> void:
 		for l: OmniLight3D in row.lights:
 			l.light_energy = 1.6
 			l.omni_range = 8.5
+	store.set_upper_lights(true)
 	post.set_shader_parameter("grain", 0.025)
 	post.set_shader_parameter("vignette", 0.18)
 	post.set_shader_parameter("saturation", 0.88)
