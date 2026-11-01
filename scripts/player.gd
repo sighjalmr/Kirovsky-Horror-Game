@@ -52,7 +52,7 @@ var _pull := 0.0
 ## 0 lowered out of sight, 1 held up in front: the hand only comes up with the torch.
 var _raise := 0.0
 
-var _whirr: AudioStreamPlayer3D
+var _whirr: AudioStreamPlayer
 var _pant: AudioStreamPlayer
 var _steps: AudioStreamPlayer3D
 var _bob := 0.0
@@ -98,12 +98,11 @@ func _ready() -> void:
 	flashlight.visible = false
 	hand.add_child(flashlight)
 
-	_whirr = AudioStreamPlayer3D.new()
+	# In his own fist, right by the ears: heard as is, not from a spot in the hall.
+	_whirr = AudioStreamPlayer.new()
 	_whirr.stream = Sfx.get_stream("whirr")
 	_whirr.bus = Sfx.BUS
 	_whirr.volume_db = WHIRR_DB
-	_whirr.max_distance = 6.0
-	_whirr.unit_size = 1.0
 	add_child(_whirr)
 	_pant = AudioStreamPlayer.new()
 	_pant.stream = Sfx.get_stream("heartbeat")
@@ -168,7 +167,7 @@ func _physics_process(delta: float) -> void:
 		var gait := "run" if running else ("creep" if crouching else "step")
 		_steps.stream = Sfx.get_stream(gait)
 		_steps.pitch_scale = randf_range(0.97, 1.03)
-		_steps.volume_db = {"run": -5.0, "creep": -13.0, "step": -10.0}[gait]
+		_steps.volume_db = {"run": -9.0, "creep": -17.0, "step": -14.0}[gait]
 		_steps.play()
 
 	_noise_t -= delta
@@ -216,10 +215,10 @@ func _set_flashlight(on: bool) -> void:
 
 ## The «жучок» heard (tools/make_torch_sound.py): the first squeeze from rest,
 ## then steady pumping in a loop, and on letting go the lever springing open and
-## the flywheel running down. Quiet, close by in his right hand.
-const WHIRR_DB := -18.0
+## the flywheel running down. Close by, in his right hand.
+const WHIRR_DB := -4.0
 var _torch_t := 0.0
-var _torch_start: AudioStreamPlayer3D
+var _torch_start: AudioStreamPlayer
 var _whirr_fade: Tween
 
 
@@ -241,10 +240,8 @@ func _torch_sound(on: bool) -> void:
 	_torch_one_shot("torch_off")
 
 
-func _torch_one_shot(id: String) -> AudioStreamPlayer3D:
-	var p := Sfx.play_3d(self, id, _whirr.global_position, WHIRR_DB, 1.0, _whirr.max_distance)
-	p.unit_size = _whirr.unit_size
-	return p
+func _torch_one_shot(id: String) -> AudioStreamPlayer:
+	return Sfx.play_2d(self, id, WHIRR_DB)
 
 
 ## Bulb brightness follows the flywheel speed of the squeezes being heard; the

@@ -38,7 +38,7 @@ func setup(role: String) -> Npc:
 	_steps.bus = Sfx.BUS
 	_steps.max_distance = 16.0
 	_steps.unit_size = 3.0
-	_steps.volume_db = -8.0
+	_steps.volume_db = -11.0
 	add_child(_steps)
 	body.footfall.connect(_on_footfall)
 	return self
