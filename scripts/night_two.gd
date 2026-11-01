@@ -359,6 +359,45 @@ func _lift(chest: String) -> void:
 	main.hud.say(N2_A3 if chest == Store.CLUE_CHEST else CHEST_TEXT[chest], -1.0, true)
 
 
+# --- the task list and the clue rings ----------------------------------------------
+
+func objectives() -> Array:
+	var out: Array = []
+	var store: Store = main.store
+	_phone_task(out)
+	if koles_state != "gone":
+		out.append(task("Принять пост. С Ковпаком участковый"))
+	if not store.duty_on:
+		out.append(task("Погас свет: поднять рубильник на щитке", false, false, true))
+	var found := clue_count()
+	out.append(task("Улики: %d из %d" % [found, clues.size()], found == clues.size()))
+	if found < clues.size():
+		if clues.seizure:
+			out.append(task("Сумку Нины забрал участковый", true, true))
+		out.append(task("Дверь в подвал, задний проход", clues.lock, true))
+		if clues.pahomov or _calls_missed > 0 or main.minutes >= Main.clock(0, 40):
+			out.append(task("Телефонный звонок на посту", clues.pahomov, true))
+		if clues.token or store.find_by_id("token").get("active", false):
+			out.append(task("Блестит у двери склада (нужен свет)", clues.token, true))
+		if clues.butt or store.find_by_id("butt").get("active", false):
+			out.append(task("На полу у двери в подвал (нужен свет)", clues.butt, true))
+	_round_tasks(out)
+	_killer_task(out)
+	return out
+
+
+func clue_marks() -> Array:
+	var store: Store = main.store
+	var out: Array = []
+	if not clues.lock:
+		out.append(Vector3(-1.52, 0.88, 27.9))
+	if not clues.token and store.find_by_id("token").get("active", false):
+		out.append(Vector3(8.3, 0.02, 26.9))
+	if not clues.butt and store.find_by_id("butt").get("active", false):
+		out.append(Vector3(-2.25, 0.02, 27.5))
+	return out
+
+
 func final_entry() -> String:
 	return N2_FINAL
 

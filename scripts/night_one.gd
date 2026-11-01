@@ -597,6 +597,92 @@ func update_notebook() -> void:
 	main.hud.set_notebook("\n".join(lines))
 
 
+# --- the task list and the clue rings ----------------------------------------------
+
+const ROUND_NAMES := ["23:30", "02:20", "04:20"]
+const CLUE_TASKS := {
+	"bag": "Ячейка № 31 в камере хранения",
+	"tape": "Касса № 2, контрольная лента",
+	"page": "Журнал обходов на посту",
+	"clip": "Лари в заморозке, под покрывалами",
+	"invoice": "Бумага у двери склада (нужен свет)",
+}
+
+
+static func task(text: String, done := false, sub := false, urgent := false) -> Dictionary:
+	return {"text": text, "done": done, "sub": sub, "urgent": urgent}
+
+
+## What the HUD task list shows now: the next things to do, in order.
+func objectives() -> Array:
+	var out: Array = []
+	_phone_task(out)
+	if kovpak_state == "prologue" and not _talked.has("kovpak_walk"):
+		out.append(task("Расспросить Ковпака и Тамару Ивановну (E)",
+			_talked.has("kovpak") and _talked.has("tamara")))
+	if kovpak_state == "visit":
+		out.append(task("Ковпак приехал. Сидеть на посту", false, false, true))
+	var found := clue_count()
+	out.append(task("Улики: %d из %d%s" % [found, clues.size(),
+		". Искать до 23:10, пока светло" if main.minutes < Main.KILLER_MIN and found < clues.size() else ""],
+		found == clues.size()))
+	if found < clues.size():
+		for k: String in ["bag", "tape", "page", "clip", "invoice"]:
+			if k == "invoice" and kovpak_state != "done":
+				continue   # nobody knows about the delivery note before Kovpak drops it
+			out.append(task(CLUE_TASKS[k], clues[k], true))
+	_round_tasks(out)
+	_killer_task(out)
+	return out
+
+
+func _phone_task(out: Array) -> void:
+	if _phone_t > 0.0:
+		out.append(task("Звонит телефон на посту: снять трубку!", false, false, true))
+
+
+func _round_tasks(out: Array) -> void:
+	var r := current_round()
+	if r < 0:
+		out.append(task("Первый обход в 23:30"))
+		return
+	var rd: Dictionary = rounds[r]
+	if not rd.signed:
+		out.append(task("Обход %s" % ROUND_NAMES[r]))
+		out.append(task("Дверь склада", rd.door, true))
+		out.append(task("Щиток в заднем проходе", rd.panel, true))
+		out.append(task("Подпись в журнале на посту", false, true))
+	elif r + 1 < rounds.size():
+		out.append(task("Обход %s подписан" % ROUND_NAMES[r], true))
+		out.append(task("Следующий обход в %s" % ROUND_NAMES[r + 1]))
+	else:
+		out.append(task("Дожить до 06:00 (стул на посту ускоряет время)"))
+
+
+func _killer_task(out: Array) -> void:
+	if killer_phase == "in":
+		var hint := task("Он в зале: держаться темноты, пригнуться (C)")
+		hint["hint"] = true
+		out.append(hint)
+
+
+## Where the not yet found clues are, for the rings round them.
+func clue_marks() -> Array:
+	var store: Store = main.store
+	var out: Array = []
+	if not clues.bag:
+		out.append(Vector3(-7.75, 0.62, 0.56))
+	if not clues.tape:
+		out.append(Vector3(-2.35, 1.0, 7.95))
+	if not clues.page:
+		out.append(Vector3(10.9, 0.8, 2.6))
+	if not clues.clip and not store.chests[Store.CLUE_CHEST].lifted:
+		out.append(store.chests[Store.CLUE_CHEST].pos + Vector3(0, 0.85, 0))
+	if not clues.invoice and kovpak_state == "done":
+		out.append(Vector3(9.5, 0.03, 26.6))
+	return out
+
+
 # --- the phone --------------------------------------------------------------------
 
 func _ring_phone() -> void:

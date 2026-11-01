@@ -23,6 +23,10 @@ func _ready() -> void:
 		await _hand_shots(p, store, night)
 		get_tree().quit()
 		return
+	if "--taskshot" in OS.get_cmdline_user_args():
+		await _task_shots(p, store, night)
+		get_tree().quit()
+		return
 	if night is NightTwo:
 		await _night2_shots(p, store, night)
 		get_tree().quit()
@@ -251,6 +255,47 @@ func _night2_shots(p: Player, store: Store, night: NightTwo) -> void:
 	_place(p, Vector3(3.5, 0, 6.5), Vector3(0.75, 0, -0.65))
 	await _wait(1.5)
 	await _shot("n2_06_dark_post")
+
+
+## The task list and the clue rings in a few states of the night
+## (`--autoshot=DIR --taskshot`, add `--night2` for night two).
+func _task_shots(p: Player, store: Store, night: NightOne) -> void:
+	if night is NightTwo:
+		main.minutes = Main.clock(1, 50)
+		night.koles_state = "gone"
+		night.clues.seizure = true
+		store.show_floor_finds()
+		store.set_duty(false, true)
+		_place(p, Vector3(5.5, 0, 25.6), Vector3(1, 0, 0.5))
+		await _wait(1.5)
+		await _shot("t20_night2_token")
+		_place(p, Vector3(-3.6, 0, 25.4), Vector3(0.6, 0, 1))
+		await _wait(1.0)
+		await _shot("t21_night2_cellar")
+		return
+	_place(p, Vector3(-0.2, 0, 5.6), Vector3(-0.5, 0, 1))
+	await _wait(1.5)
+	await _shot("t01_till")
+	night.clues.bag = true
+	night.clues.tape = true
+	main.minutes = Main.clock(23, 40)
+	night.rounds[0].door = true
+	night._ring_phone()
+	_place(p, Vector3(-4.0, 0, 15.0), Vector3(0.3, 0, 1))
+	await _wait(1.0)
+	await _shot("t02_round_phone")
+	night.stop_sounds()
+	night.rounds[0].signed = true
+	main.minutes = Main.clock(2, 5)
+	night.kovpak_state = "done"
+	store.show_invoice()
+	_place(p, Vector3(9.0, 0, 24.0), Vector3(0.2, 0, 1))
+	p.flashlight_on = true
+	await _wait(1.0)
+	await _shot("t03_invoice")
+	main.hud.toggle_tasks()
+	await _wait(0.3)
+	await _shot("t04_hidden")
 
 
 func _place(p: Player, pos: Vector3, dir: Vector3) -> void:

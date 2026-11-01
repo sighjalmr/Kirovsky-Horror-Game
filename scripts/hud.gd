@@ -24,6 +24,15 @@ var title_sub: Label
 var note: Label
 var choices: ColorRect
 var memo: ColorRect
+## The task list in the top left corner (J hides it) and the rings round
+## clues close by. Main fills them every frame while the shift is on.
+var tasks: PanelContainer
+var tasks_wanted := true
+var tasks_allowed := false
+var marks: ClueMarks
+
+var _tasks_text: RichTextLabel
+var _tasks_key := ""
 
 var _memo_text: Label
 
@@ -56,6 +65,13 @@ func _ready() -> void:
 	title_sub = _label(Vector2(360, 440), Vector2(1200, 560), 30, HORIZONTAL_ALIGNMENT_CENTER, INK)
 	title_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title_sub.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	marks = ClueMarks.new()
+	marks.position = Vector2.ZERO
+	marks.size = Vector2(1920, 1080)
+	marks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(marks)
+	move_child(marks, 1)
+	_build_tasks()
 	_voice = AudioStreamPlayer.new()
 	_voice.process_mode = Node.PROCESS_MODE_PAUSABLE   # holds while the notebook is open
 	add_child(_voice)
@@ -115,6 +131,77 @@ func _ready() -> void:
 	_memo_text.add_theme_font_size_override("font_size", 25)
 	_memo_text.add_theme_color_override("font_color", Color(0.12, 0.16, 0.38))
 	memo.add_child(_memo_text)
+
+
+func _build_tasks() -> void:
+	tasks = PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.02, 0.02, 0.02, 0.34)
+	box.border_color = Color(PAPER, 0.35)
+	box.border_width_left = 2
+	box.content_margin_left = 18
+	box.content_margin_right = 18
+	box.content_margin_top = 10
+	box.content_margin_bottom = 12
+	tasks.add_theme_stylebox_override("panel", box)
+	tasks.position = Vector2(30, 84)
+	tasks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tasks.visible = false
+	add_child(tasks)
+	_tasks_text = RichTextLabel.new()
+	_tasks_text.bbcode_enabled = true
+	_tasks_text.fit_content = true
+	_tasks_text.scroll_active = false
+	_tasks_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tasks_text.custom_minimum_size = Vector2(540, 0)
+	_tasks_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tasks_text.add_theme_font_size_override("normal_font_size", 21)
+	_tasks_text.add_theme_color_override("default_color", INK)
+	_tasks_text.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_tasks_text.add_theme_constant_override("outline_size", 6)
+	_tasks_text.add_theme_constant_override("line_separation", 3)
+	tasks.add_child(_tasks_text)
+
+
+## The task list: each entry is {text, done, sub, urgent, hint}. Done ones are
+## struck through and dimmed, sub-steps indented, urgent ones in red. The
+## panel flares up for a moment when something new appears on it.
+func set_tasks(list: Array) -> void:
+	var key := ""
+	for t: Dictionary in list:
+		key += "%s|%s|%s\n" % [t.text, t.get("done", false), t.get("urgent", false)]
+	if key == _tasks_key:
+		return
+	var grew := false
+	for line in key.split("\n"):
+		if line != "" and line.ends_with("|false|false") and not _tasks_key.contains(line):
+			grew = true
+	_tasks_key = key
+	var out := PackedStringArray(["[color=#8f927f][font_size=17]ЧТО ДЕЛАТЬ      J — скрыть[/font_size][/color]"])
+	for t: Dictionary in list:
+		var text: String = t.text
+		var mark := "·"
+		if t.get("done", false):
+			text = "[color=#7d7f72][s]%s[/s][/color]" % text
+			mark = "[color=#7d7f72]×[/color]"
+		elif t.get("hint", false):
+			text = "[color=#a4a796]%s[/color]" % text
+		elif t.get("urgent", false):
+			text = "[color=#e0634f]%s[/color]" % text
+			mark = "[color=#e0634f]![/color]"
+		if t.get("sub", false):
+			out.append("[indent]%s %s[/indent]" % [mark, text])
+		else:
+			out.append("%s  %s" % ["—" if not t.get("done", false) else mark, text])
+	_tasks_text.text = "\n".join(out)
+	tasks.reset_size()
+	if grew and tasks.visible:
+		tasks.modulate = Color(1.6, 1.45, 1.15)
+		create_tween().tween_property(tasks, "modulate", Color.WHITE, 1.4)
+
+
+func toggle_tasks() -> void:
+	tasks_wanted = not tasks_wanted
 
 
 ## Shows a handwritten note until E (or a click) puts it away.
@@ -192,6 +279,9 @@ func _process(delta: float) -> void:
 	if hall != -1:
 		var duck := DUCK_DB if _voice.playing else 0.0
 		AudioServer.set_bus_volume_db(hall, move_toward(AudioServer.get_bus_volume_db(hall), duck, delta * 20.0))
+	tasks.visible = tasks_wanted and tasks_allowed and _tasks_key != "" \
+		and not notebook.visible and not memo.visible and not choices.visible
+	marks.visible = tasks_allowed and not notebook.visible and not memo.visible
 	if get_tree().paused:
 		return
 	_sub_t -= delta
@@ -285,3 +375,26 @@ func hide_title() -> void:
 	var tw := create_tween().set_parallel()
 	tw.tween_property(title, "modulate:a", 0.0, 0.6)
 	tw.tween_property(title_sub, "modulate:a", 0.0, 0.6)
+
+
+## Thin pale rings round the clues within a few steps of Gordeev, so the eye
+## finds them in the gloom. Main hands over screen points each frame:
+## [position, nearness 0..1].
+class ClueMarks extends Control:
+	var points: Array = []
+	var _t := 0.0
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var pulse := 0.5 + 0.5 * sin(_t * 2.4)
+		for p: Array in points:
+			var at: Vector2 = p[0]
+			var near: float = p[1]
+			var r := lerpf(20.0, 34.0, near) + pulse * 2.5
+			var a := clampf(near * 1.6, 0.0, 1.0) * lerpf(0.55, 0.85, pulse)
+			draw_arc(at, r + 1.5, 0, TAU, 48, Color(0, 0, 0, a * 0.45), 4.0, true)
+			draw_arc(at, r, 0, TAU, 48, Color(0.93, 0.9, 0.78, a), 2.0, true)
+			draw_circle(at, 2.2, Color(0.93, 0.9, 0.78, a * 0.8))
