@@ -12,12 +12,13 @@ extends RefCounted
 ##   meta "wiper"  Node3D the driver's wiper, rotates about its local Z
 ##   meta "door"   Node3D the driver's door, hinged at the front
 ##   meta "seat"   Vector3 the driver's eye point (for the shot from inside)
+##   meta "steer"  Node3D the wheel with the hands (the «Жигули», see CarCabin)
 
 const ZHIGULI := {
 	"len": 4.17, "hw": 0.8, "paint": Color(0.55, 0.66, 0.72), "bottom": 0.26,
 	"hood": [0.80, 0.86, 0.9], "trunk": [0.9, 0.86, 0.8],
 	"glass": [-0.78, -0.2, 0.62, 1.15], "roof": 1.40, "belt": 0.92, "quad": true,
-	"wheel_z": [-1.28, 1.15], "plate": true,
+	"wheel_z": [-1.28, 1.15], "plate": true, "cabin": true,
 }
 const VOLGA := {
 	"len": 4.74, "hw": 0.9, "paint": Color(0.05, 0.05, 0.055), "bottom": 0.24,
@@ -78,7 +79,19 @@ static func build(s: Dictionary) -> Node3D:
 	# Rows run front to back and each goes right to left over the top, so
 	# the quads face outwards.
 	rows.reverse()
-	paint.sheet(Transform3D.IDENTITY, rows, Color.WHITE, 2.0, false)
+	if s.get("cabin", false):
+		# Open over the cabin: the bonnet and the boot whole, between the
+		# windscreen and the rear window only the flanks up to the shoulder.
+		# (rows now run back to front: index 3 is the rear window, 4 the windscreen)
+		paint.sheet(Transform3D.IDENTITY, rows.slice(0, 4), Color.WHITE, 2.0, false)
+		paint.sheet(Transform3D.IDENTITY, rows.slice(4), Color.WHITE, 2.0, false)
+		for half: Array in [[0, 5], [5, 10]]:
+			var side: Array = []
+			for k in [3, 4]:
+				side.append((rows[k] as PackedVector3Array).slice(half[0], half[1]))
+			paint.sheet(Transform3D.IDENTITY, side, Color.WHITE, 2.0, false)
+	else:
+		paint.sheet(Transform3D.IDENTITY, rows, Color.WHITE, 2.0, false)
 	# Underside, and the end faces behind the grille and the tail panel.
 	black.box(Props.at(0, bot - 0.02, 0), Vector3(hw * 2 - 0.1, 0.04, s.len - 0.1))
 	var front_top: float = hood[0] - 0.06
@@ -179,20 +192,24 @@ static func build(s: Dictionary) -> Node3D:
 				Color.WHITE, Rect2(0, 0, 1, 1), Rect2(), true, true)
 			chrome.cylinder(Props.rot(Vector3.BACK, -sx * PI * 0.5, Vector3(sx * (hw + 0.008), 0.31, wz)), 0.17, 0.12, 0.03, 16)
 
-	# Inside: dashboard, seats, a steering wheel, seen through the glass.
-	var inside := kit.b("leather", Color(0.18, 0.15, 0.13))
-	inside.box(Props.at(0, belt - 0.2, g[0] + 0.12), Vector3(hw * 2 - 0.16, 0.26, 0.3))
-	for sx: float in [-0.36, 0.36]:
-		inside.box(Props.at(sx, 0.35, 0.2), Vector3(0.5, 0.15, 0.5))
-		inside.box(Props.rot(Vector3.RIGHT, -0.2, Vector3(sx, 0.48, 0.5)), Vector3(0.5, 0.6, 0.12))
-	inside.box(Props.at(0, 0.35, 1.0), Vector3(hw * 2 - 0.2, 0.15, 0.5))
-	var wheel_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-62)), Vector3(-0.36, belt - 0.06, g[0] + 0.42))
-	black.lathe(wheel_xf, [Vector2(0.17, -0.012), Vector2(0.19, 0.0), Vector2(0.17, 0.012), Vector2(0.15, 0.0), Vector2(0.17, -0.012)], 24)
-	black.cylinder(wheel_xf * Transform3D(Basis.IDENTITY, Vector3(0, -0.1, 0)), 0.025, 0.04, 0.1, 8)
-	# Dials glowing green on the dash.
-	kit.b("dial", Color(0.6, 0.9, 0.6), Color(0.2, 0.45, 0.25)).box(
-		Props.rot(Vector3.RIGHT, -0.5, Vector3(-0.36, belt - 0.0, g[0] + 0.22)), Vector3(0.3, 0.1, 0.01))
+	# Inside: Gordeev's car gets the whole cabin (CarCabin); the director's
+	# «Волга» only a dash, seats and a wheel, seen through the glass.
+	if not s.get("cabin", false):
+		var inside := kit.b("leather", Color(0.18, 0.15, 0.13))
+		inside.box(Props.at(0, belt - 0.2, g[0] + 0.12), Vector3(hw * 2 - 0.16, 0.26, 0.3))
+		for sx: float in [-0.36, 0.36]:
+			inside.box(Props.at(sx, 0.35, 0.2), Vector3(0.5, 0.15, 0.5))
+			inside.box(Props.rot(Vector3.RIGHT, -0.2, Vector3(sx, 0.48, 0.5)), Vector3(0.5, 0.6, 0.12))
+		inside.box(Props.at(0, 0.35, 1.0), Vector3(hw * 2 - 0.2, 0.15, 0.5))
+		var wheel_xf := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-62)), Vector3(-0.36, belt - 0.06, g[0] + 0.42))
+		black.lathe(wheel_xf, [Vector2(0.17, -0.012), Vector2(0.19, 0.0), Vector2(0.17, 0.012), Vector2(0.15, 0.0), Vector2(0.17, -0.012)], 24)
+		black.cylinder(wheel_xf * Transform3D(Basis.IDENTITY, Vector3(0, -0.1, 0)), 0.025, 0.04, 0.1, 8)
+		# Dials glowing green on the dash.
+		kit.b("dial", Color(0.6, 0.9, 0.6), Color(0.2, 0.45, 0.25)).box(
+			Props.rot(Vector3.RIGHT, -0.5, Vector3(-0.36, belt - 0.0, g[0] + 0.22)), Vector3(0.3, 0.1, 0.01))
 	kit.build(car)
+	if s.get("cabin", false):
+		CarCabin.build(car, s)
 
 	# Driver's door seam and handle (no opening door: he gets out off screen).
 	var door := Node3D.new()
@@ -226,7 +243,8 @@ static func build(s: Dictionary) -> Node3D:
 	car.set_meta("tail", tail_mat)
 	car.set_meta("wiper", wpiv)
 	car.set_meta("door", door)
-	car.set_meta("seat", Vector3(-0.36, 1.13, 0.32))
+	if not car.has_meta("seat"):
+		car.set_meta("seat", Vector3(-0.36, 1.13, 0.32))
 	return car
 
 
@@ -238,3 +256,4 @@ static func set_lights(car: Node3D, on: bool, energy := HEADLIGHT) -> void:
 		m.set_shader_parameter("emission", Color(3.0, 2.8, 2.3) if on else Color.BLACK)
 	(car.get_meta("tail") as ShaderMaterial).set_shader_parameter("emission",
 		Color(1.6, 0.1, 0.05) if on else Color(0.2, 0.01, 0.0))
+	CarCabin.set_dash(car, on)

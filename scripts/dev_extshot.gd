@@ -1,8 +1,9 @@
 extends SceneTree
 
 ## Dev: stills of the street outside without the cutscene timing.
-##   godot --path . -s scripts/dev_extshot.gd -- night /tmp/dir
-## Writes a few fixed views of the Exterior (night or day).
+##   godot --path . -s scripts/dev_extshot.gd -- night /tmp/dir [seat]
+## Writes a few fixed views of the Exterior (night or day); with "seat" only
+## the view from the driver's seat of the «Жигули».
 
 const VIEWS := [
 	[Vector3(-14, 16, -46), Vector3(2, 4, 0)],
@@ -33,13 +34,16 @@ func _initialize() -> void:
 	root.add_child(cam)
 	cam.current = true
 	root.size = Vector2i(1280, 720)
+	var only_seat := args.size() > 2 and args[2] == "seat"
 	for i in VIEWS.size():
+		if only_seat and i != VIEWS.size() - 1:
+			continue
 		cam.global_position = VIEWS[i][0]
 		cam.look_at(VIEWS[i][1])
 		if i == VIEWS.size() - 1:  # the driver's seat
 			ext.zhiguli.position = Exterior.ZHIGULI_SPOT + Vector3(0, 0, -9)
 			cam.fov = 62.0
-			cam.global_transform = ext.zhiguli.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-4.0)),
+			cam.global_transform = ext.zhiguli.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-10.0)),
 				ext.zhiguli.get_meta("seat"))
 		ext.follow(cam)
 		for f in 4:
