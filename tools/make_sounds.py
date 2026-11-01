@@ -3,7 +3,8 @@
 (44.1 kHz, 16 bit, mono) by physical-ish modelling: struck metal as decaying
 modal partials, the fluorescent ballast as mains harmonics with buzz, the
 horror stings as sawing violin sections. Footsteps and the blows are built from
-real recordings by tools/make_foley.py. Loops are seamless. Each WAV is a plain
+real recordings by tools/make_foley.py, the dynamo torch by
+tools/make_torch_sound.py. Loops are seamless. Each WAV is a plain
 file: replace it with a field recording of the same name and the game uses it.
 
     python3 tools/make_sounds.py            # all sounds
@@ -153,36 +154,6 @@ def click(name):
     # The panel cabinet rings on a little.
     x += band(g.noise(0.6), 300, 1200) * env(t, 0.001, 0.08) * 0.15
     save(name, x)
-
-
-def whirr(name):
-    """The dynamo torch: six squeezes a second spin a flywheel through plastic
-    gears, a whine that rises and sags with each squeeze, ratchet clicks, and
-    the lever knocking on the case."""
-    g = Gen(name)
-    t = g.t(1.0)
-    phase_sq = (t * 6.0) % 1.0
-    speed = 0.55 + 0.45 * np.sin(np.pi * phase_sq) ** 0.7
-    f = 210 * speed
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    tone = sum(a * np.sin(k * ph) for k, a in ((1, 1.0), (2, 0.6), (3, 0.45), (4, 0.25), (6, 0.15), (8, 0.1)))
-    # Gear mesh: 12 teeth per turn.
-    mesh = np.sin(12 * ph) * 0.35
-    x = tone * 0.5 + mesh
-    x *= 0.6 + 0.4 * speed
-    # Ratchet clicks at the gear rate.
-    rate_ph = np.cumsum(f * 0.25) / SR
-    ticks = np.diff(np.floor(rate_ph), prepend=0) > 0
-    clicks = np.zeros_like(t)
-    clicks[ticks] = 1.0
-    clicks = band(np.convolve(clicks, g.rng.standard_normal(60) * np.exp(-np.arange(60) / 12), "same"), 2000, 9000, True)
-    x += norm(clicks, 0.12)
-    # Lever knock at each squeeze.
-    for k in range(6):
-        place(x, band(g.noise(0.01), 600, 4000) * env(g.t(0.01), 0.0005, 0.003) * 0.3, k / 6 + 0.002)
-    x = band(x, 80, 5000, True)
-    x[-200:] = x[-200:] * np.linspace(1, 0, 200) + x[:200] * np.linspace(0, 1, 200)
-    save(name, x, 0.45)
 
 
 def phone(name):
@@ -545,7 +516,7 @@ def lock(name):
 
 ALL = {
     "engine": engine, "knock": knock, "cans": cans, "lock": lock, "crowd": crowd,
-    "hum": hum, "click": click, "whirr": whirr, "phone": phone, "compressor": compressor, "room": room,
+    "hum": hum, "click": click, "phone": phone, "compressor": compressor, "room": room,
     "cloth": cloth, "stinger": stinger, "drone": drone, "chime": chime, "breath": breath,
     "clank": clank, "keys": keys, "pickup": pickup, "attack_sting": attack_sting, "swing": swing,
     "heartbeat": heartbeat, "ringing": ringing, "killer_breath": killer_breath,
