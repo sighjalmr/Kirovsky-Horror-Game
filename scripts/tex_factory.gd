@@ -7,7 +7,8 @@ extends RefCounted
 ## "sign:<text>" ids name the hanging aisle signs.
 
 const DIR := "res://textures/"
-const SIGNS := {"БАКАЛЕЯ": "bakaleya", "КОНСЕРВЫ": "konservy", "МОЛОКО": "moloko", "ЗАМОРОЗКА": "zamorozka"}
+const SIGNS := {"БАКАЛЕЯ": "bakaleya", "КОНСЕРВЫ": "konservy", "МОЛОКО": "moloko", "ЗАМОРОЗКА": "zamorozka",
+	"ПРОМТОВАРЫ": "promtovary", "ТКАНИ": "tkani", "ПОСУДА": "posuda", "ГАЛАНТЕРЕЯ": "galantereya"}
 
 static var _cache: Dictionary = {}
 
