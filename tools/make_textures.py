@@ -1328,7 +1328,63 @@ def basket(name):
     t.save(name)
 
 
-SIGNS = {"sign_bakaleya": "БАКАЛЕЯ", "sign_konservy": "КОНСЕРВЫ", "sign_moloko": "МОЛОКО", "sign_zamorozka": "ЗАМОРОЗКА"}
+def ornament(name):
+    """Gallery parapet panels, 1.2 m square: stamped anodised aluminium in
+    bronze and gold, a grid of 4×4 cells, each a diamond in a diamond with a
+    boss in the middle, the late-seventies universam look."""
+    t = T(512, 512, (0.55, 0.4, 0.2), name)
+    yy, xx = np.mgrid[0:512, 0:512].astype(np.float32)
+    cx = (xx % 128) - 64
+    cy = (yy % 128) - 64
+    dia = (np.abs(cx) + np.abs(cy)) / 64.0  # 0 in the middle, 1 at the cell corners' diamond
+    rings = np.cos(dia * np.pi * 3.0) * 0.5 + 0.5
+    boss = np.clip(1 - np.sqrt(cx ** 2 + cy ** 2) / 12.0, 0, 1)
+    seam = np.minimum(np.minimum(np.abs(cx + 64), np.abs(cx - 64)), np.minimum(np.abs(cy + 64), np.abs(cy - 64)))
+    seam = np.clip(seam / 3.0, 0, 1)
+    h = (rings * 0.55 + boss * 0.6) * (dia < 0.95) + (dia >= 0.95) * 0.15
+    h = h * seam
+    t.relief = h.astype(np.float32)
+    gold = np.array([0.78, 0.6, 0.3], np.float32)
+    bronze = np.array([0.42, 0.27, 0.13], np.float32)
+    m = np.clip(h, 0, 1)[..., None]
+    t.a[..., :3] = bronze * (1 - m) + gold * m
+    t.mul(0.55 + 0.45 * seam)
+    t.shade(grime(t, 120), 0.82, 1.05)
+    t.grain(0.012)
+    t.rough = 0.35 + 0.3 * (1 - m[..., 0])
+    t.save(name)
+
+
+def corrugated(name):
+    """Profiled steel cladding of the upper walls, 1.2 m square: vertical
+    ribs every 15 cm, light so it can be tinted, streaks of dust."""
+    t = T(256, 256, (0.85, 0.86, 0.84), name)
+    xx = np.mgrid[0:256, 0:256][1].astype(np.float32)
+    rib = np.abs(((xx % 32) / 32.0) - 0.5) * 2
+    t.relief = smooth(np.clip((rib - 0.3) * 2.5, 0, 1)).astype(np.float32)
+    t.mul(0.78 + 0.22 * t.relief)
+    t.lines(30, 120, (0.6, 0.6, 0.58), 1, 0.15, None, np.pi / 2, 0.05)
+    t.shade(grime(t, 90), 0.88, 1.03)
+    t.save(name)
+
+
+def kirovsky_letters(name):
+    """«КИРОВСКИЙ» as on the 1980s facade: one white letter on each red
+    square box, nine of them in a strip (1152×128, 128 px a letter)."""
+    word = "КИРОВСКИЙ"
+    t = T(128 * len(word), 128, (0.72, 0.1, 0.07), name)
+    t.shade(t.noise(60, 3), 0.9, 1.05)
+    for i, ch in enumerate(word):
+        x = i * 128
+        t.bevel(x, 0, 128, 128, 7, (0.95, 0.45, 0.35), (0.3, 0.04, 0.02), 0.8)
+        t.text((x + 64, 68), ch, 98, (0.97, 0.95, 0.9))
+    t.stain(grime(t, 50), 0.7, (0.35, 0.1, 0.06), 0.4)
+    t.grain(0.01)
+    t.save(name)
+
+
+SIGNS = {"sign_bakaleya": "БАКАЛЕЯ", "sign_konservy": "КОНСЕРВЫ", "sign_moloko": "МОЛОКО", "sign_zamorozka": "ЗАМОРОЗКА",
+         "sign_promtovary": "ПРОМТОВАРЫ", "sign_tkani": "ТКАНИ", "sign_posuda": "ПОСУДА", "sign_galantereya": "ГАЛАНТЕРЕЯ"}
 
 ALL = {
     "floor": floor, "wall": wall, "ceiling": ceiling, "kafel": kafel, "concrete": concrete, "galv": galv,
@@ -1364,6 +1420,7 @@ ALL = {
     "fabric": lambda n: plain(n, (0.82, 0.82, 0.82), 60, 0.1),
     "white": lambda n: plain(n, (0.9, 0.9, 0.9), 30, 0.04, 64),
     "exit": exit_sign, "notice": notice, "fire_board": fire_board,
+    "ornament": ornament, "corrugated": corrugated, "kirovsky_letters": kirovsky_letters,
 }
 for _k, _v in SIGNS.items():
     ALL[_k] = (lambda text: lambda n: sign(n, text))(_v)
@@ -1382,7 +1439,7 @@ NORMALS = {
     "rubber": (2.0, 1.0), "leather": (3.0, 1.0), "fur": (4.0, 0.8), "quilted": (3.0, 1.0),
     "dublyonka": (3.0, 0.7), "woman_coat": (3.0, 0.7), "headscarf": (2.0, 0.7), "torch": (1.0, 1.0), "chrome": (0.6, 1.0), "basket": (2.0, 1.0),
     "fabric": (2.0, 1.0), "grille": (3.0, 0.7), "hair": (4.0, 0.6), "denim": (2.5, 0.7), "smock": (2.0, 0.7),
-    "jacket": (3.0, 1.0),
+    "jacket": (3.0, 1.0), "ornament": (5.0, 0.8), "corrugated": (3.0, 1.0),
 }
 
 

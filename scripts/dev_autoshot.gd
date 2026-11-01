@@ -27,6 +27,10 @@ func _ready() -> void:
 		await _night2_shots(p, store, night)
 		get_tree().quit()
 		return
+	if "--hallshot" in OS.get_cmdline_user_args():
+		await _hall_shots(p, store, night)
+		get_tree().quit()
+		return
 	if "--storeshot" in OS.get_cmdline_user_args():
 		await _store_shots(p, store, night)
 		get_tree().quit()
@@ -166,6 +170,44 @@ func _store_shots(p: Player, store: Store, night: NightOne) -> void:
 		p.head.rotation.x = v[3]
 		await _wait(0.8)
 		await _shot(v[0] + "_dark")
+
+
+## The two-storey hall (--hallshot): the gallery, the parapet, the letters on
+## the back wall; at night with the rows lit, then dark with the torch, then
+## in the day look.
+func _hall_shots(p: Player, store: Store, night: NightOne) -> void:
+	night.kovpak.visible = false
+	night.tamara.visible = false
+	var views := [
+		["h1_from_tills", Vector3(-0.5, 0, 9.6), Vector3(0.05, 0, 1), 0.3],
+		["h2_up_gallery", Vector3(-3.0, 0, 15.0), Vector3(-0.8, 0, 1), 0.5],
+		["h3_back_letters", Vector3(1.5, 0, 13.0), Vector3(0, 0, 1), 0.38],
+		["h4_look_back", Vector3(-1.5, 0, 23.0), Vector3(0.15, 0, -1), 0.4],
+		["h5_aisle_d", Vector3(7.4, 0, 13.0), Vector3(0.1, 0, 1), 0.3],
+	]
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(0.8)
+		await _shot(v[0])
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in [views[1], views[3]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(0.8)
+		await _shot(v[0] + "_dark")
+	p.force_flashlight = false
+	for i in store.rows.size():
+		store.switch_on(i)
+	main._day_look()
+	await _wait(1.0)
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(0.8)
+		await _shot(v[0] + "_day")
 
 
 ## Night two (--night2 --autoshot=DIR): the участковый at the post, his
