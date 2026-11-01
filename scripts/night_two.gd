@@ -49,12 +49,14 @@ const N2_LIGHT_BACK := "Поднял рубильник дежурного св�
 const N2_PANEL_DARK := "Рубильник дежурного света опущен до упора. Его не задели, его выключили."
 
 const N2_PH_ANSWER := "— Пост охраны, «Кировский». Гордеев слушает."
-const N2_PH_DISPATCH := "Дежурная: — Пульт вневедомственной, Сабурова. Гордеев? Сменщика вашего, Пахомова, вчера из Шарташа выловили. Пьяный, говорят, утонул. Вы уж там не пейте."
+const N2_PH_DISPATCH := "Дежурная: — Пульт вневедомственной, Сабурова. Гордеев? Пахомова, что до вас на «Кировском» сторожил, вчера из Шарташа выловили. Пьяный, говорят, утонул. Вы уж там не пейте."
 const N2_PH_MISSED := "Не успел. Если это пульт, позвонят ещё."
 
 const N2_CLUE_SEIZURE := "Сумку Нины забрал участковый. Без протокола, без понятых, без описи. Вещдок, который нигде не записан, уже не вещдок."
 const N2_CLUE_PAHOMOV := "Пахомов дежурил в ночь на седьмое. Через день уволился, а теперь утонул. Кто-то убирает тех, кто видел."
 const N2_CLUE_TOKEN := "Жетон тридцать первой ячейки, на шнурке. Нина носила его на шее. Шнурок не порван, его развязали. В пятницу его здесь не было."
+## The same find when Tamara never told him where Nina kept the token.
+const N2_CLUE_TOKEN_PLAIN := "Жетон тридцать первой ячейки, на шнурке. Шнурок не порван, его развязали. В пятницу его здесь не было."
 const N2_CLUE_LOCK := "Дверь в подвал. Там сломанный холодильник, туда с августа никто не ходит. А замок новый, навесной, ещё в заводской смазке, и петли смазаны."
 const N2_CLUE_BUTT := "Окурок «Космоса» у двери в подвал. Свежий, фильтр примят зубами. Вася курит «Беломор», Ковпак не курит. Вечером «Космос» курил участковый, но «Космос» курит полгорода."
 const N2_FINAL := "Сумку Нины унёс участковый, без протокола. Сторож, который видел седьмое, утонул. Жетон с её шеи лежал у склада, на подвале новый замок, у двери свежий «Космос». Кто-то ходит сюда по ночам к тому, что спрятано внизу. У него есть ключи, и милиции он не боится."
@@ -63,11 +65,12 @@ const N2_A3 := "Третий ларь. Пельменей нет, иней со�
 const N2_LOCKER_EMPTY := "Ячейка тридцать один пуста. Сумку Нины унёс Колесников."
 const N2_LOCKER_BAG := "Сумка Нины. Колесников пришёл за ней."
 const N2_REGISTER2 := "Касса № 2. Ленту сменили, старую забрал Ковпак. Хорошо, что я свою выписку сделал."
+const N2_REGISTER2_LOST := "Касса № 2. Ленту сменили, старую забрал Ковпак. Что на ней было, теперь не узнать."
 const N2_KL_LATER := "Колесников: — Потом, Гордеев. Сначала сумочка."
 const N2_K_NOT_NOW := "Ковпак: — Не при нём, Гордеев. Иди на пост."
 const N2_CELLAR_AGAIN := "Замок висит. Новый. Ключа у меня нет."
 const N2_K_END_OK := "Ковпак: — Подписи на месте. Слыхал? Пахомов-то утонул. Пил много."
-const N2_G_END := "Ковпак говорит про Пахомова, а смотрит в пол. Днём схожу к Ринату: седьмого он уходил из магазина последним."
+const N2_G_END := "Ковпак говорит про Пахомова, а смотрит в пол. Днём схожу к Ринату: седьмого он задерживался, мясо рубил."
 
 var kolesnikov: Npc
 ## before, talk, gone
@@ -76,11 +79,21 @@ var koles_state := "before"
 var _call := ""
 var _calls_missed := 0
 var _answer := -1
+## What Gordeev brought from night one (clue keys) and day one (question ids).
+var known: Dictionary = {}
+var heard: Array = []
 
 
 func _init(m: Node) -> void:
 	super(m)
 	clues = {"seizure": false, "pahomov": false, "token": false, "lock": false, "butt": false}
+	known = Main.night_clues.duplicate()
+	heard = Main.day_answers.duplicate()
+	if known.is_empty():
+		# Started from the title screen: as if nights one and day one were played through.
+		known = {"bag": true, "clip": true, "tape": true, "page": true, "invoice": true}
+		for q: Array in DayOne.QUESTIONS:
+			heard.append(q[0])
 
 
 func _ready() -> void:
@@ -293,7 +306,7 @@ func interact(id: String) -> bool:
 			else:
 				hud.say(N2_LOCKER_BAG, -1.0, true)
 		"register2":
-			hud.say(N2_REGISTER2, -1.0, true)
+			hud.say(N2_REGISTER2 if known.get("tape", false) else N2_REGISTER2_LOST, -1.0, true)
 		"talk_kolesnikov":
 			kolesnikov.look_at_point(main.player.global_position)
 			hud.say(N2_KL_LATER, -1.0, true)
@@ -309,7 +322,7 @@ func interact(id: String) -> bool:
 		"token":
 			Sfx.play_3d(main.view, "pickup", main.player.global_position, -6.0)
 			store.take_token()
-			_find_clue("token", N2_CLUE_TOKEN)
+			_find_clue("token", N2_CLUE_TOKEN if "bag" in heard else N2_CLUE_TOKEN_PLAIN)
 		"butt":
 			Sfx.play_3d(main.view, "pickup", main.player.global_position, -10.0)
 			store.take_butt()
@@ -364,8 +377,10 @@ func update_notebook() -> void:
 			detail = "  склад %s, щиток %s" % ["да" if rd.door else "нет", "да" if rd.panel else "нет"]
 		lines.append("%s %s%s" % [mark, names[i], detail])
 	lines.append("")
-	lines.append("С прошлой ночи: Нина осталась в магазине 7-го после десяти и сама пробила чек в 22:58. Собиралась в ОБХСС про мясо Ковпака и Рината.")
-	lines.append("")
+	var past := _past_notes()
+	if not past.is_empty():
+		lines.append("Из пятницы и субботы: " + " ".join(past))
+		lines.append("")
 	lines.append("Улики: %d из 5" % clue_count())
 	if clues.seizure:
 		lines.append("— Колесников забрал сумку Нины без протокола и понятых.")
@@ -385,6 +400,31 @@ func update_notebook() -> void:
 	lines.append("")
 	lines.append("Tab: закрыть")
 	main.hud.set_notebook("\n".join(lines))
+
+
+## What night one and Tamara's statements left in the notebook: only what
+## Gordeev actually found and asked about.
+func _past_notes() -> PackedStringArray:
+	var out := PackedStringArray()
+	if known.get("bag", false):
+		out.append("Сумка Нины пролежала в 31-й с ключами и деньгами.")
+	if "evening" in heard:
+		out.append("7-го Нина осталась в магазине после десяти.")
+	if known.get("tape", false):
+		out.append("Чек в 22:58 пробила сама Нина." if "tape" in heard else "7-го в 22:58 на второй кассе пробит чек, магазин был закрыт.")
+	if known.get("clip", false):
+		out.append("В третьем ларе была её заколка.")
+	if known.get("invoice", false):
+		out.append("Нина узнала про мясо Ковпака и Рината и шла в ОБХСС." if "invoice" in heard else "Ковпак вывозит говядину «без реализации», пометка «Р.».")
+	if "page" in heard:
+		out.append("Сторожа с ночи 7-го вызывал к себе Колесников.")
+	elif known.get("page", false):
+		out.append("Страница журнала за 7-е вырвана.")
+	if "bag" in heard:
+		out.append("Жетон № 31 Нина носила на шее, при сумке его не было.")
+	if "who" in heard:
+		out.append("7-го вечером в магазине были Вася Кран, Ринат и Эдик.")
+	return out
 
 
 # --- morning --------------------------------------------------------------------

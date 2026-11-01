@@ -86,6 +86,8 @@ func _process(delta: float) -> void:
 		return
 	var dir := to.normalized()
 	global_position += dir * minf(speed * delta, to.length())
+	# Up or down steps (the porch outside): climb at half the walking pace.
+	global_position.y = move_toward(global_position.y, _path[_i].y, speed * delta * 0.5)
 	rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), clampf(delta * 8.0, 0.0, 1.0))
 	_animate(speed, delta)
 
