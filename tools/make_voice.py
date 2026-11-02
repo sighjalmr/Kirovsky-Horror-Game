@@ -81,9 +81,17 @@ def duration(path: Path) -> float:
     return round(float(out.stdout), 2)
 
 
+# Abbreviations Silero spells wrong, written the way they are said.
+SAY_AS = {
+    "ЖБИ": "Жэбэ+и",
+}
+
+
 def silero_text(line: dict) -> str:
     # Silero reads Cyrillic with its own stresses; "+" before a vowel forces one.
     text = line.get("say", line["text"])
+    for word, said in SAY_AS.items():
+        text = re.sub(rf"(?<!\w){word}(?!\w)", said, text)
     return text.replace("«", "").replace("»", "").replace("—", "").replace("№", "номер").strip()
 
 
