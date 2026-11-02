@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draws the textures of the street outside «Кировский» for the cutscenes:
 the red profiled sheet of the facade, the white letters on red squares, the
-arrow sign «УНИВЕРСАМ», the panel nine-storey blocks of ЖБИ and their lit
+arrow sign «УНИВЕРСАМ», the panel nine-storey blocks of МЖК and their lit
 windows, wet asphalt with puddles, the black Soviet number plate.
 Writes textures/ext_*.png (and _n / _r maps) next to the store's own.
 
@@ -106,7 +106,7 @@ def universam(name):
 
 
 def panel(name):
-    """Nine-storey panel block of ЖБИ, 1024 px = 4 window bays × 4 floors
+    """Nine-storey panel block of МЖК, 1024 px = 4 window bays × 4 floors
     (12 m × 11.2 m, tiles up and across): grey-beige panels with dark sealed
     seams, wooden double windows, glazed loggias every other bay."""
     W, H = 1024, 1024
