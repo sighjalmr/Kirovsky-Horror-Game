@@ -95,6 +95,7 @@ var _storage_hinge: Node3D
 var _upper_lights: Array[OmniLight3D] = []
 var _upper_tube: ShaderMaterial
 var _row_mats: Dictionary = {}
+var _row_glows: Dictionary = {}
 
 
 func _ready() -> void:
@@ -104,6 +105,7 @@ func _ready() -> void:
 	_build_booth()
 	_build_checkout()
 	_build_hall()
+	_dress_life()
 	_build_gallery()
 	_build_rows()
 	_build_waypoints()
@@ -350,7 +352,7 @@ func _build_checkout() -> void:
 	var xs := [-7.5, -2.5, 2.5]
 	for i in 3:
 		var x: float = xs[i]
-		Props.checkout(self, Vector3(x, 0, 8.25))
+		Equip.checkout(self, Vector3(x, 0, 8.25), i + 1, _glow_mat("Касса и вход"))
 		add_interactable(names[i], Vector3(x + 0.9, 0, 8.0), "Осмотреть кассу № %d" % (i + 1), 1.3)
 	for span: Vector2 in [Vector2(-12, -8), Vector2(5.5, 12)]:
 		var w := span.y - span.x
@@ -395,6 +397,33 @@ func _build_hall() -> void:
 		for k in 4:
 			var id := "%s%d" % [side[0], k + 1]
 			_build_chest(id, Vector3(side[1], 0, 14.0 + k * 2.8), rng)
+
+
+## Signs of a working shop: the customers' control scales by the door, the
+## opening hours, the complaints book and the price board on the walls,
+## cartons nobody has unpacked in the back passage, crates of milk bottles
+## by the dairy cases, and on the floor melt water by the freezers, a
+## smashed jar of tomato juice, dropped receipts, dried boot prints.
+func _dress_life() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1410
+	Equip.control_scales(self, Vector3(-4.4, 0, 0.5), PI)
+	Equip.plate(self, Vector3(-2.75, 1.75, 0.012), Vector3.BACK, "hours", Vector2(0.6, 0.3))
+	Equip.plate(self, Vector3(-11.988, 1.75, 6.6), Vector3.RIGHT, "complaints", Vector2(0.5, 0.25))
+	Equip.plate(self, Vector3(-11.988, 1.6, 7.6), Vector3.RIGHT, "prices", Vector2(0.9, 0.45))
+	Equip.carton_stack(self, rng, Vector3(-1.0, 0, 27.4), 0.08, 3)
+	Equip.carton_stack(self, rng, Vector3(-5.6, 0, 27.4), -0.05, 2)
+	Equip.bottle_crates(self, rng, Vector3(11.4, 0, 26.6), PI * 0.5, 5)
+	Equip.decal(self, Vector3(-7.95, 0, 15.1), 0.9, "puddle", 0.4)
+	Equip.decal(self, Vector3(8.0, 0, 19.8), 0.8, "puddle", 2.1)
+	Equip.decal(self, Vector3(-8.0, 0, 20.9), 0.6, "puddle", 1.0)
+	Equip.decal(self, Vector3(3.3, 0, 22.4), 0.85, "juice", 0.7)
+	Equip.decal(self, Vector3(-1.3, 0, 9.5), 0.7, "litter", 0.3)
+	Equip.decal(self, Vector3(4.1, 0, 9.7), 0.6, "litter", 2.4)
+	Equip.decal(self, Vector3(-6.2, 0, 10.6), 0.5, "litter", 1.2)
+	Equip.decal(self, Vector3(0.6, 0, 2.3), 1.3, "boots", 1.4)
+	Equip.decal(self, Vector3(-0.9, 0, 5.2), 1.1, "boots", 1.7)
+	Equip.decal(self, Vector3(-3.0, 0, 18.0), 1.2, "boots", 1.57)
 
 
 func _build_chest(id: String, pos: Vector3, rng: RandomNumberGenerator) -> void:
@@ -692,6 +721,16 @@ func _tube_mat(title: String, color := TUBE_COLOR) -> ShaderMaterial:
 	return _row_mats[title]
 
 
+## An emissive material on texture `tex` that lights and goes out with the
+## light row `title` (the «КАССА» boxes over the tills).
+func _glow_mat(title: String, tex := Equip.TEX) -> ShaderMaterial:
+	var m := Mats.unique(tex, Color.WHITE, Color(0.85, 0.82, 0.75))
+	if not _row_glows.has(title):
+		_row_glows[title] = []
+	(_row_glows[title] as Array).append(m)
+	return m
+
+
 func _build_waypoints() -> void:
 	var ids := {}
 	var next := 0
@@ -822,6 +861,8 @@ func switch_off(i: int, instant := false) -> void:
 func _set_row_light(row: LightRow, on: bool) -> void:
 	for l in row.lights:
 		l.visible = on
+	for m: ShaderMaterial in _row_glows.get(row.title, []):
+		m.set_shader_parameter("emission", Color(0.85, 0.82, 0.75) if on else Color(0.02, 0.02, 0.02))
 	row.tube_mat.set_shader_parameter("emission", row.tube_on if on else Color(0.02, 0.02, 0.02))
 
 
