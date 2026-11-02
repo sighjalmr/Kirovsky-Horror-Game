@@ -25,6 +25,11 @@ const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": 
 const NINA_1 := "Нина: — Вот. Пробила, как вы сказали. Сорок килограммов говядины, без реализации."
 const NINA_2 := "Нина: — Теперь вы им всё покажете? Правда?"
 const N1_CITY := "Свердловск. ЖБИ. Девятиэтажки, лужи до колена, и посреди всего этого универсам «Кировский»."
+const N1_BLOCKS := "Девять этажей, восемь подъездов, и в каждом окне один и тот же «Прожектор перестройки». Здесь все про всех всё знают. А когда надо, никто ничего не видел."
+const N1_STOP := "Последний автобус ушёл в десять. До утра отсюда не уехать, разве что пешком через пустырь."
+const N1_KIOSK := "«Союзпечать» закрыта с семи. Утром тут очередь за газетами, хотя пишут в них одно и то же."
+const N1_SLOGAN := "«Миру — мир». Над крышей горит исправно. В подъездах лампочки через одну."
+const N1_PHONE := "Два автомата у крыльца. В одном трубку оторвали ещё летом, второй глотает двушки. Ночью отсюда до милиции не дозвониться."
 const N1_JOB := "Тридцать лет я ловил убийц. Теперь сторожу колбасу, которой нет на прилавках."
 const N1_SUROVA := "В восемьдесят шестом меня убрали из следственного. Дело Галины Суровой я так и не закрыл. Мне велели не копать."
 const N1_NINA := "Неделю назад отсюда не вернулась домой Нина Лукина, продавщица из кулинарии. Участковый закрыл заявление за один день: уехала к матери, в Тагил."
@@ -530,7 +535,35 @@ func _night_one() -> void:
 	fade(0.0, 2.5)
 	caption("Свердловск, ЖБИ, Сиреневый бульвар\nПятница, 14 октября 1988 года, 22:20", 5.0)
 	say(N1_CITY)
-	await shot(8.0, Vector3(-14, 16, -46), Vector3(2, 4, 0), Vector3(-9, 8, -36), Vector3(2.5, 3, -2), 42.0, 0.2)
+	# Over the roofs of the block across the road, down towards the square.
+	await shot(10.0, Vector3(-24, 32, -84), Vector3(0, 3, -10), Vector3(-12, 15, -44), Vector3(2, 3, -3), 42.0, 0.15)
+	# A tour of the estate before he comes: the far block, its lit windows
+	# and an entrance with its lamp in the rain.
+	say(N1_BLOCKS)
+	await shot(6.0, Vector3(-25, 1.7, -15), Vector3(-44, 22, 2), Vector3(-27, 1.6, -13.5), Vector3(-44, 6, -6), 52.0, 0.3)
+	await shot(5.0, Vector3(-38.6, 1.25, -14.2), Vector3(-44, 1.7, -10), Vector3(-39.6, 1.25, -13.0), Vector3(-44, 1.5, -10),
+		46.0, 0.4)
+	# The empty bus stop by the road.
+	say(N1_STOP)
+	await shot(7.5, Vector3(-32.8, 1.2, -25.6), Vector3(-38, 1.35, -20.4), Vector3(-34.6, 1.25, -24.9), Vector3(-38.4, 1.3, -20.4),
+		45.0, 0.4)
+	# The «Союзпечать» kiosk, shut for the night.
+	say(N1_KIOSK)
+	await shot(7.5, Vector3(-12.2, 1.5, -21.8), Vector3(-15.5, 1.5, -16.8), Vector3(-13.4, 1.45, -20.4), Vector3(-15.5, 1.4, -16.8),
+		45.0, 0.4)
+	# The slogan on the roof of the block beside the store.
+	say(N1_SLOGAN)
+	await shot(7.0, Vector3(25, 1.6, -24), Vector3(38, 8, 2), Vector3(25.5, 2.0, -25), Vector3(46, 28.5, 3.3), 46.0, 0.3)
+	# The phone booths by the store.
+	say(N1_PHONE)
+	var booth := OmniLight3D.new()  # the bulb under the booth's roof
+	booth.light_color = Color(0.85, 0.9, 1.0)
+	booth.light_energy = 1.4
+	booth.omni_range = 5.0
+	root.add_child(booth)
+	booth.global_position = Vector3(14.3, 2.0, -2.2)
+	await shot(9.5, Vector3(11.0, 1.5, -8.2), Vector3(14.0, 1.6, -2), Vector3(12.0, 1.5, -7.0), Vector3(14.0, 1.5, -2),
+		44.0, 0.4)
 	# Along the road: headlights in the rain, the car turns into the square.
 	_drive(0.0, 21.0)
 	say(N1_JOB)
