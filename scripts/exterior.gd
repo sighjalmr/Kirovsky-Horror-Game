@@ -181,49 +181,7 @@ func _build_store() -> void:
 	for y: float in [PORCH + 0.05, PORCH + 2.45, CANOPY_Y - 0.1]:
 		box(Vector3((gx0 + gx1) * 0.5, y, 0.0), Vector3(gx1 - gx0, 0.07, 0.12), "chrome", Color(0.75, 0.75, 0.75), 1.0)
 	_build_lobby()
-	# Canopy: a flat slab on square white posts, fascia painted dark.
-	box(Vector3(2.5, CANOPY_Y, -2.9), Vector3(15, 0.35, 6.2), "paint", Color(0.82, 0.82, 0.8), 2.0)
-	box(Vector3(2.5, CANOPY_Y + 0.35, -5.95), Vector3(15, 0.25, 0.1), "paint", Color(0.3, 0.3, 0.3), 1.0)
-	for px: float in [9.4, 5.5, -0.5, -4.4]:
-		box(Vector3(px, PORCH, -5.4), Vector3(0.36, CANOPY_Y - PORCH, 0.36), "concrete", Color(0.92, 0.92, 0.9), 1.0)
-	# Soffit lamps under the canopy.
-	for px: float in [7.5, 2.5, -2.5]:
-		box(Vector3(px, CANOPY_Y - 0.04, -3.0), Vector3(0.5, 0.04, 0.5), "white", Color.WHITE, 1.0, MeshFactory.NY,
-			Color(1.6, 1.5, 1.2) if look == "night" else Color.BLACK)
-	# «КИРОВСКИЙ»: nine boxes standing on the canopy edge.
-	var letters := MeshBuilder.Kit.new()
-	letters.ao = false
-	var lmat := Mats.unique("ext_kirovsky", Color.WHITE, Color.BLACK)
-	sign_mats.append(lmat)
-	var lb := letters.custom(lmat)
-	var back := letters.b("paint", Color(0.55, 0.08, 0.06))
-	for i in 9:
-		var cx := 6.82 - i * 1.08
-		lb.box(Props.at(cx, CANOPY_Y + 0.62, -5.6), Vector3(1.0, 1.0, 0.3), Color.WHITE, Rect2(i / 9.0, 0, 1 / 9.0, 1), Vector2.ONE,
-			MeshFactory.NZ)
-		back.box(Props.at(cx, CANOPY_Y + 0.62, -5.6), Vector3(1.0, 1.0, 0.3), Color.WHITE, Rect2(), Vector2.ONE,
-			MeshFactory.ALL & ~MeshFactory.NZ)
-		back.box(Props.at(cx, CANOPY_Y + 0.35, -5.6), Vector3(0.06, 0.27, 0.06))
-	letters.build(self)
-	# «УНИВЕРСАМ»: the arrow on a lattice frame, tilted back a little, above
-	# the left end of the canopy, pointing right at the doors.
-	var arrow := Node3D.new()
-	arrow.position = Vector3(6.0, CANOPY_Y + 2.15, -4.6)
-	arrow.rotation.x = deg_to_rad(-8)
-	add_child(arrow)
-	var ak := MeshBuilder.Kit.new()
-	ak.ao = false
-	var amat := Mats.unique("ext_universam", Color.WHITE, Color.BLACK)
-	sign_mats.append(amat)
-	ak.custom(amat).box(Props.at(0, 0, 0), Vector3(6.4, 1.6, 0.04), Color.WHITE, Rect2(0, 0, 1, 1), Vector2.ONE, MeshFactory.NZ)
-	var frame := ak.b("metal", Color(0.4, 0.4, 0.42))
-	frame.box(Props.at(-0.4, 0.2, 0.12), Vector3(5.2, 0.06, 0.06))
-	frame.box(Props.at(-0.4, 1.3, 0.12), Vector3(5.2, 0.06, 0.06))
-	for k in 7:
-		frame.box(Props.rot(Vector3.BACK, 0.6 if k % 2 == 0 else -0.6, Vector3(-2.8 + k * 0.8, -1.9, 0.3)), Vector3(0.04, 2.3, 0.04))
-	for sx: float in [-2.4, 1.6]:
-		frame.box(Props.at(sx, -2.05, 0.3), Vector3(0.08, 2.1, 0.08))
-	ak.build(arrow)
+	_build_canopy()
 	# Red profiled sheet: above the glazing, the tall block on the right, the
 	# low wing on the left; a grey upper storey set back behind.
 	box(Vector3(2.5, CANOPY_Y + 0.35, 0.15), Vector3(14, 8.5 - CANOPY_Y - 0.35, 0.3), "ext_profnastil", red, sheet_m, MeshFactory.NZ)
@@ -265,6 +223,90 @@ func _build_store() -> void:
 	for ax: float in [-8.0, -17.0]:
 		box(Vector3(ax, 12.5, 6.0), Vector3(0.05, 3.0, 0.05), "metal", Color(0.4, 0.4, 0.4), 1.0)
 		box(Vector3(ax, 15.2, 6.0), Vector3(2.2, 0.04, 0.04), "metal", Color(0.4, 0.4, 0.4), 1.0)
+
+
+## The entrance canopy, after the photo: a flat slab on slender round
+## columns, its front a white fascia with «КИРОВСКИЙ» in white letters on red
+## squares, and over it a wedge that rises towards +X (the left as you face the
+## store) to a sharp prow, the «УНИВЕРСАМ» board along its slanted edge.
+func _build_canopy() -> void:
+	var zf := -6.35  # the fascia's face
+	var x0 := -5.0
+	var x1 := 10.2
+	var yb := CANOPY_Y + 1.5  # top of the fascia, foot of the wedge
+	var tip := Vector3(12.6, yb + 2.6, zf)
+	var kit := MeshBuilder.Kit.new()
+	kit.ao = false
+	var white := kit.b("paint", Color(1.0, 0.92, 0.84))
+	var trim := kit.b("paint", Color(0.55, 0.1, 0.07))
+	# The slab and its soffit.
+	white.box(Props.at((x0 + x1) * 0.5, CANOPY_Y, (zf + 0.0) * 0.5), Vector3(x1 - x0, 0.35, -zf))
+	# The fascia: a white band with a red rule along top and bottom.
+	white.box(Props.at((x0 + x1) * 0.5, CANOPY_Y - 0.1, zf + 0.15), Vector3(x1 - x0, 1.6, 0.3))
+	for y: float in [CANOPY_Y - 0.1, yb - 0.12]:
+		trim.box(Props.at((x0 + x1) * 0.5, y, zf - 0.01), Vector3(x1 - x0 + 0.02, 0.12, 0.04))
+	# The wedge: a triangular prism from the fascia back to the wall.
+	var a := Vector3(x0, yb, zf)
+	var b := Vector3(x1, yb, zf)
+	var c := tip
+	var back := Vector3(0, 0, -zf - 0.2)
+	var uvt := [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0)]
+	var wedge := kit.b("paint", Color(1.0, 0.92, 0.84), Color.BLACK, Mats.DOUBLE)
+	wedge.tri(Transform3D.IDENTITY, [a, c, b], uvt, Color.WHITE, false)                  # front
+	wedge.tri(Transform3D.IDENTITY, [a + back, b + back, c + back], uvt, Color.WHITE, false)  # back
+	wedge.quad(Transform3D.IDENTITY, [a + back, a, c, c + back], [Vector2(0, 1), Vector2(0, 0), Vector2(4, 0), Vector2(4, 1)],
+		Color(0.8, 0.8, 0.78), false)                                                     # the slanted top
+	wedge.quad(Transform3D.IDENTITY, [b, c, c + back, b + back], [Vector2(0, 1), Vector2(0, 0), Vector2(1, 0), Vector2(1, 1)],
+		Color(0.9, 0.9, 0.88), false)                                                     # the prow's end
+	wedge.quad(Transform3D.IDENTITY, [a, b, b + back, a + back], [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)],
+		Color(0.7, 0.7, 0.68), false)                                                     # underside
+	# A dark edge along the slope, so the wedge reads against the sky.
+	var slope := (c - a)
+	var ang := atan2(slope.y, slope.x)
+	kit.b("paint", Color(0.3, 0.3, 0.3)).box(Transform3D(Basis(Vector3.BACK, ang), a.lerp(c, 0.5) + Vector3(0, -0.05, 0.1)),
+		Vector3(slope.length() + 0.1, 0.1, 0.25))
+	# Slender round columns, four along the front, steel caps and feet.
+	var col := kit.b("paint", Color(0.88, 0.88, 0.86))
+	var steel := kit.b("metal", Color(0.45, 0.45, 0.45))
+	for px: float in [9.3, 5.5, -0.5, -4.3]:
+		col.cylinder(Props.at(px, PORCH, -5.6), 0.17, 0.17, CANOPY_Y - PORCH, 12)
+		steel.cylinder(Props.at(px, PORCH, -5.6), 0.24, 0.22, 0.12, 12)
+		steel.cylinder(Props.at(px, CANOPY_Y - 0.12, -5.6), 0.2, 0.26, 0.12, 12)
+	# Soffit lamps under the canopy.
+	var lamp := kit.b("white", Color.WHITE, Color(1.6, 1.5, 1.2) if look == "night" else Color.BLACK)
+	for px: float in [7.5, 2.5, -2.5]:
+		lamp.box(Props.at(px, CANOPY_Y - 0.04, -3.0), Vector3(0.5, 0.04, 0.5), Color.WHITE, Props.NO_RECT, Vector2.ONE,
+			MeshFactory.NY)
+	kit.build(self)
+	# «КИРОВСКИЙ»: nine white-on-red boxes set into the fascia.
+	var letters := MeshBuilder.Kit.new()
+	letters.ao = false
+	var lmat := Mats.unique("ext_kirovsky", Color.WHITE, Color.BLACK)
+	sign_mats.append(lmat)
+	var lb := letters.custom(lmat)
+	var lback := letters.b("paint", Color(0.55, 0.08, 0.06))
+	var step := 1.5
+	for i in 9:
+		var cx := (x0 + x1) * 0.5 + (4 - i) * step
+		var xf := Props.at(cx, CANOPY_Y + 0.1, zf - 0.1)
+		lb.box(xf, Vector3(1.3, 1.3, 0.2), Color.WHITE, Rect2(i / 9.0, 0, 1 / 9.0, 1), Vector2.ONE, MeshFactory.NZ)
+		lback.box(xf, Vector3(1.3, 1.3, 0.2), Color.WHITE, Rect2(), Vector2.ONE, MeshFactory.ALL & ~MeshFactory.NZ)
+	letters.build(self)
+	# «УНИВЕРСАМ» on the slanted edge, its pointed end at the prow.
+	var bk := MeshBuilder.Kit.new()
+	bk.ao = false
+	var bmat := Mats.unique(Street.TEX, Color.WHITE, Color.BLACK)
+	sign_mats.append(bmat)
+	var board_c := a.lerp(c, 0.72) + Vector3(0, 0, -0.12)
+	var bb := Basis(Vector3.BACK, ang)
+	var up := bb * Vector3.UP
+	bk.custom(bmat).box(Transform3D(bb, board_c + up * 0.05), Vector3(6.6, 1.4, 0.06), Color.WHITE,
+		Street._cell("univ_board"), Vector2.ONE, MeshFactory.NZ)
+	var stays := bk.b("metal", Color(0.35, 0.35, 0.35))
+	for k in 3:
+		var p := board_c + bb * Vector3(-2.4 + k * 2.4, 0.0, 0.0)
+		stays.box(Transform3D(bb, p + Vector3(0, 0, 0.08)), Vector3(0.06, 0.6, 0.06))
+	bk.build(self)
 
 
 ## Behind the glass: the lobby with its lockers and the lit hall beyond, at

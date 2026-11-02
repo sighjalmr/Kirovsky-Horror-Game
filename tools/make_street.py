@@ -22,6 +22,7 @@ import os
 import sys
 
 import numpy as np
+from PIL import ImageDraw
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import make_textures as mt  # noqa: E402
@@ -32,7 +33,7 @@ CELLS = [
     "soyuz", "kiosk_win", "phone", "bus_sign",
     "afisha", "poster_drink", "slogan", "door",
     "podezd", "house_no", "bin", "tara",
-    "timetable", "bark", "panel_plinth", "blank",
+    "timetable", "bark", "panel_plinth", "univ_board",
 ]
 
 
@@ -246,6 +247,26 @@ def panel_plinth(t):
         t.rect(x + k * 128, y, 3, H, (0.2, 0.2, 0.2), 0.8)
 
 
+def univ_board(t):
+    """The board on the slanted edge of the entrance canopy: white, a grey
+    frame, «УНИВЕРСАМ» in dark blue. It is stretched 2.36 times across a
+    6.6 × 1.4 m board, so the lettering is drawn squeezed by as much; the
+    left end (the canopy's prow) is cut to a point with alpha."""
+    from PIL import Image
+    x, y = xy("univ_board")
+    wide = int(W * 2.36)
+    img = Image.new("RGBA", (wide, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.polygon([(0, 0), (wide - 1, 0), (wide - 1, H - 1), (150, H - 1)], fill=(232, 230, 222, 255),
+              outline=(140, 142, 140, 255), width=10)
+    d.text((wide * 0.55, H * 0.52), "УНИВЕРСАМ", font=mt.font(118, True, False, False), fill=(35, 40, 95, 255),
+           anchor="mm")
+    small = np.asarray(img.resize((W, H), Image.LANCZOS), np.float32) / 255.0
+    t.a[y:y + H, x:x + W, :3] = small[..., :3]
+    t.a[y:y + H, x:x + W, 3] = (small[..., 3] > 0.5).astype(np.float32)
+    t.shade(t.noise(40, 3), 0.9, 1.02, reg("univ_board"))
+
+
 def street(name):
     t = T(2048, 1024, (0.5, 0.5, 0.5), name)
     soyuz(t)
@@ -264,6 +285,7 @@ def street(name):
     bark(t)
     panel_plinth(t)
     t.grain(0.015)
+    univ_board(t)
     t.save(name)
 
 

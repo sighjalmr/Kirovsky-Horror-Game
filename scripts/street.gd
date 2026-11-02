@@ -15,7 +15,7 @@ const CELLS := [
 	"soyuz", "kiosk_win", "phone", "bus_sign",
 	"afisha", "poster_drink", "slogan", "door",
 	"podezd", "house_no", "bin", "tara",
-	"timetable", "bark", "panel_plinth", "blank",
+	"timetable", "bark", "panel_plinth", "univ_board",
 ]
 const DECALS := {"puddle": Rect2(0, 0, 0.5, 0.5), "leaves": Rect2(0.5, 0, 0.5, 0.5),
 	"oil": Rect2(0, 0.5, 0.5, 0.5), "hatch": Rect2(0.5, 0.5, 0.5, 0.5)}
