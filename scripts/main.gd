@@ -26,6 +26,9 @@ const DAY_AIR := Color("d8dad4")
 ## The first time Gordeev runs out of breath.
 const G_WINDED := "Сердце колотится в горле. Мне не тридцать лет, долго я не пробегу."
 
+## How near a clue has to be before a ring shows round it, metres.
+const CLUE_MARK_RANGE := 4.5
+
 enum Phase { TITLE, CUT, PLAY, DEAD, END }
 
 ## The last signed round, kept across a scene reload after death.
@@ -123,7 +126,7 @@ func _ready() -> void:
 		"Мышь — смотреть      W / A / S / D — идти\n" +
 		"Shift — бег (шумно и недолго: одышка)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
-		"E — осмотреть, поговорить      Tab — блокнот\n\nНажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая")
+		"E — осмотреть, поговорить      Tab — блокнот      J — задания\n\nНажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая")
 
 
 func _night_name() -> String:
@@ -191,6 +194,7 @@ func _setup_input() -> void:
 	_bind("crouch", [KEY_C, KEY_CTRL], [JOY_BUTTON_LEFT_STICK], [])
 	_bind("restart", [KEY_R], [JOY_BUTTON_START], [])
 	_bind("new_night", [KEY_N], [], [])
+	_bind("tasks", [KEY_J], [JOY_BUTTON_X], [])
 	if InputMap.action_get_events("flashlight").size() < 4:
 		var m := InputEventMouseButton.new()
 		m.button_index = MOUSE_BUTTON_RIGHT
@@ -319,6 +323,7 @@ func after(dm: float, f: Callable) -> void:
 func _process(delta: float) -> void:
 	_flash = maxf(0.0, _flash - delta * 1.6)
 	post.set_shader_parameter("flash", _flash)
+	hud.tasks_allowed = phase == Phase.PLAY and not _morning and player.controllable
 	if phase != Phase.PLAY or get_tree().paused:
 		return
 	var rate := EARLY_RATE if minutes < KILLER_MIN or day else LATE_RATE
@@ -337,6 +342,7 @@ func _process(delta: float) -> void:
 	hud.clock.text = _fmt(minutes)
 	_update_env(delta)
 	_update_interaction()
+	_update_tasks()
 	if day:
 		day.update(delta)
 		return
@@ -378,7 +384,33 @@ func _update_interaction() -> void:
 		_interact(it.id)
 
 
+## The task list and the rings round clues near by.
+func _update_tasks() -> void:
+	var chap: Node = day if day else night
+	hud.set_tasks(chap.objectives())
+	var pts: Array = []
+	var cam := player.camera
+	var eye := cam.global_position
+	var space := player.get_world_3d().direct_space_state
+	for p: Vector3 in chap.clue_marks():
+		var d := eye.distance_to(p)
+		if d > CLUE_MARK_RANGE or cam.is_position_behind(p):
+			continue
+		var q := PhysicsRayQueryParameters3D.create(eye, p)
+		q.exclude = [player.get_rid()]
+		var hit := space.intersect_ray(q)
+		# Hidden behind a shelf or a wall; the clue's own box may stop the ray close to it.
+		if not hit.is_empty() and eye.distance_to(hit.position) < d - 0.9:
+			continue
+		var at := cam.unproject_position(p)
+		if Rect2(0, 0, RENDER_W, RENDER_H).has_point(at):
+			pts.append([at, 1.0 - clampf((d - 1.2) / (CLUE_MARK_RANGE - 1.2), 0.0, 1.0)])
+	hud.marks.points = pts
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("tasks"):
+		hud.toggle_tasks()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		player.look((event as InputEventMouseMotion).relative)
 	elif event is InputEventMouseButton and event.pressed and phase == Phase.PLAY and not hud.notebook.visible:

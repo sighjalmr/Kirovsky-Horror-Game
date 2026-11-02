@@ -229,6 +229,24 @@ func update_notebook() -> void:
 	main.hud.set_notebook("\n".join(lines))
 
 
+## The HUD task list for the day.
+func objectives() -> Array:
+	var out: Array = []
+	if not done:
+		var left := ASK_LIMIT - asked.size()
+		out.append(NightOne.task("Расспросить Тамару Ивановну на кассе № 2" if not talking
+			else "Расспросить Тамару Ивановну: ещё %d %s" % [left, _questions_word(left)]))
+		out.append(NightOne.task("Можно заговорить с Эдиком у входа", _edik_talked, true))
+	else:
+		out.append(NightOne.task("Расспросить Тамару Ивановну", true))
+		out.append(NightOne.task("Уйти домой через входную дверь"))
+	return out
+
+
+func clue_marks() -> Array:
+	return []
+
+
 func summary() -> String:
 	var lines := PackedStringArray()
 	for q: Array in QUESTIONS:

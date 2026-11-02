@@ -142,6 +142,13 @@ func move_interactable(id: String, pos: Vector3) -> void:
 			it.pos = pos
 
 
+func find_by_id(id: String) -> Dictionary:
+	for it in interactables:
+		if it.id == id:
+			return it
+	return {}
+
+
 func set_interactable(id: String, active: bool, prompt := "") -> void:
 	for it in interactables:
 		if it.id == id:
