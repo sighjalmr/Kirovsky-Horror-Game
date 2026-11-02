@@ -94,6 +94,7 @@ var _patrol_ids: Array[int] = []
 var _storage_hinge: Node3D
 var _upper_lights: Array[OmniLight3D] = []
 var _upper_tube: ShaderMaterial
+var _row_mats: Dictionary = {}
 
 
 func _ready() -> void:
@@ -369,11 +370,16 @@ func _build_hall() -> void:
 		for k in 4:
 			Props.gondola(self, rng, Vector3(x, 0, seg_z[k] + 1.5625), 3.125, sides[x], k == 0 or k == 2, k == 1 or k == 3)
 		Fittings.column(self, Vector3(x, 0, 18.5), H2, 0.45)
+	# Along the walls: the low-temperature glass counters of заморозка on the
+	# left, the open dairy cases on the right (their canopy lights belong to
+	# the Молочный row and go out with it).
+	var counter_stock := [["chicken", "pelmeni", "chicken"], ["fish", "fish", "pelmeni"], ["pelmeni", "plombir", "butter"],
+		["chicken", "fish", "pelmeni"]]
 	for k in 4:
-		Props.wall_shelf(self, rng, Vector3(-11.6, 0, 12.0 + k * 3.25 + 1.625), 3.25, 1.0, "zamorozka")
-		Props.wall_shelf(self, rng, Vector3(11.6, 0, 12.0 + k * 3.25 + 1.625), 3.25, -1.0, "moloko")
+		Cases.frozen_counter(self, rng, Vector3(-11.55, 0, 12.0 + k * 3.25 + 1.625), 3.25, 1.0, counter_stock[k])
+		Cases.dairy_case(self, rng, Vector3(11.6, 0, 12.0 + k * 3.25 + 1.625), 3.25, -1.0, _tube_mat("Молочный"))
 	# Pyramids: three-litre juice jars in бакалея, tins of peas in консервы.
-	Props.pyramid(self, rng, Vector3(-1.6, 0, 16.0), "jar_juice", 4)
+	Props.pyramid(self, rng, Vector3(-1.6, 0, 16.0), "jar_tomato", 4)
 	Props.pyramid(self, rng, Vector3(1.6, 0, 20.0), "peas", 6)
 	for s: Array in [[-3.0, "БАКАЛЕЯ"], [3.0, "КОНСЕРВЫ"], [9.6, "МОЛОКО"], [-9.6, "ЗАМОРОЗКА"]]:
 		Props.aisle_sign(self, Vector3(s[0], 2.45, 12.6), s[1], _ceiling_at(s[0], 12.6))
@@ -651,7 +657,7 @@ func _add_row(title: String, rect: Rect2, points: Array[Vector3], color: Color) 
 	row.title = title
 	row.rect = rect
 	row.tube_on = color
-	row.tube_mat = Mats.unique("white", Color(0.8, 0.8, 0.8), color)
+	row.tube_mat = _tube_mat(title, color)
 	var c := Vector3.ZERO
 	for p in points:
 		Props.fixture(self, Vector3(p.x, H - 0.07, p.z), row.tube_mat)
@@ -676,6 +682,14 @@ func _add_row(title: String, rect: Rect2, points: Array[Vector3], color: Color) 
 	add_child(row.hum)
 	row.hum.position = row.center
 	rows.append(row)
+
+
+## The shared tube material of a light row, made on first use so that the
+## dairy cases built before the rows can share it.
+func _tube_mat(title: String, color := TUBE_COLOR) -> ShaderMaterial:
+	if not _row_mats.has(title):
+		_row_mats[title] = Mats.unique("white", Color(0.8, 0.8, 0.8), color)
+	return _row_mats[title]
 
 
 func _build_waypoints() -> void:
