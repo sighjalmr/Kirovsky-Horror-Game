@@ -62,6 +62,7 @@ var _players: Array[Node] = []
 var _shot_n := 0
 var _wipe_t := 0.0
 var _wiping := false
+var _car_prev: Array = []
 var _engine: Node
 
 
@@ -222,6 +223,8 @@ func _process(delta: float) -> void:
 	_place_camera()
 	if ext:
 		ext.follow(cam)
+	if ext and ext.zhiguli and ext.zhiguli.has_meta("steer"):
+		_steer(ext.zhiguli, delta)
 	if _wiping and ext:
 		_wipe_t += delta
 		var w: Node3D = ext.zhiguli.get_meta("wiper")
@@ -229,12 +232,34 @@ func _process(delta: float) -> void:
 		w.rotation.z = -sin(ph * PI) * 1.75
 
 
+## Turns the wheel (and his hands on it) with the car: the angle a 2106
+## needs for the bend it is taking (wheelbase 2.42 m, steering ratio 16:1),
+## eased, with the small corrections a driver makes on a straight road.
+## Held to about a third of a turn: his hands stay on the rim at ten to two
+## (a tighter bend would need them to shuffle round it).
+func _steer(car: Node3D, delta: float) -> void:
+	var yaw := car.global_rotation.y
+	var pos := car.global_position
+	if _car_prev.is_empty():
+		_car_prev = [yaw, pos]
+		return
+	var rate := angle_difference(_car_prev[0], yaw) / maxf(delta, 0.001)
+	var speed := Vector2(pos.x - (_car_prev[1] as Vector3).x, pos.z - (_car_prev[1] as Vector3).z).length() / maxf(delta, 0.001)
+	_car_prev = [yaw, pos]
+	var want := 0.0
+	if speed > 0.5:
+		want = clampf(16.0 * atan(rate * 2.42 / speed), -0.55, 0.55)
+		want += sin(_shot_t * 0.9) * 0.04 + sin(_shot_t * 2.3) * 0.015
+	var steer: Node3D = car.get_meta("steer")
+	steer.rotation.z = lerpf(steer.rotation.z, want, clampf(delta * 3.0, 0.0, 1.0))
+
+
 func _place_camera() -> void:
 	if _shot.has("car"):
 		var car: Node3D = _shot.car
 		var seat: Vector3 = car.get_meta("seat")
 		var bob := Vector3(sin(_shot_t * 7.0) * 0.004, sin(_shot_t * 11.0) * 0.006, 0)
-		cam.global_transform = car.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-4.0)), seat + bob)
+		cam.global_transform = car.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-10.0)), seat + bob)
 		return
 	var k := clampf(_shot_t / maxf(_shot.dur, 0.01), 0.0, 1.0)
 	k = k * k * (3.0 - 2.0 * k) * 0.6 + k * 0.4

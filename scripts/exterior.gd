@@ -409,6 +409,10 @@ func _build_rain() -> void:
 	m.albedo_color = Color(0.7, 0.75, 0.8, 0.22)
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
 	m.billboard_keep_scale = true
+	# No drops right at the lens (nor inside the car in the shots from the seat).
+	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	m.distance_fade_min_distance = 1.3
+	m.distance_fade_max_distance = 2.6
 	q.material = m
 	rain.mesh = q
 	rain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
