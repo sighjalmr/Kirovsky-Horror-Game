@@ -7,8 +7,9 @@ extends RefCounted
 ## of wood-look trim and the glovebox on the passenger's side; the thin
 ## two-spoke wheel on its column with the stalks, Gordeev's hands on the rim
 ## at ten to two; the A-pillars, the header and the headliner, sun visors,
-## the mirror, the door cards with the window cranks and the chrome posts of
-## the quarter lights; the checked cloth seats.
+## the mirror, the door cards with the window cranks; the checked cloth
+## seats. The body, the glass and the quarter-light posts are the car
+## model's own (tools/build_cars.py).
 ## Car frame as in Vehicles: nose towards -Z, ground at y = 0, the driver on
 ## the left (-X).
 ## Adds to the car:
@@ -126,7 +127,7 @@ static func build(car: Node3D, s: Dictionary) -> void:
 	kit.b("white", Color(0.75, 0.1, 0.08), Color(0.04, 0.0, 0.0), Mats.DOUBLE).quad(pen, [Vector3(-0.04, 0.0, 0), Vector3(0.04, 0.0, 0),
 		Vector3(0.04, 0.03, 0), Vector3(-0.04, 0.03, 0)], [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)], Color.WHITE, false)
 
-	# --- Door cards, armrests, window cranks, the posts of the quarter lights.
+	# --- Door cards, armrests, window cranks.
 	for sx: float in [-1.0, 1.0]:
 		var x := sx * (hw - 0.07)
 		card.box(Props.at(x, 0.3, 0.02), Vector3(0.02, belt - 0.32, 1.0))
@@ -137,17 +138,16 @@ static func build(car: Node3D, s: Dictionary) -> void:
 		chrome.cylinder(Props.rot(Vector3.BACK, sx * PI * 0.5, crank), 0.022, 0.018, 0.02, 10)
 		chrome.box(Props.rot(Vector3.RIGHT, 0.6, crank + Vector3(-sx * 0.025, 0, 0)), Vector3(0.012, 0.012, 0.1))
 		black.cylinder(Props.rot(Vector3.BACK, sx * PI * 0.5, crank + Vector3(-sx * 0.03, -0.03, 0.045)), 0.01, 0.01, 0.04, 8)
-		# The quarter light's chrome post, upright from the belt.
-		chrome.box(Props.at(sx * (hw - 0.06), belt, g[0] + 0.36), Vector3(0.015, roof - belt - 0.1, 0.015))
-		black.box(Props.at(sx * (hw - 0.06), belt, (g[0] + g[0] + 0.36) * 0.5 + 0.02), Vector3(0.02, 0.02, 0.34))
 
 	# --- Seats in the checked cloth, the floor, the tunnel, the gear lever.
 	for sx: float in [-0.36, 0.36]:
-		cloth.box(Props.at(sx, 0.32, 0.32), Vector3(0.5, 0.16, 0.5))
-		cloth.box(Props.rot(Vector3.RIGHT, -0.22, Vector3(sx, 0.46, 0.6)), Vector3(0.48, 0.62, 0.13))
-		cloth.box(Props.rot(Vector3.RIGHT, -0.22, Vector3(sx, 1.07, 0.75)), Vector3(0.26, 0.17, 0.08))
-	cloth.box(Props.at(0, 0.33, 1.05), Vector3(w - 0.1, 0.15, 0.5))
-	cloth.box(Props.rot(Vector3.RIGHT, -0.25, Vector3(0, 0.46, 1.32)), Vector3(w - 0.1, 0.5, 0.12))
+		cloth.box(Props.at(sx, 0.32, 0.12), Vector3(0.5, 0.16, 0.5))
+		cloth.box(Props.rot(Vector3.RIGHT, -0.22, Vector3(sx, 0.46, 0.36)), Vector3(0.48, 0.6, 0.13))
+		cloth.box(Props.rot(Vector3.RIGHT, -0.22, Vector3(sx, 1.05, 0.5)), Vector3(0.26, 0.17, 0.08))
+	# The rear bench, its back against the parcel shelf under the rear window.
+	var rz: float = g[3] - 0.1
+	cloth.box(Props.at(0, 0.33, rz - 0.3), Vector3(w - 0.1, 0.15, 0.45))
+	cloth.box(Props.rot(Vector3.RIGHT, -0.25, Vector3(0, 0.44, rz - 0.04)), Vector3(w - 0.1, 0.44, 0.1))
 	carpet.box(Props.at(0, 0.24, 0.1), Vector3(w, 0.02, 1.9))
 	carpet.box(Props.at(0, 0.24, 0.0), Vector3(0.22, 0.12, 1.4))
 	black.cylinder(Props.rot(Vector3.RIGHT, 0.3, Vector3(0, 0.36, -0.28)), 0.007, 0.006, 0.3, 8)

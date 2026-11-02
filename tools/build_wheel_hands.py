@@ -10,8 +10,8 @@ The wheel is the «шестёрка»'s: a thin black rim, two spokes dropping t
 long horn bar with the chrome VAZ boat in the middle. The hand is
 models/hand/Hand_Nails_R.gltf (Godot XR Tools, CC0). The right hand takes
 the rim at two o'clock: the rim runs across the palm, each finger closes
-joint by joint until its skin rests on the rim, the thumb lies along the
-rim towards twelve, then a coat sleeve runs from the wrist towards the
+joint by joint until its skin rests on the rim, the thumb comes round the
+inside of the rim and rests on it, then a coat sleeve runs from the wrist towards the
 elbow. The left hand is the right one mirrored to ten o'clock.
 
 Frame (Blender, Z up): the rim lies in the XZ plane round the origin, the
@@ -23,8 +23,8 @@ from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
 
 ARGS = json.loads(sys.argv[sys.argv.index("--") + 1]) if "--" in sys.argv else {}
-P = dict(R=0.19, r=0.0125, phi=28.0, a=18.0, beta=35.0, px=-0.031, py=0.072, pz=0.0, twist=0.0,
-         arm=[0.25, -0.8, -0.55], arm_mix=0.7, cuff=-0.01, thumb_ang=200.0, thumb_r=0.022,
+P = dict(R=0.19, r=0.0125, phi=28.0, a=18.0, beta=50.0, px=-0.031, py=0.072, pz=0.0, twist=0.0,
+         arm=[0.5, -0.75, -0.45], arm_mix=0.75, cuff=-0.01, thumb_ang=200.0, thumb_r=0.022,
          out="/tmp/wheel_hands.png", res=[960, 540], samples=24, export="")
 P.update(ARGS)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -302,25 +302,57 @@ def aim(bone, target_world):
     bpy.data.objects.remove(e)
 
 
-def lay_thumb(r_):
-    """Thumb along the rim towards twelve, resting on its driver's side."""
-    ang = math.radians(P["thumb_ang"])
-    for bone, drop in (("Thumb_Proximal_R", 0.0), ("Thumb_Distal_R", 0.003)):
-        pb = arm.pose.bones[bone]
-        h = G.inverted() @ (arm.matrix_world @ pb.head)
-        rad = r_ - drop
-        q = Vector((rad * math.cos(ang), 0, rad * math.sin(ang)))
-        dxz = math.hypot(q.x - h.x, q.z - h.z)
-        dy = math.sqrt(max(1e-6, pb.length ** 2 - dxz * dxz))
-        aim(bone, G @ Vector((q.x, h.y + dy, q.z)))
+def distances(idx):
+    """Signed distances (m) of the given verts to the rim, all of them."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = skin.evaluated_get(dg)
+    me = ev.to_mesh()
+    mw = skin.matrix_world
+    out = []
+    for i in idx:
+        p = mw @ me.vertices[i].co
+        loc, nrm, _, dist = RIM_TREE.find_nearest(p, 0.2)
+        if loc is None:
+            out.append(0.2)
+            continue
+        out.append(dist if (p - loc).dot(nrm) >= 0 else -dist)
+    ev.to_mesh_clear()
+    return out
 
 
-tr_ = P["thumb_r"]
-lay_thumb(tr_)
-while penetration(verts_of(chains["Thumb"] + ["Thumb_Tip_R"])) < 0.0005 and tr_ < 0.06:
-    tr_ += 0.001
-    lay_thumb(tr_)
-print("THUMB_R", round(tr_, 3))
+# The thumb comes round the inside of the rim and rests on it, the way a
+# hand lies on a wheel without gripping hard: search the base joint (swing
+# towards the palm about Z, out from it about X) and the bend of the two
+# outer joints for the pose in which the thumb lies closest along the rim
+# with no part of it inside.
+thumb_all = verts_of(chains["Thumb"] + ["Thumb_Tip_R"], any_owner)
+thumb_pad = verts_of(["Thumb_Distal_R", "Thumb_Tip_R"])
+thumb_mid = verts_of(["Thumb_Proximal_R"])
+meta = arm.pose.bones["Thumb_Metacarpal_R"]
+prox = arm.pose.bones["Thumb_Proximal_R"]
+dist_ = arm.pose.bones["Thumb_Distal_R"]
+for pb in (meta, prox, dist_):
+    pb.rotation_mode = "XYZ"
+best, pose = None, (0, 0, 0)
+for mz in range(-20, 71, 10):
+    for mx in range(-40, 41, 10):
+        meta.rotation_euler = (math.radians(mx), 0, math.radians(mz))
+        for pz in range(-10, 71, 10):
+            prox.rotation_euler = (0, 0, math.radians(pz))
+            dist_.rotation_euler = (0, 0, math.radians(pz * 0.8))
+            bpy.context.view_layer.update()
+            if min(distances(thumb_all)) < 0.0004:
+                continue
+            dp = distances(thumb_pad)
+            dm = distances(thumb_mid)
+            score = sum(dp) / len(dp) + 0.5 * sum(dm) / len(dm) + (0.0 if min(dp) < 0.003 else 0.01)
+            if best is None or score < best:
+                best, pose = score, (mx, mz, pz)
+meta.rotation_euler = (math.radians(pose[0]), 0, math.radians(pose[1]))
+prox.rotation_euler = (0, 0, math.radians(pose[2]))
+dist_.rotation_euler = (0, 0, math.radians(pose[2] * 0.8))
+bpy.context.view_layer.update()
+print("THUMB", pose, round(best * 1000, 1))
 
 worst = 1.0
 for f, bones in chains.items():
