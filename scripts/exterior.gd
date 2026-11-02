@@ -1,7 +1,7 @@
 class_name Exterior
 extends Node3D
 
-## The square in front of универсам «Кировский» on Сиреневый бульвар, ЖБИ,
+## The square in front of универсам «Кировский» on Сиреневый бульвар, МЖК,
 ## after the 1980s photo: a red profiled-sheet box, a flat canopy on white
 ## posts with «КИРОВСКИЙ» in white letters on red squares along its edge,
 ## the arrow «УНИВЕРСАМ» above, wide steps, puddles on the asphalt, firs on

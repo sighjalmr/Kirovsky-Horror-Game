@@ -39,6 +39,9 @@ var force_flashlight := false  # dev screenshots
 var crouching := false
 ## On the chair at the post, waiting out the night.
 var sitting := false
+## Tucked away in a hiding place (Main.hide_in): the killer cannot see him.
+var hidden := false
+const HIDE_EYE := 0.75
 ## 1 fresh, 0 out of breath.
 var breath := 1.0
 var winded := false
@@ -131,7 +134,7 @@ func _physics_process(delta: float) -> void:
 	var running := false
 	var want_light := force_flashlight
 	if controllable and not dead:
-		want_light = want_light or Input.is_action_pressed("flashlight")
+		want_light = (want_light or Input.is_action_pressed("flashlight")) and not hidden
 		var stick := Input.get_vector("look_left", "look_right", "look_up", "look_down")
 		rotation.y -= stick.x * STICK_SENS * delta
 		head.rotation.x = clampf(head.rotation.x - stick.y * STICK_SENS * delta, -PITCH_LIMIT, PITCH_LIMIT)
@@ -159,7 +162,7 @@ func _physics_process(delta: float) -> void:
 		# Head bob: small, PS1 games kept it subtle.
 		_bob += delta * moved * 4.2
 		var amp := clampf(moved / WALK_SPEED, 0.0, 1.5)
-		var eye_to := SIT_EYE if sitting else (CROUCH_EYE if crouching else EYE_HEIGHT)
+		var eye_to := HIDE_EYE if hidden else (SIT_EYE if sitting else (CROUCH_EYE if crouching else EYE_HEIGHT))
 		_eye = move_toward(_eye, eye_to, delta * 2.5)
 		head.position = Vector3(cos(_bob * 0.5) * 0.025 * amp, _eye + absf(sin(_bob)) * 0.035 * amp, 0)
 		_update_hand(delta)

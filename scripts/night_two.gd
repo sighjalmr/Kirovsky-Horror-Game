@@ -13,7 +13,8 @@ extends NightOne
 ##        Колесников sees him, he sends him back to the post, and the killer
 ##        comes back early that night (02:00 instead of 02:40).
 ## 22:50  the rows go dark.  23:03 Колесников gets out and goes round the
-##        building to the back yard.  23:05 the storage door: the killer is in.
+##        building to the back yard (later if the prologue ran long; then he
+##        still sits ~12 min first).  Two minutes on, the storage door: he is in.
 ## 01:46  after the killer has gone, the «бобик» drives off without lights.
 ## 23:30, 02:20, 04:20  rounds, as on night one.
 ## 00:40  the phone: the duty officer at the security desk says Пахомов, the
@@ -29,7 +30,22 @@ extends NightOne
 ## new padlock on the cellar door, the cigarette end. Chest A3 has been
 ## scrubbed clean since Friday.
 
-const N2_HANDOVER := "Ковпак: — Принимай пост, Гордеев. И веди себя тихо: участковый пришёл на тебя посмотреть."
+const N2_HANDOVER := "Ковпак: — Принимай пост, Гордеев. Там на крыльце участковый, хочет на тебя посмотреть. Докурит, впущу."
+## Before Kovpak lets him in Gordeev can move Nina's bag to his own locker.
+const N2_LET_IN := "Ковпак: — Всё, зову. И веди себя тихо, Гордеев."
+const N2_MOVE_BAG := "Переложить сумку Нины в свою ячейку № 12"
+const N2_G_MOVED := "Переложил сумку в свою двенадцатую. Тридцать первую закрыл. Пусть ищет."
+const N2_KL_EMPTY := "Колесников: — Пусто. Кто открывал, Гордеев?"
+const N2_G_LIE := "— Не могу знать. Ключ от ячеек у директора."
+const N2_KL_NUNU := "Колесников: — Ну-ну. Найдётся сумочка. Всё находится."
+const N2_G_NOT_BELIEVE := "Не поверил. Теперь он знает, что старик копает. И знает, где я сижу по ночам."
+const N2_LOCKER_OWN := "Сумка Нины лежит в моей ячейке."
+const N2_LOCKER_OWN_LATER := "Не при нём. Посмотрю, когда уйдёт."
+const N2_OWN_PROMPT := "Осмотреть сумку Нины (ячейка № 12)"
+const N2_CLUE_NOTE := "В подкладке сумки записка рукой Нины: «7-го, 22:40, заднее крыльцо. К. будет свидетелем. Пробить чек на мясо». «К.» Ковпак? Но Ковпаку незачем быть свидетелем против себя самого."
+const N2_FINAL_KEPT := "Сумку Нины я спрятал, а участковый пришёл за ней без протокола. В сумке записка: свидетелем седьмого должен был быть «К.». Сторож, который видел седьмое, утонул. Жетон с её шеи лежал у склада, на подвале новый замок, у двери свежий «Космос». У него есть ключи, и милиции он не боится."
+## Where Gordeev keeps his things: locker 12, top row, far right.
+const OWN_LOCKER := Vector3(-5.25, 0, 0.75)
 const N2_G_KOLES := "Участковый Колесников. Тот, что закрыл заявление про Нину за один день. Курит «Космос» прямо в зале, а Ковпак молчит."
 const N2_KL_HELLO := "Колесников: — Так вот ты какой, Гордеев. Следователь в сторожах. Наслышан."
 const N2_KL_BAG := "Колесников: — Сумочку Лукиной я у вас заберу. Вещдок, сам понимаешь."
@@ -94,9 +110,12 @@ var kolesnikov: Npc
 var koles_seat: Npc
 ## before, walking (to the car), sitting, empty (he went round the back), gone
 var koles_car := "before"
+var _sat_at := -INF
 var _seen_t := 0.0
 ## before, talk, gone
 var koles_state := "before"
+## Gordeev moved Nina's bag to his own locker before Колесников came in.
+var bag_hidden := false
 ## "", "dispatch", "breath": what the ringing phone is
 var _call := ""
 var _calls_missed := 0
@@ -125,6 +144,7 @@ func _ready() -> void:
 	# The seal on the storage door was found torn on Friday; no news tonight.
 	_talked["torn"] = true
 	main.store.add_interactable("talk_kolesnikov", Vector3.ZERO, "Заговорить с участковым", 1.7, false, false)
+	main.store.add_interactable("locker12", OWN_LOCKER, N2_OWN_PROMPT, 1.2, false, false)
 	_park_bobik()
 
 
@@ -186,9 +206,7 @@ func build_timeline() -> void:
 	m.at(2, 0, func():
 		if street.get("spotted", false):
 			_killer_return())
-	m.at(23, 5, func():
-		_killer_in()
-		hud.say(G_DOOR, -1.0, true))
+	m.at(23, 5, _killer_enters)
 	m.at(0, 10, func(): hud.say(N2_G_0010))
 	for i in rounds.size():
 		var idx := i
@@ -212,18 +230,35 @@ func build_timeline() -> void:
 func _prologue() -> void:
 	var hud: Hud = main.hud
 	var store: Store = main.store
-	koles_state = "talk"
+	koles_state = "before"
 	store.car_park()
 	kovpak.visible = true
 	kovpak.global_position = Vector3(6.3, 0, 2.7)
 	kovpak.look_at_point(main.player.global_position)
-	kolesnikov.visible = true
-	kolesnikov.global_position = Vector3(2.4, 0, 2.6)
-	kolesnikov.look_at_point(main.player.global_position)
+	update_locker_prompt()
 	hud.say(N2_HANDOVER)
 	hud.say(K_ROUNDS)
+	# Колесников finishes his cigarette on the porch: a few minutes to put
+	# Nina's bag out of his reach.
+	await _wait_min(5.0)
+	if main.phase != Main.Phase.PLAY:
+		return
+	hud.say(N2_LET_IN)
+	kovpak.walk(PackedVector3Array([Vector3(4.25, 0, 4.0), Vector3(0, 0, 3.0), Vector3(-0.6, 0, 1.2)]))
+	await kovpak.arrived
+	store.set_front_door(true)
+	koles_state = "talk"
+	update_locker_prompt()
+	kolesnikov.visible = true
+	kolesnikov.global_position = Vector3(-1.0, 0, -2.0)
+	kolesnikov.walk(PackedVector3Array([Vector3(-1.0, 0, 0.6), Vector3(2.4, 0, 2.6)]))
+	await get_tree().create_timer(2.0).timeout
+	store.set_front_door(false)
+	kovpak.walk(PackedVector3Array([Vector3(1.5, 0, 3.4), Vector3(4.25, 0, 4.0)]))
+	await kolesnikov.arrived
+	kolesnikov.look_at_point(main.player.global_position)
 	hud.say(N2_G_KOLES)
-	await _wait_min(2.0)
+	await _wait_min(1.0)
 	kolesnikov.walk(PackedVector3Array([Vector3(4.4, 0, 4.2), Vector3(6.1, 0, 4.0)]))
 	await kolesnikov.arrived
 	kolesnikov.look_at_point(main.player.global_position)
@@ -250,10 +285,19 @@ func _prologue() -> void:
 	kolesnikov.look_at_point(Vector3(-7.75, 0, 0))
 	await get_tree().create_timer(1.5).timeout
 	Sfx.play_3d(store, "clank", Vector3(-7.75, 0.7, 0.6), -6.0, 1.5)
-	store.empty_locker31()
-	kolesnikov.body.bag = kolesnikov.body.attach("Bip01 L Hand", Characters.handbag(Color(0.45, 0.2, 0.18)))
-	_find_clue("seizure", N2_CLUE_SEIZURE)
-	hud.say(N2_G_TAKES)
+	if bag_hidden:
+		kolesnikov.look_at_point(main.player.global_position)
+		hud.say(N2_KL_EMPTY, -1.0, true)
+		await get_tree().create_timer(3.0).timeout
+		hud.say(N2_G_LIE, -1.0, true)
+		await get_tree().create_timer(3.0).timeout
+		hud.say(N2_KL_NUNU, -1.0, true)
+		hud.say(N2_G_NOT_BELIEVE)
+	else:
+		store.empty_locker31()
+		kolesnikov.body.bag = kolesnikov.body.attach("Bip01 L Hand", Characters.handbag(Color(0.45, 0.2, 0.18)))
+		_find_clue("seizure", N2_CLUE_SEIZURE)
+		hud.say(N2_G_TAKES)
 	await get_tree().create_timer(2.0).timeout
 	kolesnikov.walk(PackedVector3Array([Vector3(-3.0, 0, 1.8), Vector3(-0.6, 0, 1.4)]))
 	kovpak.walk(PackedVector3Array([Vector3(4.25, 0, 4.0), Vector3(0.4, 0, 2.6)]))
@@ -274,6 +318,7 @@ func _prologue() -> void:
 	await kovpak.arrived
 	kovpak.visible = false
 	koles_state = "gone"
+	update_locker_prompt()
 	store.car_start()
 	hud.say(N2_G_WALKS)
 	await get_tree().create_timer(2.5).timeout
@@ -295,16 +340,33 @@ func _koles_to_car() -> void:
 	kolesnikov.visible = false
 	koles_seat.visible = true
 	koles_car = "sitting"
+	_sat_at = main.minutes
 	main.store.set_interactable("bobik_watch", true)
 
 
+## 23:05, the storage door: he is in. He is Колесников, so not before he
+## has got out of the «бобик».
+func _killer_enters() -> void:
+	if koles_car in ["before", "walking", "sitting"]:
+		main.after(1.0, _killer_enters)
+		return
+	_killer_in()
+	main.hud.say(G_DOOR, -1.0, true)
+	if bag_hidden:
+		# The bag he did not get: first he goes to look at the lockers.
+		main.killer.wander_to(Vector3(-6.5, 0, 1.8))
+
+
 func _koles_leaves_car() -> void:
-	if koles_car == "walking":
+	# A long talk in the prologue keeps him in the store past 23:03: then he
+	# still sits in the car a while (time to spot him) before he gets out.
+	if koles_car in ["before", "walking"] or (koles_car == "sitting" and main.minutes < _sat_at + 12.0):
 		main.after(1.0, _koles_leaves_car)
 		return
 	if koles_car != "sitting":
 		return
 	koles_car = "empty"
+	street["out_at"] = main._fmt(main.minutes)
 	koles_seat.visible = false
 	main.store.set_interactable("bobik_watch", false)
 	main.store.set_interactable("bobik_car", true)
@@ -409,7 +471,7 @@ func street_notes() -> PackedStringArray:
 	if street.get("spotted", false):
 		out.append("— Он меня видел.")
 	if street.get("sneaks", false):
-		out.append("— В 23:03 вылез и пошёл вдоль стены к заднему двору. В 23:05 хлопнула дверь склада.")
+		out.append("— В %s вылез и пошёл вдоль стены к заднему двору. Через пару минут хлопнула дверь склада." % street.get("out_at", "23:03"))
 	if street.get("car", false):
 		out.append("— В «бобике» окурки «Космоса» и сумка Нины. В отделение он её не повёз." if street.get("car_bag", false)
 			else "— В «бобике» окурки «Космоса».")
@@ -503,10 +565,27 @@ func interact(id: String) -> bool:
 	var store: Store = main.store
 	match id:
 		"locker31":
-			if koles_state == "gone" or clues.seizure:
+			if bag_hidden:
+				hud.say(N2_LOCKER_OWN, -1.0, true)
+			elif koles_state == "before":
+				Sfx.play_3d(main.view, "clank", main.player.global_position + Vector3(0, 1, 0), -10.0, 1.5)
+				bag_hidden = true
+				store.empty_locker31()
+				update_locker_prompt()
+				hud.say(N2_G_MOVED, -1.0, true)
+			elif koles_state == "gone" or clues.seizure:
 				hud.say(N2_LOCKER_EMPTY, -1.0, true)
 			else:
 				hud.say(N2_LOCKER_BAG, -1.0, true)
+		"locker12":
+			if koles_state != "gone":
+				hud.say(N2_LOCKER_OWN_LATER, -1.0, true)
+			elif not clues.seizure:
+				Sfx.play_3d(main.view, "cloth", main.player.global_position + Vector3(0, 1, 0), -8.0)
+				_find_clue("seizure", N2_CLUE_NOTE)
+				update_locker_prompt()
+			else:
+				hud.say(N2_LOCKER_OWN, -1.0, true)
 		"register2":
 			hud.say(N2_REGISTER2 if known.get("tape", false) else N2_REGISTER2_LOST, -1.0, true)
 		"bobik_watch":
@@ -582,14 +661,18 @@ func objectives() -> Array:
 	var out: Array = []
 	var store: Store = main.store
 	_phone_task(out)
-	if koles_state != "gone":
-		out.append(task("Принять пост. С Ковпаком участковый"))
+	if koles_state == "before" and not bag_hidden:
+		out.append(task("Участковый на крыльце. Успеть переложить сумку Нины (ячейка № 31) в свою?", false, false, true))
+	elif koles_state != "gone":
+		out.append(task("Принять пост. Пришёл участковый"))
 	if not store.duty_on:
 		out.append(task("Погас свет: поднять рубильник на щитке", false, false, true))
 	var found := clue_count()
 	out.append(task("Улики: %d из %d" % [found, clues.size()], found == clues.size()))
 	if found < clues.size():
-		if clues.seizure:
+		if bag_hidden:
+			out.append(task("Осмотреть сумку Нины в своей ячейке № 12", clues.seizure, true))
+		elif clues.seizure:
 			out.append(task("Сумку Нины забрал участковый", true, true))
 		out.append(task("Дверь в подвал, задний проход", clues.lock, true))
 		if clues.pahomov or _calls_missed > 0 or main.minutes >= Main.clock(0, 40):
@@ -615,6 +698,10 @@ func _street_tasks(out: Array) -> void:
 func clue_marks() -> Array:
 	var store: Store = main.store
 	var out: Array = []
+	if koles_state == "before" and not bag_hidden:
+		out.append(Vector3(-7.75, 0.62, 0.56))
+	if bag_hidden and not clues.seizure and koles_state == "gone":
+		out.append(Vector3(-5.25, 1.75, 0.56))
 	if not clues.lock:
 		out.append(Vector3(-1.52, 0.88, 27.9))
 	if not clues.token and store.find_by_id("token").get("active", false):
@@ -631,7 +718,18 @@ func _street_marks(out: Array) -> void:
 
 
 func final_entry() -> String:
-	return N2_FINAL
+	return N2_FINAL_KEPT if bag_hidden else N2_FINAL
+
+
+## Locker 31 offers to move the bag while Колесников is still on the porch;
+## locker 12 opens once he has gone.
+func update_locker_prompt() -> void:
+	var store: Store = main.store
+	if koles_state == "before" and not bag_hidden:
+		store.set_interactable("locker31", true, N2_MOVE_BAG)
+	else:
+		store.set_interactable("locker31", true, "Осмотреть ячейку № 31")
+	store.set_interactable("locker12", bag_hidden, N2_OWN_PROMPT)
 
 
 func update_notebook() -> void:
@@ -653,7 +751,9 @@ func update_notebook() -> void:
 		lines.append("Из пятницы и субботы: " + " ".join(past))
 		lines.append("")
 	lines.append("Улики: %d из 5" % clue_count())
-	if clues.seizure:
+	if clues.seizure and bag_hidden:
+		lines.append("— Сумку Нины я спрятал в свою ячейку. В подкладке записка: 7-го в 22:40 у заднего крыльца, «К. будет свидетелем».")
+	elif clues.seizure:
 		lines.append("— Колесников забрал сумку Нины без протокола и понятых.")
 	if clues.pahomov:
 		lines.append("— Пахомов, сторож с ночи 7-го, «утонул пьяный» в Шарташе.")
@@ -665,7 +765,7 @@ func update_notebook() -> void:
 		lines.append("— Свежий окурок «Космоса» у двери в подвал.")
 	if not clues.values().has(false):
 		lines.append("")
-		lines.append(N2_FINAL)
+		lines.append(final_entry())
 	var sn := street_notes()
 	if not sn.is_empty():
 		lines.append("")
@@ -745,7 +845,7 @@ func _morning() -> void:
 
 func summary() -> String:
 	var n := clue_count()
-	var text := N2_FINAL if n == clues.size() else "Сумки Нины в универсаме больше нет. А то, что ещё есть, кто-то прячет внизу."
+	var text := final_entry() if n == clues.size() else "Сумки Нины в универсаме больше нет. А то, что ещё есть, кто-то прячет внизу."
 	return "Улик найдено: %d из %d. Обходов подписано: %d из %d.\n\n%s" % [n, clues.size(), rounds_signed(), rounds.size(), text]
 
 
@@ -754,6 +854,7 @@ func summary() -> String:
 func save_state() -> Dictionary:
 	var d := super()
 	d["koles_state"] = koles_state
+	d["bag_hidden"] = bag_hidden
 	d["duty_on"] = main.store.duty_on
 	d["calls_missed"] = _calls_missed
 	return d
@@ -764,7 +865,8 @@ func restore_state(d: Dictionary) -> void:
 	koles_state = "gone"
 	var was_gone := koles_car == "gone"
 	koles_car = "empty"
-	_calls_missed = d.get("calls_missed", 0)
+	bag_hidden = d.get("bag_hidden", false)
+	_calls_missed = int(d.get("calls_missed", 0))
 	super(d)
 	kovpak_state = "done"
 	store.empty_locker31()
@@ -785,4 +887,5 @@ func restore_state(d: Dictionary) -> void:
 			store.take_butt()
 	if not clues.pahomov and _calls_missed < 2 and main.minutes > Main.clock(0, 40):
 		main.after(3.0, func(): _ring("dispatch"))
+	update_locker_prompt()
 	update_notebook()

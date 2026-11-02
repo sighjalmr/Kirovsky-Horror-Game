@@ -123,6 +123,32 @@ func hear(pos: Vector3, radius: float) -> void:
 	_go_to(pos)
 
 
+## Gordeev tore free: he reels back with the torch in his face, then is
+## after him again.
+func stun(t: float) -> void:
+	state = State.ATTACK
+	velocity = Vector3.ZERO
+	body.play("breathe")
+	var away := global_position - player.global_position
+	away.y = 0.0
+	if away.length() > 0.01:
+		var tw := create_tween()
+		tw.tween_property(self, "global_position", global_position + away.normalized() * 0.9, 0.35).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(t).timeout
+	if state == State.ATTACK and not player.dead:
+		if player.hidden:
+			state = State.SEARCH
+			_wait = 0.0
+			_go_to(player.global_position)
+		else:
+			_start_chase()
+
+
+## True while he is chasing Gordeev and has him in sight right now.
+func has_him_in_sight() -> bool:
+	return state == State.CHASE and _lost_t < 0.3
+
+
 ## Walks somewhere without being alarmed (used while Gordeev is on the phone).
 func wander_to(pos: Vector3) -> void:
 	if state in [State.PATROL, State.SEARCH]:
@@ -193,7 +219,7 @@ func _physics_process(delta: float) -> void:
 				_wait = 0.0
 				_go_to(_last_seen)
 				lost.emit()
-			elif _dist_to_player() < REACH and not player.dead:
+			elif _dist_to_player() < REACH and not player.dead and not player.hidden:
 				state = State.ATTACK
 				velocity = Vector3.ZERO
 				_face(player.global_position, 1.0)
@@ -229,7 +255,7 @@ func _dist_to_player() -> float:
 
 
 func _sees_player() -> bool:
-	if player.dead or blind or Outdoors.is_out(player.global_position):
+	if player.dead or blind or player.hidden or Outdoors.is_out(player.global_position):
 		return false
 	var eye := global_position + Vector3(0, 1.7, 0)
 	var tgt := player.global_position + Vector3(0, player.sight_height(), 0)

@@ -26,6 +26,15 @@ const DAY_AIR := Color("d8dad4")
 ## The first time Gordeev runs out of breath.
 const G_WINDED := "Сердце колотится в горле. Мне не тридцать лет, долго я не пробегу."
 
+## Hiding and tearing free.
+const G_HIDE_LATE := "Он смотрит прямо на меня. Прятаться поздно."
+const G_ESCAPE := "Ударил его фонарём в лицо и вырвался. Второй раз так не повезёт."
+## E presses needed in STRUGGLE_TIME seconds to tear free, once a night.
+const STRUGGLE_PRESSES := 8
+const STRUGGLE_TIME := 1.8
+## The progress file: the chapter, what was found and asked, the last signature.
+const SAVE_PATH := "user://save.json"
+
 ## How near a clue has to be before a ring shows round it, metres.
 const CLUE_MARK_RANGE := 4.5
 
@@ -43,6 +52,8 @@ static var night_clues: Dictionary = {}
 ## handed on to night two together with night_clues. Night two started from
 ## the title screen (night_clues empty) counts everything as known.
 static var day_answers: Array = []
+## The save file is read once, on the first start of the game.
+static var _booted := false
 
 var phase := Phase.TITLE
 var minutes := START_MIN
@@ -66,6 +77,11 @@ var _heart: AudioStreamPlayer
 var _lit := 1.0
 var _flash := 0.0
 var _morning := false
+## Once a night Gordeev may tear free of him (mash E).
+var _escaped := false
+var _struggling := false
+var _mash := 0
+var _hide_spot: Dictionary = {}
 
 
 ## Minutes since midnight of the 14th for a clock time; after-midnight hours
@@ -80,6 +96,10 @@ static func clock(h: int, m: int) -> float:
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
+	if not _booted:
+		_booted = true
+		if not _dev():
+			_load_save()
 	_setup_input()
 	Sfx.setup_buses()
 	_build_view()
@@ -137,7 +157,15 @@ func _ready() -> void:
 		"Мышь — смотреть      W / A / S / D — идти\n" +
 		"Shift — бег (шумно и недолго: одышка)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
-		"E — осмотреть, поговорить      Tab — блокнот      J — задания\n\nНажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая")
+		"E — осмотреть, поговорить, спрятаться      Tab — блокнот      J — задания\n\n" +
+		_continue_line() + "Нажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая")
+
+
+## "C — continue from the signature at 02:20" when the save has one.
+func _continue_line() -> String:
+	if checkpoint.is_empty():
+		return ""
+	return "C — продолжить с подписи в журнале (%s)\n" % _fmt(checkpoint.minutes)
 
 
 func _night_name() -> String:
@@ -379,6 +407,15 @@ func _update_env(delta: float) -> void:
 
 
 func _update_interaction() -> void:
+	if player.hidden:
+		hud.set_prompt("Вы спрятались. E или W / A / S / D — выйти")
+		if Input.is_action_just_pressed("interact") \
+				or Input.get_vector("strafe_left", "strafe_right", "move_forward", "move_back").length() > 0.3:
+			leave_hiding()
+		return
+	if _struggling:
+		hud.set_prompt("ВЫРЫВАЙТЕСЬ! Жмите E: %d" % maxi(0, STRUGGLE_PRESSES - _mash))
+		return
 	if player.sitting:
 		hud.set_prompt("Сидите и ждёте. W / A / S / D — встать")
 		return
@@ -430,7 +467,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if phase == Phase.TITLE and event.is_action_pressed("interact"):
+	if _struggling and event.is_action_pressed("interact"):
+		_mash += 1
+		Sfx.play_2d(self, "hurt", -14.0, Sfx.BUS, randf_range(1.1, 1.3))
+		return
+	if phase == Phase.TITLE and event is InputEventKey and event.pressed \
+			and (event as InputEventKey).physical_keycode == KEY_C and not checkpoint.is_empty() and night:
+		_resume = true
+		get_tree().reload_current_scene()
+	elif phase == Phase.TITLE and event.is_action_pressed("interact"):
 		_start()
 	elif phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
 			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3]:
@@ -464,6 +509,7 @@ func _go_to(ch: String, clues: Dictionary, answers: Array) -> void:
 	chapter = ch
 	night_clues = clues
 	day_answers = answers
+	write_save(ch, clues, answers, {})
 	get_tree().reload_current_scene()
 
 
@@ -472,6 +518,7 @@ func _start() -> void:
 	hud.hide_title()
 	await _cutscenes()
 	checkpoint = {}
+	write_save(chapter, night_clues, day_answers, {})
 	start_now()
 	if day:
 		day.start()
@@ -538,8 +585,35 @@ func sit_down() -> void:
 
 
 func stand_up() -> void:
+	if player.hidden:
+		leave_hiding()
 	player.sitting = false
 	player.busy = false
+
+
+## Gets into a hiding place: {"id", "pos" (where he crouches), "face", "out"
+## (where he steps back out)}. Too late if the killer is watching him.
+func hide_in(spot: Dictionary) -> void:
+	if killer.has_him_in_sight():
+		hud.say(G_HIDE_LATE, -1.0, true)
+		return
+	_hide_spot = spot
+	player.crouching = false
+	player.hidden = true
+	player.busy = true
+	player.global_position = spot.pos
+	player.face(spot.face)
+	Sfx.play_3d(view, "cloth", spot.pos + Vector3(0, 0.5, 0), -12.0, 0.8)
+
+
+func leave_hiding() -> void:
+	if not player.hidden:
+		return
+	player.hidden = false
+	player.busy = false
+	if not _hide_spot.is_empty():
+		player.global_position = _hide_spot.out
+	_hide_spot = {}
 
 
 # --- saving at the journal -------------------------------------------------------
@@ -547,6 +621,7 @@ func stand_up() -> void:
 func save_checkpoint() -> void:
 	checkpoint = night.save_state()
 	checkpoint["minutes"] = minutes
+	write_save(chapter, night_clues, day_answers, checkpoint)
 	hud.flash_note("Смена сохранена: %s" % _fmt(minutes))
 
 
@@ -593,8 +668,53 @@ func _on_lost() -> void:
 
 
 func _on_caught() -> void:
+	if phase != Phase.PLAY or _struggling:
+		return
+	if not _escaped:
+		_struggle()
+		return
+	_kill()
+
+
+## His hands on Gordeev: one chance a night to tear free by hammering E.
+func _struggle() -> void:
+	_escaped = true
+	_struggling = true
+	_mash = 0
+	stand_up()
+	player.controllable = false
+	player.busy = true
+	hud.notebook.visible = false
+	var to := killer.global_position - player.global_position
+	create_tween().tween_property(player, "rotation:y",
+		player.rotation.y + angle_difference(player.rotation.y, atan2(-to.x, -to.z)), 0.2)
+	Sfx.play_2d(self, "attack_sting", -4.0)
+	Sfx.play_3d(view, "killer_breath", killer.global_position + Vector3(0, 1.7, 0), -2.0, 1.0, 6.0)
+	_flash = 0.6
+	player.hit(0)
+	var t := 0.0
+	while t < STRUGGLE_TIME and phase == Phase.PLAY:
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	_struggling = false
 	if phase != Phase.PLAY:
 		return
+	if _mash < STRUGGLE_PRESSES:
+		_kill()
+		return
+	Sfx.play_3d(view, "clank", killer.global_position + Vector3(0, 1.6, 0), 0.0, 0.8)
+	_flash = 0.3
+	player.controllable = true
+	player.busy = false
+	player.breath = maxf(player.breath, 0.7)
+	player.winded = false
+	hud.set_prompt("")
+	hud.say(G_ESCAPE, -1.0, true)
+	killer.stun(2.5)
+	on_noise(player.global_position, 10.0)
+
+
+func _kill() -> void:
 	phase = Phase.DEAD
 	stand_up()
 	player.controllable = false
@@ -687,9 +807,11 @@ func end_shift() -> void:
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
 	if chapter == "night2":
+		write_save("night2", night_clues, day_answers, {})
 		hud.show_title("06:00. КОНЕЦ ВТОРОЙ НОЧИ",
 			"%s\n\nДальше: день второй, разговор с Ринатом (в работе).\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
+	write_save("day1", night.clues, [], {})
 	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
 		"%s\n\nE: дальше, день первый\nR: сыграть ночь ещё раз" % night.summary())
 
@@ -704,8 +826,41 @@ func end_day() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 1.0)
+	write_save("night2", night_clues, day.asked, {})
 	hud.show_title("КОНЕЦ ДНЯ ПЕРВОГО",
 		"%s\n\nE: дальше, ночь вторая\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
+
+
+# --- the save file -----------------------------------------------------------------
+
+## Developer runs (any command-line arguments) neither read nor write the save.
+static func _dev() -> bool:
+	return not OS.get_cmdline_user_args().is_empty()
+
+
+## Where the player is: the chapter to start, what the earlier chapters left,
+## and the last signature in the journal (night only).
+static func write_save(ch: String, clues: Dictionary, answers: Array, cp: Dictionary) -> void:
+	if _dev():
+		return
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify({"version": 1, "chapter": ch, "night_clues": clues,
+			"day_answers": answers, "checkpoint": cp}))
+
+
+static func _load_save() -> void:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2"]:
+		return
+	chapter = data.chapter
+	night_clues = data.get("night_clues", {})
+	day_answers = data.get("day_answers", [])
+	checkpoint = data.get("checkpoint", {})
+	if chapter == "day1":
+		checkpoint = {}
 
 
 func _fmt(m: float) -> String:

@@ -172,7 +172,7 @@ func _process(_delta: float) -> void:
 	var n: NightOne = main.night
 	var scene: bool = n.kovpak_state in ["prologue", "visit"] or main.killer.state == Killer.State.LEAVE
 	if n is NightTwo:
-		scene = (n as NightTwo).koles_state == "talk" or (n as NightTwo).koles_car == "walking" \
+		scene = (n as NightTwo).koles_state == "talk" or (n as NightTwo).koles_car in ["walking", "sitting"] \
 			or (main.minutes > Main.clock(23, 1) and main.minutes < Main.clock(23, 4))
 	main.time_scale = 1.0 if scene else 40.0
 	if Engine.get_process_frames() % 20 == 0 and out_dir != "":
