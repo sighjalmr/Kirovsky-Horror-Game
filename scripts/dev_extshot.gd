@@ -3,7 +3,8 @@ extends SceneTree
 ## Dev: stills of the street outside without the cutscene timing.
 ##   godot --path . -s scripts/dev_extshot.gd -- night /tmp/dir [seat]
 ## Writes a few fixed views of the Exterior (night or day); with "seat" only
-## the view from the driver's seat of the «Жигули».
+## the view from the driver's seat of the «Жигули», with "feet" his feet on
+## the pedals.
 
 const VIEWS := [
 	[Vector3(-14, 16, -46), Vector3(2, 4, 0)],
@@ -45,7 +46,26 @@ func _initialize() -> void:
 	root.add_child(cam)
 	cam.current = true
 	root.size = Vector2i(1280, 720)
-	var only_seat := args.size() > 2 and args[2] == "seat"
+	var only_seat := args.size() > 2 and args[2] in ["seat", "feet"]
+	if args.size() > 2 and args[2] == "feet":  # the footwell, as in the cutscene
+		ext.zhiguli.position = Exterior.ZHIGULI_SPOT + Vector3(0, 0, -9)
+		cam.fov = 55.0
+		var e := Vector3(-0.34, 1.0, 0.02)
+		cam.global_transform = ext.zhiguli.global_transform * Transform3D(
+			Basis.looking_at(Vector3(-0.4, 0.4, -0.55) - e, Vector3.UP), e)
+		for f in 4:
+			await process_frame
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_jpg("%s/%s_feet.jpg" % [out, look], 0.85)
+		var e2 := Vector3(0.45, 0.62, -0.25)
+		cam.global_transform = ext.zhiguli.global_transform * Transform3D(
+			Basis.looking_at(Vector3(-0.4, 0.5, -0.3) - e2, Vector3.UP), e2)
+		for f in 2:
+			await process_frame
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_jpg("%s/%s_feet_side.jpg" % [out, look], 0.85)
+		quit()
+		return
 	if args.size() > 2 and args[2] == "detail":
 		for i in DETAIL.size():
 			cam.global_position = DETAIL[i][0]

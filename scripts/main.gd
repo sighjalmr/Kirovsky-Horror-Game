@@ -115,6 +115,7 @@ func _ready() -> void:
 		hud.subtitle.position = Vector2(60, 1260)
 		hud.subtitle.size = Vector2(960, 320)
 		hud.subtitle.add_theme_font_size_override("font_size", 42)
+		hud.subtitle.visible = "--subs" in OS.get_cmdline_user_args()  # the voice plays, no subtitles
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--cut="):
 			chapter = a.get_slice("=", 1)

@@ -236,6 +236,23 @@ func ride(dur: float, car: Node3D, fov := 62.0) -> void:
 	await wait(dur)
 
 
+## A camera fixed inside the car (car space), from `eye` looking at `at`:
+## the footwell, his feet on the pedals.
+func inside(dur: float, car: Node3D, eye: Vector3, at: Vector3, fov := 55.0) -> void:
+	_shot = {"dur": dur, "car": car, "eye": eye, "at": at}
+	_shot_t = 0.0
+	cam.fov = fov * 1.1 if vertical() else fov
+	_place_camera()
+	_shot_n += 1
+	if shot_dir != "":
+		await wait(dur * 0.5)
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_jpg("%s/%s_%02d.jpg" % [shot_dir, kind, _shot_n], 0.88)
+		await wait(dur * 0.5)
+		return
+	await wait(dur)
+
+
 func _process(delta: float) -> void:
 	if _done or _shot.is_empty():
 		return
@@ -277,6 +294,11 @@ func _steer(car: Node3D, delta: float) -> void:
 func _place_camera() -> void:
 	if _shot.has("car"):
 		var car: Node3D = _shot.car
+		if _shot.has("eye"):
+			var e: Vector3 = _shot.eye
+			var bump := Vector3(0, sin(_shot_t * 11.0) * 0.004, 0)
+			cam.global_transform = car.global_transform * Transform3D(Basis.looking_at(_shot.at - e, Vector3.UP), e + bump)
+			return
 		var seat: Vector3 = car.get_meta("seat")
 		var bob := Vector3(sin(_shot_t * 7.0) * 0.004, sin(_shot_t * 11.0) * 0.006, 0)
 		cam.global_transform = car.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-10.0)), seat + bob)
@@ -598,7 +620,9 @@ func _night_one() -> void:
 	var wipe := sound("wiper", -12.0)
 	(wipe as AudioStreamPlayer).finished.connect(func(): if is_instance_valid(wipe) and _wiping: (wipe as AudioStreamPlayer).play())
 	say(N1_SUROVA)
-	await ride(8.5, ext.zhiguli)
+	await ride(5.0, ext.zhiguli)
+	# Down in the footwell: his old shoes on the pedals, the rubber mat.
+	await inside(4.0, ext.zhiguli, Vector3(-0.34, 1.0, 0.02), Vector3(-0.4, 0.4, -0.55))
 	_wiping = false
 	inside.queue_free()
 	wipe.queue_free()
