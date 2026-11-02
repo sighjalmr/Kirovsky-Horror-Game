@@ -11,36 +11,19 @@ const FULL := Rect2(0, 0, 1, 1)
 const ALL := MeshFactory.ALL
 const SIDES := MeshFactory.PX | MeshFactory.NX | MeshFactory.PZ | MeshFactory.NZ
 
-## Products: [shape, size, label cell]. "box" size is (width along the shelf,
-## height, depth); "tin" size is (radius, height, 0). Label cells index the
-## 4×4 "labels" atlas (see tools/make_textures.py).
-const PRODUCTS := {
-	"salt": ["box", Vector3(0.08, 0.12, 0.05), 4],
-	"tea": ["box", Vector3(0.07, 0.1, 0.045), 5],
-	"macaroni": ["box", Vector3(0.07, 0.22, 0.1), 6],
-	"matches": ["box", Vector3(0.14, 0.07, 0.1), 7],
-	"flour": ["box", Vector3(0.11, 0.2, 0.07), 12],
-	"sugar": ["box", Vector3(0.1, 0.17, 0.07), 13],
-	"chicory": ["box", Vector3(0.06, 0.12, 0.045), 14],
-	"milk": ["box", Vector3(0.08, 0.13, 0.08), 15],
-	"peas": ["tin", Vector3(0.04, 0.11, 0), 1],
-	"condensed": ["tin", Vector3(0.038, 0.08, 0), 2],
-	"sprats": ["tin", Vector3(0.05, 0.035, 0), 3],
-	"kilka": ["tin", Vector3(0.05, 0.04, 0), 11],
-	"jar_tomato": ["tin", Vector3(0.045, 0.15, 0), 9],
-	"bottle": ["tin", Vector3(0.035, 0.2, 0), 15],
-	"jar_juice": ["tin", Vector3(0.085, 0.26, 0), 0],
-	"jar_birch": ["tin", Vector3(0.085, 0.26, 0), 8],
-	"jar_apple": ["tin", Vector3(0.085, 0.26, 0), 10],
+## What each aisle sells. Soviet shelves: long runs of one product and gaps.
+## Goods are in Goods.ITEMS (scripts/goods.gd).
+const RANGE := {
+	"bakaleya": ["salt", "tea", "macaroni", "matches", "flour", "sugar", "chicory", "barley", "grechka", "psheno",
+		"soda", "oil", "salt", "sugar", "macaroni"],
+	"konservy": ["peas", "condensed", "tushonka", "kapusta", "kilka", "sprats", "ikra", "jar_tomato", "jar_birch",
+		"jar_apple", "kilka", "kapusta", "jar_birch"],
+	"moloko": ["milk", "milk", "kefir", "kefir", "ryazhenka", "smetana", "tetra", "tetra", "butter"],
+	"zamorozka": ["kilka", "sprats", "kapusta", "jar_tomato", "peas", "ikra"],
 }
 
-## What each aisle sells. Soviet shelves: long runs of one product and gaps.
-const RANGE := {
-	"bakaleya": ["salt", "tea", "macaroni", "matches", "flour", "sugar", "chicory", "jar_birch", "jar_apple"],
-	"konservy": ["peas", "condensed", "sprats", "kilka", "jar_tomato", "jar_juice"],
-	"moloko": ["milk", "milk", "bottle", "bottle", "condensed", "jar_birch"],
-	"zamorozka": ["kilka", "sprats", "salt", "jar_tomato", "peas"],
-}
+## Shapes that can stand on top of one another.
+const STACKS := ["tin", "flat", "box"]
 
 
 static func at(x: float, y: float, z: float) -> Transform3D:
@@ -71,31 +54,14 @@ static func collider(parent: Node3D, pos: Vector3, size: Vector3) -> void:
 	parent.add_child(body)
 
 
-static func label_rect(cell: int) -> Rect2:
-	var h := 0.5 / 128.0
-	return Rect2((cell % 4) * 0.25 + h, (cell / 4) * 0.25 + 3.0 / 128.0, 0.25 - 2.0 * h, 28.5 / 128.0)
-
-
-static func cap_rect(cell: int) -> Rect2:
-	return Rect2((cell % 4) * 0.25 + 1.0 / 128.0, (cell / 4) * 0.25 + 0.5 / 128.0, 0.25 - 2.0 / 128.0, 1.5 / 128.0)
+## One product standing on the shelf frame `xf` at local (x, y, z).
+static func product(kit: MeshBuilder.Kit, xf: Transform3D, id: String, pos: Vector3, yaw: float) -> void:
+	Goods.build(kit.b(Goods.TEX), xf * Transform3D(Basis(Vector3.UP, yaw), pos), id)
 
 
 static func tag_rect(rng: RandomNumberGenerator) -> Rect2:
 	var i := rng.randi_range(0, 31)
 	return Rect2((i % 4) * 0.25, (i / 4) * 0.125, 0.25, 0.125)
-
-
-## One product standing on the shelf frame `xf` at local (x, y, z).
-static func product(kit: MeshBuilder.Kit, xf: Transform3D, id: String, pos: Vector3, yaw: float) -> void:
-	var p: Array = PRODUCTS[id]
-	var size: Vector3 = p[1]
-	var cell: int = p[2]
-	var t := xf * Transform3D(Basis(Vector3.UP, yaw), pos)
-	var mb := kit.b("labels")
-	if p[0] == "box":
-		mb.box(t, size, Color.WHITE, label_rect(cell))
-	else:
-		mb.cylinder(t, size.x, size.x, size.y, 12 if size.x < 0.05 else 16, Color.WHITE, label_rect(cell), cap_rect(cell))
 
 
 ## Fills a shelf board. Shelf frame: x along the board from its left end,
@@ -109,12 +75,11 @@ static func fill_shelf(kit: MeshBuilder.Kit, rng: RandomNumberGenerator, xf: Tra
 			x += rng.randf_range(0.25, 0.9)
 			continue
 		var id: String = choices[rng.randi() % choices.size()]
-		var p: Array = PRODUCTS[id]
-		var size: Vector3 = p[1]
-		var tin: bool = p[0] == "tin"
-		var w := size.x * 2.0 if tin else size.x
-		var d := size.x * 2.0 if tin else size.z
+		var size := Goods.size_of(id)
+		var w := size.x
+		var d := size.z
 		var h := size.y
+		var stacks: bool = Goods.ITEMS[id][0] in STACKS
 		if h > clear:
 			x += 0.1
 			continue
@@ -123,9 +88,9 @@ static func fill_shelf(kit: MeshBuilder.Kit, rng: RandomNumberGenerator, xf: Tra
 			Vector2.ONE, MeshFactory.NZ)
 		var rows := mini(int(depth / (d + 0.01)), 3)
 		var stack := 1
-		if h < 0.06:
+		if stacks and h < 0.06:
 			stack = mini(3, int(clear / h))
-		elif h < 0.13 and clear > h * 2.0 + 0.03 and rng.randf() < 0.4:
+		elif stacks and h < 0.13 and clear > h * 2.0 + 0.03 and rng.randf() < 0.4:
 			stack = 2
 		var sold := rng.randf() < 0.3  # front row bought out
 		while x + w <= end:
@@ -137,7 +102,7 @@ static func fill_shelf(kit: MeshBuilder.Kit, rng: RandomNumberGenerator, xf: Tra
 					if s > 0 and rng.randf() < 0.2:
 						break
 					product(kit, xf, id, Vector3(x + w * 0.5 + rng.randf_range(-0.004, 0.004), s * h, z),
-						rng.randf_range(-0.12, 0.12))
+						rng.randf_range(-0.12, 0.12) if stacks or Goods.ITEMS[id][0] != "tetra" else rng.randf_range(-0.3, 0.3))
 			x += w + 0.008
 		x = end + 0.03
 
@@ -214,9 +179,8 @@ static func wall_shelf(parent: Node3D, rng: RandomNumberGenerator, pos: Vector3,
 static func pyramid(parent: Node3D, rng: RandomNumberGenerator, pos: Vector3, id: String, base: int) -> void:
 	var root := node(parent, pos)
 	var kit := MeshBuilder.Kit.new()
-	var p: Array = PRODUCTS[id]
-	var size: Vector3 = p[1]
-	var w := size.x * 2.0 + 0.006
+	var size := Goods.size_of(id)
+	var w := size.x + 0.006
 	var span := base * w
 	kit.b("cardboard").box(at(0, 0, 0), Vector3(span + 0.1, 0.12, span + 0.1), Color(0.8, 0.8, 0.8), NO_RECT,
 		Vector2(0.6, 0.6))
@@ -285,6 +249,7 @@ static func chest(root: Node3D, rng: RandomNumberGenerator) -> Node3D:
 		liner.box(at(0, 0.45, z), Vector3(0.88, 0.27, 0.06), Color.WHITE, Rect2(0, 0.5, 1, 0.4))
 	kit.b("frozen").box(at(0, 0.45, 0), Vector3(0.88, 0.02, 2.28), Color.WHITE, NO_RECT, Vector2(0.5, 0.5),
 		MeshFactory.PY, 0.6)
+	Cases.chest_goods(kit, rng)
 	var ch := kit.b("chrome")
 	for x: float in [-0.49, 0.49]:
 		ch.box(at(x, 0.72, 0), Vector3(0.04, 0.035, 2.42))

@@ -35,6 +35,10 @@ func _ready() -> void:
 		await _hall_shots(p, store, night)
 		get_tree().quit()
 		return
+	if "--goodsshot" in OS.get_cmdline_user_args():
+		await _goods_shots(p, store, night)
+		get_tree().quit()
+		return
 	if "--storeshot" in OS.get_cmdline_user_args():
 		await _store_shots(p, store, night)
 		get_tree().quit()
@@ -172,6 +176,42 @@ func _store_shots(p: Player, store: Store, night: NightOne) -> void:
 	for v: Array in [views[0], views[2], views[3]]:
 		_place(p, v[1], v[2])
 		p.head.rotation.x = v[3]
+		await _wait(0.8)
+		await _shot(v[0] + "_dark")
+
+
+## Goods and refrigerated equipment close up (--goodsshot): each aisle's
+## shelves at arm's length, the juice pyramid, the chests, the dairy wall.
+func _goods_shots(p: Player, store: Store, night: NightOne) -> void:
+	main.hud.visible = false
+	night.kovpak.visible = false
+	night.tamara.visible = false
+	var views := [
+		["g1_bakaleya", Vector3(-1.2, 0, 13.4), Vector3(1, 0, 0.9), 0.25],
+		["g2_konservy", Vector3(1.2, 0, 13.4), Vector3(-1, 0, 0.9), 0.25],
+		["g3_moloko", Vector3(7.6, 0, 13.4), Vector3(-1, 0, 0.9), 0.2],
+		["g4_dairy_wall", Vector3(10.0, 0, 13.0), Vector3(1, 0, 0.8), 0.15],
+		["g5_left_wall", Vector3(-10.0, 0, 13.0), Vector3(-1, 0, 0.8), 0.15],
+		["g6_pyramid", Vector3(-1.6, 0, 14.6), Vector3(0, 0, 1), 0.5],
+		["g7_chest", Vector3(-9.9, 0, 12.0), Vector3(0.3, 0, 1), 0.45],
+		["g8_aisle", Vector3(-3.0, 0, 11.2), Vector3(0, 0, 1), 0.1],
+	]
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = -v[3]
+		await _wait(0.8)
+		await _shot(v[0])
+	store.lift_cloth("A1")
+	_place(p, views[6][1], views[6][2])
+	p.head.rotation.x = -0.45
+	await _wait(0.8)
+	await _shot("g7b_chest_open")
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in [views[0], views[3]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = -v[3]
 		await _wait(0.8)
 		await _shot(v[0] + "_dark")
 

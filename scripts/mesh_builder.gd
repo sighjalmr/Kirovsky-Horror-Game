@@ -105,6 +105,18 @@ func cylinder(xf: Transform3D, r_bottom: float, r_top: float, h: float, sides: i
 				_vertex(xf, t[0], t[1], n, color, ao)
 
 
+## A flat disc facing up at height `y`, `rect` mapped on it as a circle.
+func disc(xf: Transform3D, r: float, y: float, sides: int, color := Color.WHITE, rect := Rect2(0, 0, 1, 1),
+		ao := true) -> void:
+	var c := rect.get_center()
+	for i in sides:
+		var a := Vector2(cos(-float(i) / sides * TAU), sin(-float(i) / sides * TAU))
+		var b := Vector2(cos(-float(i + 1) / sides * TAU), sin(-float(i + 1) / sides * TAU))
+		for t: Array in [[Vector3(0, y, 0), c], [Vector3(b.x * r, y, b.y * r), c + b * rect.size * 0.5],
+				[Vector3(a.x * r, y, a.y * r), c + a * rect.size * 0.5]]:
+			_vertex(xf, t[0], t[1], Vector3.UP, color, ao)
+
+
 ## A surface of revolution round local +Y: `profile` is a list of
 ## Vector2(radius, height) from bottom to top. Smooth normals; u wraps round
 ## `rect` once, v runs down it along the profile. Close an end with radius 0.
@@ -202,6 +214,13 @@ func quad(xf: Transform3D, p: Array, uv: Array, color: Color, ao := true, normal
 	# Godot treats clockwise triangles as front faces.
 	for idx: int in [0, 2, 1, 0, 3, 2]:
 		_vertex(xf, p[idx], uv[idx], normals[idx] if not normals.is_empty() else n, color, ao)
+
+
+## One triangle p0 p1 p2, counter-clockwise seen from its front.
+func tri(xf: Transform3D, p: Array, uv: Array, color: Color, ao := true) -> void:
+	var n: Vector3 = (p[1] - p[0]).cross(p[2] - p[0]).normalized()
+	for idx: int in [0, 2, 1]:
+		_vertex(xf, p[idx], uv[idx], n, color, ao)
 
 
 func _vertex(xf: Transform3D, p: Vector3, uv: Vector2, n: Vector3, color: Color, ao: bool) -> void:
