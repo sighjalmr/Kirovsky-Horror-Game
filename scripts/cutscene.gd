@@ -32,7 +32,7 @@ const N1_SLOGAN := "«Миру — мир». Над крышей горит ис
 const N1_PHONE := "Два автомата у крыльца. В одном трубку оторвали ещё летом, второй глотает двушки. Ночью отсюда до милиции не дозвониться."
 const N1_JOB := "Тридцать лет я ловил убийц. Теперь сторожу колбасу, которой нет на прилавках."
 const N1_SUROVA := "В восемьдесят шестом меня убрали из следственного. Дело Галины Суровой я так и не закрыл. Мне велели не копать."
-const N1_NINA := "Неделю назад отсюда не вернулась домой Нина Лукина, продавщица из кулинарии. Участковый закрыл заявление за один день: уехала к матери, в Тагил."
+const N1_NINA := "Неделю назад отсюда не вернулась домой Нина Лукина, продавщица из кулинарии. Участковый закрыл заявление за один день: уехала к маме, в Тагил."
 const N1_VOLGA := "«Волга» директора ещё у крыльца. Ночь через две, девяносто рублей к пенсии."
 const N1_GO := "Ну что, Гордеев. Пошёл на смену."
 const D1_DAY := "Днём «Кировский» не узнать: очередь до крыльца, авоськи, давка у молочного. Будто ночью тут ничего и не бывает."
@@ -636,9 +636,8 @@ func _night_one() -> void:
 	var wipe := sound("wiper", -12.0)
 	(wipe as AudioStreamPlayer).finished.connect(func(): if is_instance_valid(wipe) and _wiping: (wipe as AudioStreamPlayer).play())
 	say(N1_SUROVA)
-	await ride(6.0, ext.zhiguli)
-	# Down in the footwell: his old shoes on the pedals, the rubber mat.
-	await inside(4.5, ext.zhiguli, Vector3(-0.34, 1.0, 0.02), Vector3(-0.4, 0.4, -0.55))
+	# Eyes on the road the whole way: the wheel and the store ahead.
+	await ride(10.5, ext.zhiguli)
 	_wiping = false
 	inside.queue_free()
 	wipe.queue_free()
