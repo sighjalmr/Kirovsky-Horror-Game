@@ -110,6 +110,12 @@ func _ready() -> void:
 		chapter = "day1"
 	if "--night2" in OS.get_cmdline_user_args():
 		chapter = "night2"
+	if Cutscene.vertical():  # dev: a phone video of a cutscene
+		get_tree().root.content_scale_size = Vector2i(1080, 1920)
+		hud.subtitle.position = Vector2(60, 1260)
+		hud.subtitle.size = Vector2(960, 320)
+		hud.subtitle.add_theme_font_size_override("font_size", 42)
+		hud.subtitle.visible = "--subs" in OS.get_cmdline_user_args()  # the voice plays, no subtitles
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--cut="):
 			chapter = a.get_slice("=", 1)
@@ -556,7 +562,8 @@ func _cutscenes() -> void:
 	view.audio_listener_enable_3d = true
 	hud.clock.visible = true
 	hud.fade.color.a = 1.0
-	if "--cutshots" in " ".join(OS.get_cmdline_user_args()):
+	var args := " ".join(OS.get_cmdline_user_args())
+	if "--cutshots" in args or "--cutquit" in args:  # dev: stills, or a movie with --write-movie
 		get_tree().quit()
 
 

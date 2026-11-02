@@ -25,6 +25,11 @@ const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": 
 const NINA_1 := "Нина: — Вот. Пробила, как вы сказали. Сорок килограммов говядины, без реализации."
 const NINA_2 := "Нина: — Теперь вы им всё покажете? Правда?"
 const N1_CITY := "Свердловск. МЖК. Девятиэтажки, лужи до колена, и посреди всего этого универсам «Кировский»."
+const N1_BLOCKS := "Девять этажей, восемь подъездов, и в каждом окне один и тот же «Прожектор перестройки». Здесь все про всех всё знают. А когда надо, никто ничего не видел."
+const N1_STOP := "Последний автобус ушёл в десять. До утра отсюда не уехать, разве что пешком через пустырь."
+const N1_KIOSK := "«Союзпечать» закрыта с семи. Утром тут очередь за газетами, хотя пишут в них одно и то же."
+const N1_SLOGAN := "«Миру — мир». Над крышей горит исправно. В подъездах лампочки через одну."
+const N1_PHONE := "Два автомата у крыльца. В одном трубку оторвали ещё летом, второй глотает двушки. Ночью отсюда до милиции не дозвониться."
 const N1_JOB := "Тридцать лет я ловил убийц. Теперь сторожу колбасу, которой нет на прилавках."
 const N1_SUROVA := "В восемьдесят шестом меня убрали из следственного. Дело Галины Суровой я так и не закрыл. Мне велели не копать."
 const N1_NINA := "Неделю назад отсюда не вернулась домой Нина Лукина, продавщица из кулинарии. Участковый закрыл заявление за один день: уехала к матери, в Тагил."
@@ -76,9 +81,18 @@ func _init(m: Main, kind_: String) -> void:
 			shot_dir = a.get_slice("=", 1)
 
 
+## Dev: `--vertical` frames everything for a 1080×1920 phone video (run with
+## `--resolution 1080x1920 --write-movie FILE.avi -- --cut=night1
+## --cutonly=night1 --cutquit --vertical`): no letterbox bars, the camera
+## keeps its width, the caption and subtitles move to fit.
+static func vertical() -> bool:
+	return "--vertical" in OS.get_cmdline_user_args()
+
+
 func _ready() -> void:
+	var size := Vector2(1080, 1920) if vertical() else Vector2(1920, 1080)
 	view = SubViewport.new()
-	view.size = Vector2i(Main.RENDER_W, Main.RENDER_H)
+	view.size = Vector2i(size)
 	view.own_world_3d = true
 	view.msaa_3d = Viewport.MSAA_4X
 	view.audio_listener_enable_3d = true
@@ -87,13 +101,13 @@ func _ready() -> void:
 	add_child(view)
 	var screen := TextureRect.new()
 	screen.texture = view.get_texture()
-	screen.size = Vector2(1920, 1080)
+	screen.size = size
 	screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	screen.stretch_mode = TextureRect.STRETCH_SCALE
 	post = main.post.duplicate()
 	screen.material = post
 	add_child(screen)
-	for y: float in [0.0, 1080.0 - 118.0]:
+	for y: float in ([] if vertical() else [0.0, 1080.0 - 118.0]):
 		var bar := ColorRect.new()
 		bar.color = Color.BLACK
 		bar.position = Vector2(0, y)
@@ -109,11 +123,15 @@ func _ready() -> void:
 	_caption.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	_caption.add_theme_constant_override("shadow_offset_x", 2)
 	_caption.add_theme_constant_override("shadow_offset_y", 2)
+	if vertical():
+		_caption.position = Vector2(70, 230)
+		_caption.size = Vector2(940, 200)
+		_caption.add_theme_font_size_override("font_size", 40)
 	_caption.modulate.a = 0.0
 	add_child(_caption)
 	_black = ColorRect.new()
 	_black.color = Color.BLACK
-	_black.size = Vector2(1920, 1080)
+	_black.size = size
 	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_black)
 
@@ -122,6 +140,8 @@ func _ready() -> void:
 	cam = Camera3D.new()
 	cam.fov = 45.0
 	cam.far = 400.0
+	if vertical():
+		cam.keep_aspect = Camera3D.KEEP_WIDTH
 	root.add_child(cam)
 	cam.current = true
 	_play.call_deferred()
@@ -187,7 +207,7 @@ func wait(t: float) -> void:
 func shot(dur: float, p0: Vector3, l0: Variant, p1: Vector3, l1: Variant, fov := 45.0, sway := 0.6) -> void:
 	_shot = {"dur": dur, "p0": p0, "l0": l0, "p1": p1, "l1": l1, "sway": sway}
 	_shot_t = 0.0
-	cam.fov = fov
+	cam.fov = fov * 1.1 if vertical() else fov
 	_place_camera()
 	_shot_n += 1
 	if shot_dir != "":
@@ -202,9 +222,42 @@ func shot(dur: float, p0: Vector3, l0: Variant, p1: Vector3, l1: Variant, fov :=
 
 ## The camera inside a car, at the driver's eyes, looking out ahead.
 func ride(dur: float, car: Node3D, fov := 62.0) -> void:
+	# The seats' cloth is all one mesh, and the near edge of it shows as a
+	# dark slab across the bottom of the view from the wheel: hide it for
+	# the shot (nothing of the seats is in view from there anyway).
+	var seats: Array[MeshInstance3D] = []
+	for mi: MeshInstance3D in car.find_children("*", "MeshInstance3D", true, false):
+		var m := mi.material_override as ShaderMaterial
+		var tex: Texture2D = m.get_shader_parameter("albedo_tex") if m else null
+		if tex and tex.resource_path.ends_with("car_seat.png") and mi.visible:
+			mi.visible = false
+			seats.append(mi)
+	await _ride(dur, car, fov)
+	for mi in seats:
+		mi.visible = true
+
+
+func _ride(dur: float, car: Node3D, fov: float) -> void:
 	_shot = {"dur": dur, "car": car}
 	_shot_t = 0.0
-	cam.fov = fov
+	cam.fov = fov * 1.1 if vertical() else fov
+	_place_camera()
+	_shot_n += 1
+	if shot_dir != "":
+		await wait(dur * 0.5)
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_jpg("%s/%s_%02d.jpg" % [shot_dir, kind, _shot_n], 0.88)
+		await wait(dur * 0.5)
+		return
+	await wait(dur)
+
+
+## A camera fixed inside the car (car space), from `eye` looking at `at`:
+## the footwell, his feet on the pedals.
+func inside(dur: float, car: Node3D, eye: Vector3, at: Vector3, fov := 55.0) -> void:
+	_shot = {"dur": dur, "car": car, "eye": eye, "at": at}
+	_shot_t = 0.0
+	cam.fov = fov * 1.1 if vertical() else fov
 	_place_camera()
 	_shot_n += 1
 	if shot_dir != "":
@@ -257,6 +310,11 @@ func _steer(car: Node3D, delta: float) -> void:
 func _place_camera() -> void:
 	if _shot.has("car"):
 		var car: Node3D = _shot.car
+		if _shot.has("eye"):
+			var e: Vector3 = _shot.eye
+			var bump := Vector3(0, sin(_shot_t * 11.0) * 0.004, 0)
+			cam.global_transform = car.global_transform * Transform3D(Basis.looking_at(_shot.at - e, Vector3.UP), e + bump)
+			return
 		var seat: Vector3 = car.get_meta("seat")
 		var bob := Vector3(sin(_shot_t * 7.0) * 0.004, sin(_shot_t * 11.0) * 0.006, 0)
 		cam.global_transform = car.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-10.0)), seat + bob)
@@ -530,11 +588,47 @@ func _night_one() -> void:
 	fade(0.0, 2.5)
 	caption("Свердловск, МЖК, Сиреневый бульвар\nПятница, 14 октября 1988 года, 22:20", 5.0)
 	say(N1_CITY)
-	await shot(8.0, Vector3(-14, 16, -46), Vector3(2, 4, 0), Vector3(-9, 8, -36), Vector3(2.5, 3, -2), 42.0, 0.2)
+	# Over the roofs of the block across the road, down towards the square.
+	await shot(10.0, Vector3(-24, 32, -84), Vector3(0, 3, -10), Vector3(-12, 15, -44), Vector3(2, 3, -3), 42.0, 0.15)
+	# A tour of the estate before he comes: the far block, its lit windows
+	# and an entrance with its lamp in the rain.
+	say(N1_BLOCKS)
+	await shot(7.5, Vector3(-25, 1.7, -15), Vector3(-44, 22, 2), Vector3(-27, 1.6, -13.5), Vector3(-44, 6, -6), 52.0, 0.3)
+	await shot(7.0, Vector3(-38.6, 1.25, -14.2), Vector3(-44, 1.7, -10), Vector3(-39.6, 1.25, -13.0), Vector3(-44, 1.5, -10),
+		46.0, 0.4)
+	# The empty bus stop by the road.
+	say(N1_STOP)
+	await shot(8.0, Vector3(-32.8, 1.2, -25.6), Vector3(-38, 1.35, -20.4), Vector3(-34.6, 1.25, -24.9), Vector3(-38.4, 1.3, -20.4),
+		45.0, 0.4)
+	# The «Союзпечать» kiosk, shut for the night.
+	say(N1_KIOSK)
+	await shot(7.5, Vector3(-12.2, 1.5, -21.8), Vector3(-15.5, 1.5, -16.8), Vector3(-13.4, 1.45, -20.4), Vector3(-15.5, 1.4, -16.8),
+		45.0, 0.4)
+	# The slogan on the roof of the block beside the store.
+	say(N1_SLOGAN)
+	var flood := SpotLight3D.new()  # the floodlight on the roof edge
+	flood.light_color = Color(1.0, 0.85, 0.7)
+	flood.light_energy = 6.0
+	flood.spot_range = 9.0
+	flood.spot_angle = 50.0
+	root.add_child(flood)
+	flood.global_position = Vector3(46, 25.0, -3.0)
+	flood.look_at(Vector3(46, 27.8, 3.3))
+	await shot(7.5, Vector3(36, 2.5, -24), Vector3(42, 14, 2), Vector3(38, 9, -22), Vector3(46, 27.8, 3.3), 42.0, 0.3)
+	# The phone booths by the store.
+	say(N1_PHONE)
+	var booth := OmniLight3D.new()  # the bulb under the booth's roof
+	booth.light_color = Color(0.85, 0.9, 1.0)
+	booth.light_energy = 1.4
+	booth.omni_range = 5.0
+	root.add_child(booth)
+	booth.global_position = Vector3(14.3, 2.0, -2.2)
+	await shot(10.5, Vector3(11.0, 1.5, -8.2), Vector3(14.0, 1.6, -2), Vector3(12.0, 1.5, -7.0), Vector3(14.0, 1.5, -2),
+		44.0, 0.4)
 	# Along the road: headlights in the rain, the car turns into the square.
-	_drive(0.0, 21.0)
+	_drive(0.0, 22.5)
 	say(N1_JOB)
-	await shot(6.5, Vector3(-4, 0.7, Exterior.ROAD_Z + 5.8), ext.zhiguli, Vector3(-3.5, 0.75, Exterior.ROAD_Z + 5.6), ext.zhiguli,
+	await shot(7.0, Vector3(-4, 0.7, Exterior.ROAD_Z + 5.8), ext.zhiguli, Vector3(-3.5, 0.75, Exterior.ROAD_Z + 5.6), ext.zhiguli,
 		38.0, 0.3)
 	# From the driver's seat: wipers, the letters coming up through the rain.
 	_wiping = true
@@ -542,22 +636,24 @@ func _night_one() -> void:
 	var wipe := sound("wiper", -12.0)
 	(wipe as AudioStreamPlayer).finished.connect(func(): if is_instance_valid(wipe) and _wiping: (wipe as AudioStreamPlayer).play())
 	say(N1_SUROVA)
-	await ride(8.5, ext.zhiguli)
+	await ride(6.0, ext.zhiguli)
+	# Down in the footwell: his old shoes on the pedals, the rubber mat.
+	await inside(4.5, ext.zhiguli, Vector3(-0.34, 1.0, 0.02), Vector3(-0.4, 0.4, -0.55))
 	_wiping = false
 	inside.queue_free()
 	wipe.queue_free()
 	# Outside, by the steps: he pulls up beside the «Волга», lights off.
 	say(N1_NINA)
-	await shot(5.5, Vector3(-5.5, 1.5, -18.5), ext.zhiguli, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), 40.0)
+	await shot(6.0, Vector3(-5.5, 1.5, -18.5), ext.zhiguli, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), 40.0)
 	Vehicles.set_lights(ext.zhiguli, false)
 	sound("click", -8.0, ext.zhiguli)
 	if is_instance_valid(_engine):
 		_tween().tween_property(_engine, "volume_db", -60.0, 1.5)
-	await shot(5.0, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
+	await shot(5.5, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
 	# The letters over the canopy, the arrow, the rain in the lamplight.
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
 	say(N1_VOLGA)
-	await shot(6.5, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
+	await shot(7.0, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
 	# Up the steps to the doors; Ковпак waits behind the glass.
 	say(N1_GO)
 	await shot(6.0, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),

@@ -148,12 +148,44 @@ static func build(car: Node3D, s: Dictionary) -> void:
 	var rz: float = g[3] - 0.1
 	cloth.box(Props.at(0, 0.33, rz - 0.3), Vector3(w - 0.1, 0.15, 0.45))
 	cloth.box(Props.rot(Vector3.RIGHT, -0.25, Vector3(0, 0.44, rz - 0.04)), Vector3(w - 0.1, 0.44, 0.1))
-	carpet.box(Props.at(0, 0.24, 0.1), Vector3(w, 0.02, 1.9))
-	carpet.box(Props.at(0, 0.24, 0.0), Vector3(0.22, 0.12, 1.4))
+	carpet.box(Props.at(0, 0.335, 0.1), Vector3(w, 0.02, 1.9))
+	carpet.box(Props.at(0, 0.335, 0.0), Vector3(0.22, 0.1, 1.4))
 	black.cylinder(Props.rot(Vector3.RIGHT, 0.3, Vector3(0, 0.36, -0.28)), 0.007, 0.006, 0.3, 8)
 	black.lathe(Props.at(0, 0.64, -0.2), [Vector2(0.0, -0.02), Vector2(0.02, -0.015), Vector2(0.024, 0.0), Vector2(0.02, 0.016),
 		Vector2(0.0, 0.022)], 12)
+	# --- The footwell: the toe board up to the dash, a rubber mat, the three
+	# pendant pedals of a 2106 (clutch, brake, the narrow accelerator).
+	carpet.box(Props.rot(Vector3.RIGHT, -0.9, Vector3(0, 0.345, -0.6)), Vector3(w, 0.22, 0.02))
+	black.box(Props.at(-0.38, 0.355, -0.3), Vector3(0.46, 0.012, 0.56))
+	var steel := kit.b("metal", Color(0.3, 0.3, 0.3))
+	for p: Array in [[-0.5, 0.075], [-0.37, 0.075], [-0.25, 0.045]]:
+		var px: float = p[0]
+		var top := Vector3(px, 0.68, -0.62)
+		var pad := Vector3(px, 0.47, -0.56)
+		var arm := Transform3D(Basis.looking_at((pad - top).normalized(), Vector3.BACK), (top + pad) * 0.5)
+		steel.box(arm, Vector3(0.014, 0.008, top.distance_to(pad)))
+		black.box(Props.rot(Vector3.RIGHT, -0.45, pad), Vector3(p[1], 0.012, 0.07 if px > -0.3 else 0.055))
 	kit.build(car, false)
+	var legs := DriverLegs.make(Vector3(-0.36, 0.53, 0.24))
+	car.add_child(legs)
+	for mi: MeshInstance3D in legs.find_children("*", "MeshInstance3D", true, false):
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The skirts of his coat over his lap.
+	var lap := MeshBuilder.Kit.new()
+	lap.ao = false
+	var wool := lap.b("guard_wool")
+	wool.ellipsoid(Props.at(-0.36, 0.6, 0.16), Vector3(0.23, 0.075, 0.2), 20, 10)
+	for sx: float in [-0.12, 0.12]:
+		wool.ellipsoid(Props.rot(Vector3.RIGHT, 0.12, Vector3(-0.36 + sx, 0.6, 0.0)), Vector3(0.1, 0.06, 0.16), 16, 8)
+	lap.build(car, false)
+
+	# A little of the dash's light falls into the footwell.
+	var well := OmniLight3D.new()
+	well.light_color = Color(0.75, 0.8, 0.7)
+	well.light_energy = 0.6
+	well.omni_range = 1.0
+	well.position = Vector3(-0.36, 0.62, -0.3)
+	car.add_child(well)
 
 	# --- The wheel with the hands, on a pivot so it can steer.
 	var pivot := Node3D.new()
