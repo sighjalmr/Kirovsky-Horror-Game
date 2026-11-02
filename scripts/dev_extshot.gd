@@ -14,6 +14,17 @@ const VIEWS := [
 	[Vector3(9, 1.2, -14), Vector3(4.6, 0.6, -11.4)],
 	[Vector3.ZERO, Vector3.FORWARD],
 ]
+## Close-ups of the street furniture ("detail"): kiosk, phone booths, bus stop,
+## the bottle-return door, a block entrance, the roof slogan, lawn and benches.
+const DETAIL := [
+	[Vector3(-13.0, 1.6, -22.0), Vector3(-15.5, 1.3, -17.0)],
+	[Vector3(12.0, 1.6, -7.5), Vector3(14.3, 1.3, -2.0)],
+	[Vector3(-34.5, 1.6, -26.0), Vector3(-38.0, 1.3, -20.6)],
+	[Vector3(-13.0, 1.7, -8.0), Vector3(-16.0, 1.2, 0.0)],
+	[Vector3(30.0, 1.7, -8.0), Vector3(36.0, 1.5, 2.0)],
+	[Vector3(30.0, 12.0, -40.0), Vector3(46.0, 26.0, 0.0)],
+	[Vector3(-6.0, 1.6, -18.0), Vector3(-14.0, 0.5, -11.0)],
+]
 
 
 func _initialize() -> void:
@@ -35,6 +46,17 @@ func _initialize() -> void:
 	cam.current = true
 	root.size = Vector2i(1280, 720)
 	var only_seat := args.size() > 2 and args[2] == "seat"
+	if args.size() > 2 and args[2] == "detail":
+		for i in DETAIL.size():
+			cam.global_position = DETAIL[i][0]
+			cam.look_at(DETAIL[i][1])
+			ext.follow(cam)
+			for f in 4:
+				await process_frame
+			await RenderingServer.frame_post_draw
+			root.get_texture().get_image().save_jpg("%s/%s_d%d.jpg" % [out, look, i], 0.85)
+		quit()
+		return
 	for i in VIEWS.size():
 		if only_seat and i != VIEWS.size() - 1:
 			continue

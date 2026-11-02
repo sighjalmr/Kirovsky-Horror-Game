@@ -415,9 +415,35 @@ static func booth(parent: Node3D, rect: Rect2) -> void:
 	ch.cylinder(at(11.0, 0.76, 1.7), 0.035, 0.04, 0.1, 8, Color.WHITE)
 	# Calendar on the wall and a shelf of key boards.
 	kit.b("calendar").box(at(11.96, 1.25, 3.7), Vector3(0.008, 0.6, 0.4), Color.WHITE, FULL, Vector2.ONE, MeshFactory.NX)
-	dark.box(at(11.93, 1.5, 1.3), Vector3(0.12, 0.5, 0.7))
-	for i in 6:
-		ch.box(at(11.86, 1.82 - (i / 3) * 0.2, 1.08 + (i % 3) * 0.22), Vector3(0.01, 0.07, 0.006))
+	# Key board: a varnished plank with two rows of hooks, keys with
+	# numbered plywood tags, two hooks empty.
+	dark.box(at(11.975, 1.3, 1.3), Vector3(0.03, 0.5, 0.75))
+	var tags := kit.b("wood", Color(1.1, 1.0, 0.85))
+	for i in 10:
+		var kz := 1.0 + (i % 5) * 0.15
+		var ky := 1.72 - (i / 5) * 0.22
+		ch.box(at(11.955, ky, kz), Vector3(0.03, 0.008, 0.008))
+		if i == 3 or i == 7:
+			continue
+		ch.box(at(11.945, ky - 0.08, kz), Vector3(0.004, 0.07, 0.018))
+		tags.box(at(11.948, ky - 0.13, kz), Vector3(0.006, 0.05, 0.035))
+	# Electric kettle, a newspaper, a fire extinguisher in the corner, the
+	# guard's coat on a hook.
+	var en := kit.b("enamel", Color(0.75, 0.82, 0.9))
+	en.cylinder(at(11.45, 0.76, 2.75), 0.075, 0.065, 0.19, 10)
+	en.box(rot(Vector3.BACK, 0.6, Vector3(11.37, 0.86, 2.75)), Vector3(0.02, 0.09, 0.02))
+	kit.b("rubber").box(at(11.53, 0.84, 2.75), Vector3(0.02, 0.11, 0.025))
+	kit.b("white", Color(0.86, 0.84, 0.76)).box(rot(Vector3.UP, 0.3, Vector3(10.95, 0.762, 3.25)),
+		Vector3(0.3, 0.006, 0.42))
+	kit.b("paint", Color(0.7, 0.1, 0.07)).cylinder(at(11.6, 0.0, 4.5), 0.08, 0.08, 0.5, 10)
+	kit.b("rubber").cylinder(at(11.6, 0.5, 4.5), 0.03, 0.02, 0.08, 8)
+	kit.b("rubber").box(rot(Vector3.BACK, 0.4, Vector3(11.52, 0.52, 4.5)), Vector3(0.018, 0.25, 0.018))
+	ch.box(at(11.97, 1.75, 4.2), Vector3(0.06, 0.015, 0.015))
+	var coat := kit.b("quilted", Color(0.55, 0.52, 0.45))
+	coat.box(at(11.9, 0.95, 4.2), Vector3(0.12, 0.72, 0.42), Color.WHITE, NO_RECT, Vector2(0.6, 0.6))
+	coat.box(rot(Vector3.RIGHT, 0.5, Vector3(11.9, 1.62, 4.02)), Vector3(0.1, 0.12, 0.08))
+	coat.box(rot(Vector3.RIGHT, -0.5, Vector3(11.9, 1.62, 4.38)), Vector3(0.1, 0.12, 0.08))
+	coat.box(at(11.9, 1.6, 4.2), Vector3(0.1, 0.14, 0.3))
 	# Glazing above the low walls.
 	var glass := kit.b("white", Color(0.65, 0.75, 0.8, 0.16), Color.BLACK, Mats.GLASS)
 	glass.box(at(rect.position.x + rect.size.x * 0.5, 1.1, rect.end.y), Vector3(rect.size.x, 1.1, 0.01), Color.WHITE,

@@ -45,6 +45,7 @@ func _ready() -> void:
 	_build_blocks()
 	_build_green()
 	_build_lamps()
+	_build_street()
 	zhiguli = Vehicles.zhiguli()
 	add_child(zhiguli)
 	zhiguli.visible = false
@@ -129,10 +130,34 @@ func _build_ground() -> void:
 			if kz > ROAD_Z and x >= -8 and x < 16:
 				continue  # the way into the square
 			box(Vector3(x + 4, 0, kz), Vector3(8, 0.14, 0.22), "concrete", Color(0.6, 0.6, 0.58), 1.0)
+	# Pavements both sides, 3 m of lighter, older asphalt; on the square's side
+	# it runs flush across the way in. A strip of lawn behind the far one.
+	for x in range(-72, 72, 8):
+		var flush := x >= -8 and x < 16
+		box(Vector3(x + 4, -0.1 if flush else 0.0, ROAD_Z + 6.1), Vector3(8, 0.1 if flush else 0.12, 2.8), "ext_asphalt",
+			Color(1.35, 1.32, 1.28), 3.0, MeshFactory.PY | MeshFactory.NZ)
+		box(Vector3(x + 4, 0.0, ROAD_Z - 6.1), Vector3(8, 0.12, 2.8), "ext_asphalt", Color(1.35, 1.32, 1.28), 3.0,
+			MeshFactory.PY | MeshFactory.PZ)
+		box(Vector3(x + 4, -0.06, ROAD_Z - 10.0), Vector3(8, 0.12, 5.0), "ext_grass", Color.WHITE, 3.0, MeshFactory.PY)
+	# Puddles, oil where the cars stand, manhole covers.
+	for p: Array in [[Vector3(-3.5, 0, -14.5), 3.2, 0.3], [Vector3(8.5, 0, -16.5), 2.6, 1.2], [Vector3(12.5, 0, -9.0), 2.2, 2.0],
+			[Vector3(-1.0, 0, -19.0), 3.6, 2.6], [Vector3(-14.0, 0, ROAD_Z + 1.5), 3.0, 0.4],
+			[Vector3(9.0, 0, ROAD_Z - 1.8), 3.4, 1.4], [Vector3(26.0, 0, ROAD_Z + 2.0), 2.4, 0.9],
+			[Vector3(-26.0, 0, -15.0), 2.8, 2.2], [Vector3(18.0, 0, -12.0), 2.6, 0.2]]:
+		var pp: Vector3 = p[0]
+		if pp.z < ROAD_Z + 4.5 and pp.z > ROAD_Z - 4.5:
+			pp.y = 0.02
+		Street.decal(self, pp, p[1], "puddle", p[2], 0.7)
+	Street.decal(self, VOLGA_SPOT + Vector3(0, 0, 0.3), 1.6, "oil", 0.5)
+	Street.decal(self, ZHIGULI_SPOT + Vector3(0.2, 0, 0.6), 1.4, "oil", 2.1)
+	Street.decal(self, Vector3(-6.0, 0, -9.0), 1.3, "oil", 1.0)
+	for h: Vector3 in [Vector3(-3.0, 0.02, ROAD_Z + 1.2), Vector3(22.0, 0.02, ROAD_Z - 1.0), Vector3(14.0, 0, -18.0),
+			Vector3(-20.0, 0.12, ROAD_Z + 6.0)]:
+		Street.decal(self, h, 0.75, "hatch", _rng.randf() * TAU)
 
 
 func _build_store() -> void:
-	var red := Color(0.78, 0.66, 0.64)
+	var red := Color(0.7, 0.62, 0.6)
 	var grey := Color(0.55, 0.6, 0.62)
 	var sheet_m := 2.0
 	# Plinth and porch, steps down to the square along its front.
@@ -217,6 +242,25 @@ func _build_store() -> void:
 			MeshFactory.NZ, Color.BLACK, 2.0, Mats.GLASS)
 		box(Vector3(wx, 2.4, -0.04), Vector3(1.3, 0.08, 0.06), "paint", Color(0.85, 0.85, 0.85), 1.0)
 		box(Vector3(wx, 8.9, -0.04), Vector3(1.3, 0.08, 0.06), "paint", Color(0.85, 0.85, 0.85), 1.0)
+	# Drainpipes down the corners, a bend at the foot.
+	for dp: Array in [[Vector3(16.05, 0, -0.1), 6.8], [Vector3(-23.75, 0, -0.1), 10.5], [Vector3(-4.35, 0, -0.1), 4.2]]:
+		var kit := MeshBuilder.Kit.new()
+		var pipe := kit.b("galv", Color(0.55, 0.55, 0.55))
+		var base: Vector3 = dp[0]
+		pipe.cylinder(Props.at(base.x, 0.35, base.z), 0.06, 0.06, float(dp[1]) - 0.35, 8)
+		pipe.capsule(Transform3D.IDENTITY, base + Vector3(0, 0.36, 0), base + Vector3(0, 0.08, -0.35), 0.06, 0.07, 8)
+		for y in range(1, int(dp[1]), 2):
+			pipe.box(Props.at(base.x, y, base.z + 0.06), Vector3(0.16, 0.03, 0.08))
+		kit.build(self)
+	# On the low wing: the bottle-return door, crates stacked by it, a trodden
+	# path to it across the lawn.
+	box(Vector3(-16.0, 0, -0.04), Vector3(1.6, 2.3, 0.08), "metal", Color(0.42, 0.45, 0.43), Vector2(1.6, 2.3), MeshFactory.NZ)
+	box(Vector3(-16.0, 0.9, -0.1), Vector3(0.8, 0.5, 0.1), "metal", Color(0.3, 0.32, 0.31), 1.0)  # the hatch they hand bottles through
+	box(Vector3(-16.0, 2.3, -0.3), Vector3(2.4, 0.08, 0.7), "paint", Color(0.35, 0.35, 0.35), 1.0)
+	Street.plate(self, Vector3(-14.4, 1.7, -0.012), Vector3.FORWARD, "tara", Vector2(1.0, 0.5))
+	box(Vector3(-16.0, -0.04, -6.5), Vector3(1.4, 0.12, 12.0), "ext_asphalt", Color(0.75, 0.7, 0.62), 2.0, MeshFactory.PY)
+	Equip.bottle_crates(self, _rng, Vector3(-17.6, 0, -0.9), 0.0, 6)
+	Equip.bottle_crates(self, _rng, Vector3(-14.2, 0, -1.4), 0.3, 3)
 	# TV aerials on the roof.
 	for ax: float in [-8.0, -17.0]:
 		box(Vector3(ax, 12.5, 6.0), Vector3(0.05, 3.0, 0.05), "metal", Color(0.4, 0.4, 0.4), 1.0)
@@ -255,7 +299,7 @@ func _build_lobby() -> void:
 
 ## The nine-storey panel blocks round the square, in 12 m sections.
 func _build_blocks() -> void:
-	_block(Vector3(70, 0, 2), Vector3(22, 0, 2), 9, 12.0)        # left of the store, as on the photo
+	_block(Vector3(70, 0, 2), Vector3(22, 0, 2), 9, 12.0, true)  # left of the store, as on the photo
 	_block(Vector3(-36, 0, -70), Vector3(36, 0, -70), 9, 12.0)   # across the road, behind the camera
 	_block(Vector3(-44, 0, 30), Vector3(-44, 0, -18), 9, 12.0)   # far right
 	_block(Vector3(40, 0, -44), Vector3(64, 0, -44), 9, 12.0)
@@ -263,7 +307,7 @@ func _build_blocks() -> void:
 
 ## A panel block whose facade runs from `a` to `b` (seen from the front, a is
 ## on the left) with `depth` metres behind it; lit windows at night.
-func _block(a: Vector3, b: Vector3, floors: int, depth: float) -> void:
+func _block(a: Vector3, b: Vector3, floors: int, depth: float, slogan := false) -> void:
 	var along := (b - a).normalized()
 	var outward := along.cross(Vector3.UP)  # to the viewer's side
 	var length := a.distance_to(b)
@@ -278,7 +322,8 @@ func _block(a: Vector3, b: Vector3, floors: int, depth: float) -> void:
 	# viewer's left, so the texture reads the right way on all four.
 	var kit := MeshBuilder.Kit.new()
 	kit.ao = false
-	var facade := kit.b("ext_panel", Color(0.95, 0.95, 0.95))
+	var shade := _rng.randf_range(0.78, 0.9)
+	var facade := kit.b("ext_panel", Color(shade, shade * 0.98, shade * 0.95))
 	var hx := length * 0.5
 	var hz := depth * 0.5
 	var corners := [Vector3(-hx, 0, hz), Vector3(hx, 0, hz), Vector3(hx, 0, -hz), Vector3(-hx, 0, -hz)]
@@ -300,6 +345,29 @@ func _block(a: Vector3, b: Vector3, floors: int, depth: float) -> void:
 					q0 + Vector3(0, y1, 0)], [Vector2(s0 / 12.0, 1.0 - y0 / 11.2), Vector2(s1 / 12.0, 1.0 - y0 / 11.2),
 					Vector2(s1 / 12.0, 1.0 - y1 / 11.2), Vector2(s0 / 12.0, 1.0 - y1 / 11.2)], Color.WHITE, false)
 	kit.b("concrete", Color(0.45, 0.45, 0.45)).box(Props.at(0, h, 0), Vector3(length + 0.3, 0.5, depth + 0.3))
+	# The plinth: darker concrete, splashed by the rain, its basement vents.
+	var plinth := kit.b(Street.TEX)
+	var segs := int(ceil(length / 6.0))
+	for i in segs:
+		var sx := -hx + (i + 0.5) * length / segs
+		plinth.box(Props.at(sx, 0, 0), Vector3(length / segs, 0.9, depth + 0.2), Color.WHITE,
+			Street._cell("panel_plinth"), Vector2.ONE, MeshFactory.PZ | MeshFactory.NZ)
+	plinth.box(Props.at(0, 0, 0), Vector3(length + 0.2, 0.9, depth + 0.2), Color.WHITE, Street._cell("panel_plinth"),
+		Vector2.ONE, MeshFactory.PX | MeshFactory.NX)
+	# On the roof: a lift-machine room over every entrance.
+	var entrances := maxi(1, int(length / 16.0))
+	var roof := kit.b("concrete", Color(0.55, 0.55, 0.53))
+	for k in entrances:
+		var ex := -hx + (k + 0.5) * length / entrances
+		roof.box(Props.at(ex, h + 0.5, 0), Vector3(3.2, 2.4, 4.5))
+		roof.box(Props.at(ex + 1.0, h + 2.9, -1.2), Vector3(0.6, 0.8, 0.6))
+	if slogan:
+		var frame := kit.b("metal", Color(0.3, 0.3, 0.3))
+		for fx: float in [-4.5, -1.5, 1.5, 4.5]:
+			frame.box(Props.at(fx, h + 0.5, hz - 1.4), Vector3(0.1, 4.0, 0.1))
+			frame.box(Props.rot(Vector3.RIGHT, -0.5, Vector3(fx, h + 0.5, hz - 2.6)), Vector3(0.08, 3.6, 0.08))
+		kit.b(Street.TEX).box(Props.at(0, h + 1.2, hz - 1.3), Vector3(10.0, 3.3, 0.06), Color.WHITE, Street._cell("slogan"),
+			Vector2.ONE, MeshFactory.PZ)
 	# Lit windows on the two long sides: emissive panes just proud of the wall.
 	if look == "night":
 		var lit := kit.b("ext_windows", Color.WHITE, Color(1.7, 1.6, 1.5))
@@ -326,11 +394,17 @@ func _block(a: Vector3, b: Vector3, floors: int, depth: float) -> void:
 						Vector3(xc, r.position.y, z)), Vector3(r.size.x, r.size.y, 0.01), tint, uv,
 						Vector2.ONE, MeshFactory.PZ)
 	kit.build(node, false)
+	for k in entrances:
+		Street.entrance(node, Vector3(-hx + (k + 0.5) * length / entrances, 0, hz), PI, look == "night", k + 1)
 
 
 func _build_green() -> void:
 	# The lawn on the right of the steps with its firs, as in the photo.
-	box(Vector3(-14.5, -0.05, -6.5), Vector3(18, 0.12, 12), "cloth", Color(0.28, 0.32, 0.18), 3.0, MeshFactory.PY)
+	box(Vector3(-14.5, -0.05, -6.5), Vector3(18, 0.12, 12), "ext_grass", Color.WHITE, 3.0, MeshFactory.PY)
+	Street.fence(self, Vector3(-23.3, 0, -12.8), Vector3(-16.9, 0, -12.8))
+	Street.fence(self, Vector3(-15.1, 0, -12.8), Vector3(-5.9, 0, -12.8))
+	for lp: Vector3 in [Vector3(-11.0, 0.07, -5.0), Vector3(-19.5, 0.07, -7.0), Vector3(-8.0, 0.07, -10.0)]:
+		Street.decal(self, lp, 3.5, "leaves", _rng.randf() * TAU)
 	box(Vector3(-14.5, 0, -12.5), Vector3(18, 0.14, 0.2), "concrete", Color(0.6, 0.6, 0.58), 1.0)
 	for p: Vector3 in [Vector3(-9.5, 0, -3.5), Vector3(-13.0, 0, -8.0), Vector3(-17.5, 0, -4.0), Vector3(-21.5, 0, -9.5),
 			Vector3(15.5, 0, -7.0), Vector3(19.0, 0, -3.5)]:
@@ -345,28 +419,42 @@ func _fir(p: Vector3, h: float) -> void:
 	kit.ao = false
 	kit.b("wood", Color(0.35, 0.25, 0.2)).cylinder(Props.at(p.x, 0, p.z), 0.14, 0.08, h * 0.3, 8)
 	var needles := kit.b("fur", Color(0.3, 0.42, 0.28))
-	var tiers := 7
+	# Drooping whorls of branches, each a ragged skirt of tilted cones: dense
+	# and dark inside, the tips lighter.
+	var tiers := 13
 	for i in tiers:
 		var t := float(i) / tiers
-		var r := lerpf(h * 0.32, h * 0.06, t)
-		var y := h * (0.15 + t * 0.75)
-		needles.cylinder(Transform3D(Basis(Vector3.UP, _rng.randf() * TAU), p + Vector3(0, y, 0)), r, 0.05, h * 0.22, 12,
-			Color.WHITE * _rng.randf_range(0.8, 1.1), Rect2(0, 0, 3, 1))
+		var r := lerpf(h * 0.3, h * 0.04, pow(t, 0.9)) * _rng.randf_range(0.85, 1.1)
+		var y := h * (0.12 + t * 0.82)
+		for k in 3:
+			var a := _rng.randf() * TAU
+			var tilt := Basis(Vector3(cos(a), 0, sin(a)), _rng.randf_range(0.04, 0.16))
+			var col := Color.WHITE * (0.75 + 0.25 * t) * _rng.randf_range(0.85, 1.1)
+			col.a = 1.0
+			needles.cylinder(Transform3D(tilt * Basis(Vector3.UP, a), p + Vector3(0, y - k * 0.08, 0)), r * (1.0 - k * 0.12),
+				0.04, h * 0.14, 10, col, Rect2(0, 0, 3, 1))
 	kit.build(self)
 
 
 func _birch(p: Vector3) -> void:
 	var kit := MeshBuilder.Kit.new()
 	kit.ao = false
-	var bark := kit.b("concrete", Color(0.85, 0.85, 0.82))
-	bark.cylinder(Props.at(p.x, 0, p.z), 0.16, 0.07, 9.0, 8)
+	var bark := kit.b(Street.TEX)
+	bark.cylinder(Props.at(p.x, 0, p.z), 0.17, 0.06, 9.0, 8, Color(0.78, 0.77, 0.74), Street._cell("bark"))
 	var twig := kit.b("wood", Color(0.25, 0.2, 0.18))
 	for i in 30:
 		var y := 2.6 + i * 0.21
 		var a := _rng.randf() * TAU
 		var ln := lerpf(2.2, 0.6, i / 30.0)
 		var dir := Vector3(cos(a), 0.9, sin(a)).normalized()
-		twig.capsule(Transform3D.IDENTITY, p + Vector3(0, y, 0), p + Vector3(0, y, 0) + dir * ln, 0.04, 0.012, 5)
+		var root := p + Vector3(0, y, 0)
+		var tip := root + dir * ln
+		twig.capsule(Transform3D.IDENTITY, root, tip, 0.04, 0.012, 5)
+		# Weeping twigs hanging off each branch, as on a birch.
+		for k in 3:
+			var q := root.lerp(tip, 0.45 + k * 0.25)
+			twig.capsule(Transform3D.IDENTITY, q, q + Vector3(_rng.randf_range(-0.2, 0.2), -_rng.randf_range(0.5, 1.1),
+				_rng.randf_range(-0.2, 0.2)), 0.008, 0.004, 3)
 	kit.build(self)
 
 
@@ -386,6 +474,21 @@ func _build_lamps() -> void:
 		s.light_energy = 9.0 if look == "night" else 0.0
 		# Only the two lamps by the steps throw shadows (cars, posts, people).
 		s.shadow_enabled = look == "night" and absf((l[0] as Vector3).z) < 20.0
+
+
+## Kiosk, bus stop, phone booths, benches, urns and bins round the square.
+func _build_street() -> void:
+	Street.kiosk(self, Vector3(-15.5, 0, -16.8), 0.0)
+	Street.bus_stop(self, Vector3(-38.0, 0.12, ROAD_Z + 6.4), 0.0)
+	Street.phone_booths(self, Vector3(14.3, 0, -2.0), 0.0)
+	for u: Vector3 in [Vector3(-4.6, 0, -7.7), Vector3(9.6, 0, -7.7), Vector3(-13.5, 0, -13.4), Vector3(-37.0, 0.12, ROAD_Z + 4.9)]:
+		Street.urn(self, u)
+	Street.bench(self, Vector3(-10.5, 0, -13.5), 0.0)
+	Street.bench(self, Vector3(-19.5, 0, -13.5), 0.0)
+	Street.bins(self, Vector3(20.5, 0, -3.0), -0.15)
+	for lp: Vector3 in [Vector3(-18.0, 0.12, ROAD_Z + 6.0), Vector3(-6.0, 0.0, ROAD_Z + 6.2), Vector3(18.0, 0.12, ROAD_Z + 6.0),
+			Vector3(30.0, 0.12, ROAD_Z + 5.8)]:
+		Street.decal(self, lp, 3.0, "leaves", _rng.randf() * TAU)
 
 
 func _build_rain() -> void:

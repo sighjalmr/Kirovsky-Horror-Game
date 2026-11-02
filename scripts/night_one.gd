@@ -147,7 +147,23 @@ var kovpak: Npc
 var tamara: Npc
 var vasya: Npc
 
+## Places to hide from him: the spot he crouches in, the way he faces, where
+## he steps back out, the prompt.
+const HIDES := {
+	"hide_till3": [Vector3(3.25, 0, 7.75), Vector3(-1, 0, 0.2), Vector3(3.3, 0, 7.0), "Спрятаться под кассой № 3"],
+	"hide_booth": [Vector3(10.35, 0, 3.15), Vector3(1, 0, 0), Vector3(9.9, 0, 3.6), "Спрятаться под столом на посту"],
+	"hide_cartons": [Vector3(-5.6, 0, 26.75), Vector3(0, 0, 1), Vector3(-5.6, 0, 26.1), "Спрятаться за коробками"],
+}
+## The «Альпинист» on the booth desk.
+const RADIO_POS := Vector3(11.3, 0.86, 2.2)
+const G_RADIO_ON := "«Маяк». Ночью он один и не спит. Слышно его, наверное, на весь зал."
+const G_RADIO_OFF_HIM := "Радио замолчало. Сам приёмник не выключается."
+const G_HIDE := "Спрятался. Не дышать. Пусть пройдёт мимо."
+
 var _phone: AudioStreamPlayer3D
+var _radio: AudioStreamPlayer3D
+var radio_on := false
+var _radio_noise_t := 0.0
 var _phone_t := 0.0
 var _phone_noise_t := 0.0
 var _talked := {}
@@ -170,6 +186,18 @@ func _ready() -> void:
 	kovpak = _person("kovpak")
 	tamara = _person("tamara")
 	vasya = _person("vasya")
+	_radio = AudioStreamPlayer3D.new()
+	_radio.stream = Sfx.get_stream("radio")
+	_radio.bus = Sfx.BUS
+	_radio.volume_db = -6.0
+	_radio.max_distance = 30.0
+	_radio.unit_size = 3.0
+	main.world.add_child(_radio)
+	_radio.global_position = RADIO_POS
+	main.store.add_interactable("radio", Vector3(11.0, 0, 1.75), "Включить радио «Маяк»", 0.9, false)
+	for id: String in HIDES:
+		var h: Array = HIDES[id]
+		main.store.add_interactable(id, h[2], h[3], 1.0, false)
 	main.store.add_interactable("talk_kovpak", Vector3.ZERO, "Спросить про Нину", 1.6, false, false)
 	main.store.add_interactable("talk_tamara", Vector3.ZERO, "Спросить про седьмое октября", 1.6, false, false)
 
@@ -478,12 +506,23 @@ func interact(id: String) -> bool:
 				_talked["tamara"] = true
 				tamara.look_at_point(main.player.global_position)
 				hud.say(T_ASK, -1.0, true)
+		"radio":
+			set_radio(not radio_on)
+			if radio_on and not _talked.has("radio"):
+				_talked["radio"] = true
+				hud.say(G_RADIO_ON, -1.0, true)
 		"chair":
 			main.sit_down()
 			hud.say(G_SIT, -1.0, true)
 		_:
 			if id.begins_with("chest_"):
 				_lift(id.trim_prefix("chest_"))
+			elif HIDES.has(id):
+				var h: Array = HIDES[id]
+				main.hide_in({"id": id, "pos": h[0], "face": h[1], "out": h[2]})
+				if main.player.hidden and not _talked.has("hid"):
+					_talked["hid"] = true
+					hud.say(G_HIDE)
 			else:
 				return false
 	return true
@@ -692,7 +731,36 @@ func _ring_phone() -> void:
 	main.hud.say(PH_RING, -1.0, true)
 
 
+## The radio in the booth: company for the night, and a lure. While it plays
+## he hears it from across the hall and comes to the booth to shut it up.
+func set_radio(on: bool, by_him := false) -> void:
+	if on == radio_on:
+		return
+	radio_on = on
+	Sfx.play_3d(main.store, "click", RADIO_POS, -8.0, 1.2)
+	if on:
+		_radio.play(randf() * maxf(0.0, _radio.stream.get_length() - 1.0))
+	else:
+		_radio.stop()
+	main.store.set_interactable("radio", true, "Выключить радио" if on else "Включить радио «Маяк»")
+	if by_him:
+		main.hud.say(G_RADIO_OFF_HIM, -1.0, true)
+
+
+func _update_radio(delta: float) -> void:
+	if not radio_on or not main.killer.is_active():
+		return
+	_radio_noise_t -= delta
+	if _radio_noise_t <= 0.0:
+		_radio_noise_t = 3.0
+		main.killer.hear(Vector3(RADIO_POS.x, 0, RADIO_POS.z), 30.0)
+	var k: Vector3 = main.killer.global_position
+	if Vector2(k.x - RADIO_POS.x, k.z - RADIO_POS.z).length() < 2.0:
+		set_radio(false, true)
+
+
 func update(delta: float) -> void:
+	_update_radio(delta)
 	if _phone_t <= 0.0:
 		return
 	_phone_t -= delta
@@ -726,6 +794,7 @@ func _answer_phone() -> void:
 
 
 func stop_sounds() -> void:
+	set_radio(false)
 	_phone.stop()
 	_phone_t = 0.0
 
