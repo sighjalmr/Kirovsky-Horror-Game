@@ -26,7 +26,7 @@ def profnastil(name):
     """Red profiled steel sheet of the facade, 2 m square: trapezoid ribs every
     20 cm, the paint chalky and faded to brick, rain streaks running down
     from every rib, rust at the bottom edge and round the fixings."""
-    t = T(512, 512, (0.62, 0.17, 0.11), name)
+    t = T(512, 512, (0.52, 0.2, 0.15), name)
     xx = np.arange(512, dtype=np.float32)
     period = 51.2
     ph = (xx % period) / period
@@ -41,7 +41,7 @@ def profnastil(name):
     g = grime(t, 160)
     t.shade(g, 0.82, 1.12)
     # Chalked paint: lighter, pinker blotches.
-    t.stain(t.noise(90, 4), 0.55, (0.72, 0.36, 0.3), 0.45)
+    t.stain(t.noise(90, 4), 0.5, (0.66, 0.4, 0.35), 0.55)
     # Streaks down from the top: dirty rain water.
     streak = np.tile(t.rng.random(512).astype(np.float32)[None, :], (512, 1))
     streak = blurred(streak, 1.2)
