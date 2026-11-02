@@ -83,7 +83,7 @@ def duration(path: Path) -> float:
 
 # Abbreviations Silero spells wrong, written the way they are said.
 SAY_AS = {
-    "ЖБИ": "Жэбэ+и",
+    "МЖК": "эмжэк+а",
 }
 
 
