@@ -28,7 +28,12 @@ var _box: Node3D
 
 
 func setup(role: String) -> Npc:
-	body = Characters.build(role)
+	return setup_body(Characters.build(role))
+
+
+## The same with a body built elsewhere (the killer seen far off in the rain).
+func setup_body(p: Person) -> Npc:
+	body = p
 	add_child(body)
 	_box = Characters.carton()
 	_box.visible = false
@@ -87,7 +92,11 @@ func _process(delta: float) -> void:
 	var dir := to.normalized()
 	global_position += dir * minf(speed * delta, to.length())
 	# Up or down steps (the porch outside): climb at half the walking pace.
-	global_position.y = move_toward(global_position.y, _path[_i].y, speed * delta * 0.5)
+	var g := Outdoors.ground_for(self)
+	if is_nan(g):
+		global_position.y = move_toward(global_position.y, _path[_i].y, speed * delta * 0.5)
+	else:
+		global_position.y = move_toward(global_position.y, g, speed * delta * 0.6)
 	rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), clampf(delta * 8.0, 0.0, 1.0))
 	_animate(speed, delta)
 

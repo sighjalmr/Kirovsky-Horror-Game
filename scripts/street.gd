@@ -76,7 +76,9 @@ static func plate(parent: Node3D, pos: Vector3, normal: Vector3, which: String, 
 
 ## Two red phone booths side by side: a steel frame with small panes, the
 ## «ТЕЛЕФОН» plate on top, the grey payphone on the back wall.
-static func phone_booths(parent: Node3D, pos: Vector3, yaw: float) -> void:
+## `bare` is the booth (0 left, 1 right) drawn without its handset on the
+## hook, for a handset that hangs on its cord instead. Returns the root node.
+static func phone_booths(parent: Node3D, pos: Vector3, yaw: float, bare := -1) -> Node3D:
 	var root := Props.node(parent, pos, yaw)
 	var kit := MeshBuilder.Kit.new()
 	var red := kit.b("paint", Color(0.62, 0.14, 0.1))
@@ -104,9 +106,11 @@ static func phone_booths(parent: Node3D, pos: Vector3, yaw: float) -> void:
 		# The payphone: a grey box with its black handset.
 		var ph := kit.b("metal", Color(0.45, 0.47, 0.47))
 		ph.box(Props.at(ox, 1.25, s * 0.5 - 0.12), Vector3(0.24, 0.36, 0.14))
-		kit.b("rubber", Color(0.08, 0.08, 0.08)).capsule(Transform3D.IDENTITY, Vector3(ox - 0.14, 1.35, s * 0.5 - 0.1),
-			Vector3(ox - 0.14, 1.55, s * 0.5 - 0.1), 0.03, 0.03, 6)
+		if k != bare:
+			kit.b("rubber", Color(0.08, 0.08, 0.08)).capsule(Transform3D.IDENTITY, Vector3(ox - 0.14, 1.35, s * 0.5 - 0.1),
+				Vector3(ox - 0.14, 1.55, s * 0.5 - 0.1), 0.03, 0.03, 6)
 	kit.build(root)
+	return root
 
 
 ## A concrete bus-stop pavilion: a back wall with the cinema bill and the

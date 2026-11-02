@@ -79,6 +79,12 @@ var front_open := false
 ## the panel can put them out too (night two).
 var duty_on := true
 var car: Node3D
+## The plain street outside the glass (wet ground, a lamp), hidden when the
+## real square (Outdoors) is built round the store; the car then stands on
+## the square's asphalt, 0.75 m below the hall floor.
+var _street_root: Node3D
+var _car_base: Node3D
+var _embedded := false
 
 var _car_lights: Array[SpotLight3D] = []
 var _engine: AudioStreamPlayer3D
@@ -205,12 +211,12 @@ func _build_shell() -> void:
 	var front: Array[MeshInstance3D] = []
 	for span: Vector2 in [Vector2(-12, -8), Vector2(-8, -4), Vector2(-4, -2), Vector2(8, 12)]:
 		front.append(box(Vector3((span.x + span.y) * 0.5, 0, -0.15), Vector3(span.y - span.x, H, 0.3), "wall", Color.WHITE,
-			wall_m, true, MeshFactory.PZ))
+			wall_m, true, MeshFactory.PZ | MeshFactory.NZ))
 	front.append(box(Vector3(2.15, 0, -0.15), Vector3(0.3, H, 0.3), "wall", Color.WHITE, wall_m, true,
 		MeshFactory.PZ | MeshFactory.PX))
 	front.append(box(Vector3(7.4, 0, -0.15), Vector3(1.2, H, 0.3), "wall", Color.WHITE, wall_m, true,
 		MeshFactory.PZ | MeshFactory.NX))
-	front.append(box(Vector3(0, 2.4, -0.15), Vector3(4, H - 2.4, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.PZ))
+	front.append(box(Vector3(0, 2.4, -0.15), Vector3(4, H - 2.4, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.PZ | MeshFactory.NZ))
 	_build_shop_window(front)
 	for mi in front:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
@@ -221,7 +227,8 @@ func _build_shell() -> void:
 	for x: float in [-1.0, 1.0]:
 		var parent: Node3D = _front_hinge if x < 0.0 else self
 		var o := Vector3(1.0, 0, 0) if x < 0.0 else Vector3(x, 0, 0)
-		box(o + Vector3(0, 0, -0.03), Vector3(1.95, 2.4, 0.06), "glass", Color.WHITE, Vector2(1.95, 2.4), true, MeshFactory.PZ, parent)
+		box(o + Vector3(0, 0, -0.03), Vector3(1.95, 2.4, 0.06), "glass", Color.WHITE, Vector2(1.95, 2.4), true,
+			MeshFactory.PZ | MeshFactory.NZ, parent)
 		box(o + Vector3(0, 0.95, 0.03), Vector3(1.4, 0.05, 0.04), "chrome", Color.WHITE, 1.0, false, MeshFactory.ALL, parent)
 		for bx: float in [-0.62, 0.62]:
 			box(o + Vector3(bx, 0.96, 0.01), Vector3(0.03, 0.03, 0.04), "chrome", Color.WHITE, 1.0, false, MeshFactory.ALL, parent)
@@ -748,12 +755,17 @@ func _build_waypoints() -> void:
 ## Wet asphalt beyond the glass doors and the director's «Волга», dark
 ## until its headlights come on.
 func _build_street() -> void:
-	box(Vector3(0, -0.12, -8.0), Vector3(28, 0.1, 15.6), "rubber", Color(0.9, 0.9, 0.9), 2.0, false, MeshFactory.PY)
-	box(Vector3(0, -0.02, -1.2), Vector3(6, 0.1, 2.0), "wall", Color(0.45, 0.45, 0.45), 2.0, false, MeshFactory.PY | MeshFactory.NZ)
-	Fittings.street_lamp(self, Vector3(4.2, 0, -7.0), Vector3(4.4, 0, 1.2))
+	_street_root = Node3D.new()
+	add_child(_street_root)
+	box(Vector3(0, -0.12, -8.0), Vector3(28, 0.1, 15.6), "rubber", Color(0.9, 0.9, 0.9), 2.0, false, MeshFactory.PY, _street_root)
+	box(Vector3(0, -0.02, -1.2), Vector3(6, 0.1, 2.0), "wall", Color(0.45, 0.45, 0.45), 2.0, false, MeshFactory.PY | MeshFactory.NZ,
+		_street_root)
+	Fittings.street_lamp(_street_root, Vector3(4.2, 0, -7.0), Vector3(4.4, 0, 1.2))
+	_car_base = Node3D.new()
+	add_child(_car_base)
 	car = Node3D.new()
 	car.position = Vector3(-14.0, 0, -9.0)
-	add_child(car)
+	_car_base.add_child(car)
 	var body := MeshBuilder.Kit.new()
 	var paint := body.b("paint", Color(0.12, 0.13, 0.15))
 	paint.box(Props.at(0, 0.25, 0), Vector3(1.8, 0.6, 4.7))
@@ -919,6 +931,13 @@ func close_storage_door() -> void:
 	tw.tween_callback(func(): Sfx.play_3d(self, "lock", Vector3(9, 1.0, 28.2), -2.0))
 
 
+## The real square is built round the store: drop the stand-in street.
+func embed_street(ground_y: float) -> void:
+	_embedded = true
+	_street_root.visible = false
+	_car_base.position.y = ground_y
+
+
 ## A key turns in the glass doors and the left leaf swings out (or back).
 func set_front_door(open: bool) -> void:
 	if open == front_open:
@@ -958,6 +977,10 @@ func car_arrive() -> void:
 	car.visible = true
 	car.position = Vector3(-14.0, 0, -8.5)
 	car.rotation.y = -PI * 0.5
+	if _embedded:
+		# Across the square from the road, not over the lawn.
+		car.position = Vector3(-1.0, 0, -22.0)
+		car.rotation.y = -PI
 	_engine.play()
 	var tw := create_tween().set_parallel()
 	for l in _car_lights:
@@ -973,8 +996,12 @@ func car_leave() -> void:
 	if not _engine.playing:
 		_engine.play()
 	var tw := create_tween().set_parallel()
-	tw.tween_property(car, "rotation:y", -PI * 0.5, 4.0).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(car, "position", Vector3(16.0, 0, -9.5), 6.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	if _embedded:
+		# Backs out across the square to the road (Gordeev's «Жигули» stands to the left).
+		tw.tween_property(car, "position", Vector3(-1.0, 0, -22.0), 6.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	else:
+		tw.tween_property(car, "rotation:y", -PI * 0.5, 4.0).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(car, "position", Vector3(16.0, 0, -9.5), 6.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	for l in _car_lights:
 		tw.tween_property(l, "light_energy", 0.0, 5.0).set_delay(1.0)
 	tw.tween_property(_engine, "volume_db", -40.0, 7.0)
