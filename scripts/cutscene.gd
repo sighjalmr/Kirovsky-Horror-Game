@@ -598,11 +598,11 @@ func _night_one() -> void:
 		46.0, 0.4)
 	# The empty bus stop by the road.
 	say(N1_STOP)
-	await shot(8.0, Vector3(-32.8, 1.2, -25.6), Vector3(-38, 1.35, -20.4), Vector3(-34.6, 1.25, -24.9), Vector3(-38.4, 1.3, -20.4),
+	await shot(8.8, Vector3(-32.8, 1.2, -25.6), Vector3(-38, 1.35, -20.4), Vector3(-34.6, 1.25, -24.9), Vector3(-38.4, 1.3, -20.4),
 		45.0, 0.4)
 	# The «Союзпечать» kiosk, shut for the night.
 	say(N1_KIOSK)
-	await shot(7.5, Vector3(-12.2, 1.5, -21.8), Vector3(-15.5, 1.5, -16.8), Vector3(-13.4, 1.45, -20.4), Vector3(-15.5, 1.4, -16.8),
+	await shot(8.3, Vector3(-12.2, 1.5, -21.8), Vector3(-15.5, 1.5, -16.8), Vector3(-13.4, 1.45, -20.4), Vector3(-15.5, 1.4, -16.8),
 		45.0, 0.4)
 	# The slogan on the roof of the block beside the store.
 	say(N1_SLOGAN)
@@ -614,7 +614,7 @@ func _night_one() -> void:
 	root.add_child(flood)
 	flood.global_position = Vector3(46, 25.0, -3.0)
 	flood.look_at(Vector3(46, 27.8, 3.3))
-	await shot(7.5, Vector3(36, 2.5, -24), Vector3(42, 14, 2), Vector3(38, 9, -22), Vector3(46, 27.8, 3.3), 42.0, 0.3)
+	await shot(8.0, Vector3(36, 2.5, -24), Vector3(42, 14, 2), Vector3(38, 9, -22), Vector3(46, 27.8, 3.3), 42.0, 0.3)
 	# The phone booths by the store.
 	say(N1_PHONE)
 	var booth := OmniLight3D.new()  # the bulb under the booth's roof
@@ -623,12 +623,12 @@ func _night_one() -> void:
 	booth.omni_range = 5.0
 	root.add_child(booth)
 	booth.global_position = Vector3(14.3, 2.0, -2.2)
-	await shot(10.5, Vector3(11.0, 1.5, -8.2), Vector3(14.0, 1.6, -2), Vector3(12.0, 1.5, -7.0), Vector3(14.0, 1.5, -2),
+	await shot(11.5, Vector3(11.0, 1.5, -8.2), Vector3(14.0, 1.6, -2), Vector3(12.0, 1.5, -7.0), Vector3(14.0, 1.5, -2),
 		44.0, 0.4)
 	# Along the road: headlights in the rain, the car turns into the square.
-	_drive(0.0, 22.5)
+	_drive(0.0, 24.0)
 	say(N1_JOB)
-	await shot(7.0, Vector3(-4, 0.7, Exterior.ROAD_Z + 5.8), ext.zhiguli, Vector3(-3.5, 0.75, Exterior.ROAD_Z + 5.6), ext.zhiguli,
+	await shot(7.8, Vector3(-4, 0.7, Exterior.ROAD_Z + 5.8), ext.zhiguli, Vector3(-3.5, 0.75, Exterior.ROAD_Z + 5.6), ext.zhiguli,
 		38.0, 0.3)
 	# From the driver's seat: wipers, the letters coming up through the rain.
 	_wiping = true
@@ -637,22 +637,22 @@ func _night_one() -> void:
 	(wipe as AudioStreamPlayer).finished.connect(func(): if is_instance_valid(wipe) and _wiping: (wipe as AudioStreamPlayer).play())
 	say(N1_SUROVA)
 	# Eyes on the road the whole way: the wheel and the store ahead.
-	await ride(10.5, ext.zhiguli)
+	await ride(11.2, ext.zhiguli)
 	_wiping = false
 	inside.queue_free()
 	wipe.queue_free()
 	# Outside, by the steps: he pulls up beside the «Волга», lights off.
 	say(N1_NINA)
-	await shot(6.0, Vector3(-5.5, 1.5, -18.5), ext.zhiguli, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), 40.0)
+	await shot(6.5, Vector3(-5.5, 1.5, -18.5), ext.zhiguli, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), 40.0)
 	Vehicles.set_lights(ext.zhiguli, false)
 	sound("click", -8.0, ext.zhiguli)
 	if is_instance_valid(_engine):
 		_tween().tween_property(_engine, "volume_db", -60.0, 1.5)
-	await shot(7.0, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
+	await shot(7.2, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
 	# The letters over the canopy, the arrow, the rain in the lamplight.
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
 	say(N1_VOLGA)
-	await shot(7.0, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
+	await shot(7.6, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
 	# Up the steps to the doors; Ковпак waits behind the glass.
 	say(N1_GO)
 	await shot(6.0, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),

@@ -14,6 +14,11 @@
     "ref": "qwen_refs/gordeev_ref.wav",
     "ref_text": "Хлопнула дверь склада. Ключ от неё есть у Ковпака и у мясника. У меня нет.",
     "instruct": "A Russian man of about seventy, a retired police investigator now working as a night watchman. Low, hoarse, raspy voice of a lifelong smoker, slightly trembling with age. Tired and calm, speaks slowly and quietly, almost to himself, with dry irony and restrained fear."
+   },
+   "yandex": {
+    "voice": "ermil",
+    "speed": 0.9,
+    "pitch": 0.94
    }
   },
   "kovpak": {
