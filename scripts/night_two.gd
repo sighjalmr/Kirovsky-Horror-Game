@@ -52,6 +52,8 @@ const N2_G_SEEN := "Увидел. Теперь он знает, что я за �
 const N2_G_WATCH := "Милицейский «бобик» за киоском, фары погашены, мотор заглушён. За рулём Колесников. Курит и смотрит не на дорогу, а на наш магазин. Ушёл, значит, пешком."
 const N2_G_SNEAKS := "Колесников вылез из машины и пошёл вдоль стены, к заднему двору. Без фонаря. Дорогу знает."
 const N2_G_CAR := "«Бобик» пустой. Капот ещё тёплый. В пепельнице окурки «Космоса», на заднем сиденье сумка Нины. До отделения он её так и не довёз."
+## The same when he went away without Nina's bag (Gordeev had hidden it).
+const N2_G_CAR_NO_BAG := "«Бобик» пустой. Капот ещё тёплый. В пепельнице окурки «Космоса», на сиденье планшет с чистыми бланками протоколов. Чистыми."
 const N2_G_CAR_AGAIN := "«Бобик» стоит, где стоял. Хозяина нет."
 const N2_G_DRIVES := "За киоском завёлся мотор. «Бобик» уехал без фар."
 const N2_G_2245 := "Понедельник, двадцать два сорок пять. Магазин снова мой до шести. Только сумки Нины в нём больше нет."
@@ -409,7 +411,8 @@ func street_notes() -> PackedStringArray:
 	if street.get("sneaks", false):
 		out.append("— В 23:03 вылез и пошёл вдоль стены к заднему двору. В 23:05 хлопнула дверь склада.")
 	if street.get("car", false):
-		out.append("— В «бобике» окурки «Космоса» и сумка Нины. В отделение он её не повёз.")
+		out.append("— В «бобике» окурки «Космоса» и сумка Нины. В отделение он её не повёз." if street.get("car_bag", false)
+			else "— В «бобике» окурки «Космоса».")
 	return out
 
 
@@ -517,8 +520,9 @@ func interact(id: String) -> bool:
 				hud.say(N2_G_CAR_AGAIN, -1.0, true)
 			else:
 				street["car"] = true
+				street["car_bag"] = kolesnikov.body.bag != null
 				Sfx.play_3d(main.view, "cloth", main.player.global_position + Vector3(0, 1, 0), -10.0)
-				hud.say(N2_G_CAR, -1.0, true)
+				hud.say(N2_G_CAR if street.car_bag else N2_G_CAR_NO_BAG, -1.0, true)
 				update_notebook()
 		"talk_kolesnikov":
 			kolesnikov.look_at_point(main.player.global_position)
