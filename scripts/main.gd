@@ -136,6 +136,17 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--autoshot="):
 			shot_dir = a.get_slice("=", 1)
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--streetshot="):
+			var ss: Node = load("res://scripts/dev_streetshot.gd").new().with(self)
+			ss.set("out_dir", a.get_slice("=", 1))
+			add_child(ss)
+			return
+		if a.begins_with("--streettest="):
+			var st: Node = load("res://scripts/dev_streettest.gd").new().with(self)
+			st.set("out_dir", a.get_slice("=", 1))
+			add_child(st)
+			return
 	if "--nighttest" in OS.get_cmdline_user_args():
 		var test := "res://scripts/dev_night2test.gd" if chapter == "night2" else "res://scripts/dev_nighttest.gd"
 		add_child(load(test).new().with(self))
@@ -397,6 +408,8 @@ func _update_env(delta: float) -> void:
 	env.fog_depth_begin = lerpf(1.0, 2.0, _lit)
 	env.fog_depth_end = lerpf(7.5, 12.0, _lit)
 	post.set_shader_parameter("grain", lerpf(0.11, 0.07, _lit))
+	if night and night.outdoors:
+		night.outdoors.blend_env(env)
 
 
 func _update_interaction() -> void:

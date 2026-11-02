@@ -153,7 +153,9 @@ func _physics_process(delta: float) -> void:
 	dir.y = 0.0
 	velocity = dir.normalized() * speed * minf(move.length(), 1.0) if dir.length() > 0.01 else Vector3.ZERO
 	move_and_slide()
-	global_position.y = 0.0
+	# On the hall floor, or out on the square: the porch, the steps, the asphalt.
+	var g := Outdoors.ground_for(self)
+	global_position.y = 0.0 if is_nan(g) else g
 	var moved := velocity.length()
 
 	if not dead:

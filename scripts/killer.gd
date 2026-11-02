@@ -116,8 +116,8 @@ func _start_leave() -> void:
 func hear(pos: Vector3, radius: float) -> void:
 	if state in [State.INACTIVE, State.CHASE, State.ATTACK, State.LEAVE]:
 		return
-	if global_position.distance_to(pos) > radius:
-		return
+	if global_position.distance_to(pos) > radius or Outdoors.is_out(pos):
+		return  # out on the square, behind glass and rain
 	state = State.INVESTIGATE
 	_wait = 0.0
 	_go_to(pos)
@@ -255,7 +255,7 @@ func _dist_to_player() -> float:
 
 
 func _sees_player() -> bool:
-	if player.dead or blind or player.hidden:
+	if player.dead or blind or player.hidden or Outdoors.is_out(player.global_position):
 		return false
 	var eye := global_position + Vector3(0, 1.7, 0)
 	var tgt := player.global_position + Vector3(0, player.sight_height(), 0)
