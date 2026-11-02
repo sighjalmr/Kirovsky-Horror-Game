@@ -35,6 +35,10 @@ func _ready() -> void:
 		await _hall_shots(p, store, night)
 		get_tree().quit()
 		return
+	if "--lifeshot" in OS.get_cmdline_user_args():
+		await _life_shots(p, store, night)
+		get_tree().quit()
+		return
 	if "--goodsshot" in OS.get_cmdline_user_args():
 		await _goods_shots(p, store, night)
 		get_tree().quit()
@@ -210,6 +214,37 @@ func _goods_shots(p: Player, store: Store, night: NightOne) -> void:
 		store.switch_off(i, true)
 	p.force_flashlight = true
 	for v: Array in [views[0], views[3]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = -v[3]
+		await _wait(0.8)
+		await _shot(v[0] + "_dark")
+
+
+## The equipment and the life of the shop (--lifeshot): the tills, the
+## register close up, the guard booth, the entrance with the control scales,
+## the back passage with the cartons, the juice on the floor, the crates.
+func _life_shots(p: Player, store: Store, night: NightOne) -> void:
+	main.hud.visible = false
+	night.kovpak.visible = false
+	night.tamara.visible = false
+	var views := [
+		["l1_tills", Vector3(-4.6, 0, 5.4), Vector3(0.9, 0, 1), 0.12],
+		["l2_register", Vector3(-1.3, 0, 7.2), Vector3(-1, 0, 0.35), 0.45],
+		["l3_booth", Vector3(8.2, 0, 3.6), Vector3(1, 0, -0.6), 0.2],
+		["l4_entrance", Vector3(-1.5, 0, 4.0), Vector3(-0.6, 0, -1), 0.12],
+		["l5_back", Vector3(-3.0, 0, 25.0), Vector3(0.2, 0, 1), 0.15],
+		["l6_juice", Vector3(3.0, 0, 20.4), Vector3(0.1, 0, 1), 0.55],
+		["l7_crates", Vector3(9.6, 0, 24.6), Vector3(0.6, 0, 1), 0.3],
+	]
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = -v[3]
+		await _wait(0.8)
+		await _shot(v[0])
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in [views[0], views[5]]:
 		_place(p, v[1], v[2])
 		p.head.rotation.x = -v[3]
 		await _wait(0.8)
