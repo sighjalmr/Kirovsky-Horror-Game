@@ -19,7 +19,6 @@ const POSE := [
 ]
 
 var hip := Vector3.ZERO
-var _fitted := false
 var _spine := -1
 
 
@@ -38,10 +37,9 @@ func _process(delta: float) -> void:
 	if _spine < 0:
 		_spine = skeleton.find_bone("Bip01 Spine1")
 	skeleton.set_bone_pose_scale(_spine, Vector3.ONE * 0.001)
-	if not _fitted:
-		# Sit the pelvis on the cushion: move the whole avatar so the
-		# pelvis bone lands on `hip`.
-		var pelvis := skeleton.find_bone("Bip01 Pelvis")
-		var at := (_model.transform * skeleton.transform * skeleton.get_bone_global_pose(pelvis)).origin
-		position = hip - at
-		_fitted = true
+	# Sit the pelvis on the cushion: move the whole avatar so the pelvis
+	# bone lands on `hip` (every frame: the seated pose only settles once
+	# the clip has run in the tree).
+	var pelvis := skeleton.find_bone("Bip01 Pelvis")
+	var at := (_model.transform * skeleton.transform * skeleton.get_bone_global_pose(pelvis)).origin
+	position = hip - at

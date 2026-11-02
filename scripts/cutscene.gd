@@ -222,6 +222,22 @@ func shot(dur: float, p0: Vector3, l0: Variant, p1: Vector3, l1: Variant, fov :=
 
 ## The camera inside a car, at the driver's eyes, looking out ahead.
 func ride(dur: float, car: Node3D, fov := 62.0) -> void:
+	# The seats' cloth is all one mesh, and the near edge of it shows as a
+	# dark slab across the bottom of the view from the wheel: hide it for
+	# the shot (nothing of the seats is in view from there anyway).
+	var seats: Array[MeshInstance3D] = []
+	for mi: MeshInstance3D in car.find_children("*", "MeshInstance3D", true, false):
+		var m := mi.material_override as ShaderMaterial
+		var tex: Texture2D = m.get_shader_parameter("albedo_tex") if m else null
+		if tex and tex.resource_path.ends_with("car_seat.png") and mi.visible:
+			mi.visible = false
+			seats.append(mi)
+	await _ride(dur, car, fov)
+	for mi in seats:
+		mi.visible = true
+
+
+func _ride(dur: float, car: Node3D, fov: float) -> void:
 	_shot = {"dur": dur, "car": car}
 	_shot_t = 0.0
 	cam.fov = fov * 1.1 if vertical() else fov
@@ -577,12 +593,12 @@ func _night_one() -> void:
 	# A tour of the estate before he comes: the far block, its lit windows
 	# and an entrance with its lamp in the rain.
 	say(N1_BLOCKS)
-	await shot(6.0, Vector3(-25, 1.7, -15), Vector3(-44, 22, 2), Vector3(-27, 1.6, -13.5), Vector3(-44, 6, -6), 52.0, 0.3)
-	await shot(5.0, Vector3(-38.6, 1.25, -14.2), Vector3(-44, 1.7, -10), Vector3(-39.6, 1.25, -13.0), Vector3(-44, 1.5, -10),
+	await shot(7.5, Vector3(-25, 1.7, -15), Vector3(-44, 22, 2), Vector3(-27, 1.6, -13.5), Vector3(-44, 6, -6), 52.0, 0.3)
+	await shot(7.0, Vector3(-38.6, 1.25, -14.2), Vector3(-44, 1.7, -10), Vector3(-39.6, 1.25, -13.0), Vector3(-44, 1.5, -10),
 		46.0, 0.4)
 	# The empty bus stop by the road.
 	say(N1_STOP)
-	await shot(7.5, Vector3(-32.8, 1.2, -25.6), Vector3(-38, 1.35, -20.4), Vector3(-34.6, 1.25, -24.9), Vector3(-38.4, 1.3, -20.4),
+	await shot(8.0, Vector3(-32.8, 1.2, -25.6), Vector3(-38, 1.35, -20.4), Vector3(-34.6, 1.25, -24.9), Vector3(-38.4, 1.3, -20.4),
 		45.0, 0.4)
 	# The «Союзпечать» kiosk, shut for the night.
 	say(N1_KIOSK)
@@ -598,7 +614,7 @@ func _night_one() -> void:
 	root.add_child(flood)
 	flood.global_position = Vector3(46, 25.0, -3.0)
 	flood.look_at(Vector3(46, 27.8, 3.3))
-	await shot(7.0, Vector3(36, 2.5, -24), Vector3(42, 14, 2), Vector3(38, 9, -22), Vector3(46, 27.8, 3.3), 42.0, 0.3)
+	await shot(7.5, Vector3(36, 2.5, -24), Vector3(42, 14, 2), Vector3(38, 9, -22), Vector3(46, 27.8, 3.3), 42.0, 0.3)
 	# The phone booths by the store.
 	say(N1_PHONE)
 	var booth := OmniLight3D.new()  # the bulb under the booth's roof
@@ -607,12 +623,12 @@ func _night_one() -> void:
 	booth.omni_range = 5.0
 	root.add_child(booth)
 	booth.global_position = Vector3(14.3, 2.0, -2.2)
-	await shot(9.5, Vector3(11.0, 1.5, -8.2), Vector3(14.0, 1.6, -2), Vector3(12.0, 1.5, -7.0), Vector3(14.0, 1.5, -2),
+	await shot(10.5, Vector3(11.0, 1.5, -8.2), Vector3(14.0, 1.6, -2), Vector3(12.0, 1.5, -7.0), Vector3(14.0, 1.5, -2),
 		44.0, 0.4)
 	# Along the road: headlights in the rain, the car turns into the square.
-	_drive(0.0, 21.0)
+	_drive(0.0, 22.5)
 	say(N1_JOB)
-	await shot(6.5, Vector3(-4, 0.7, Exterior.ROAD_Z + 5.8), ext.zhiguli, Vector3(-3.5, 0.75, Exterior.ROAD_Z + 5.6), ext.zhiguli,
+	await shot(7.0, Vector3(-4, 0.7, Exterior.ROAD_Z + 5.8), ext.zhiguli, Vector3(-3.5, 0.75, Exterior.ROAD_Z + 5.6), ext.zhiguli,
 		38.0, 0.3)
 	# From the driver's seat: wipers, the letters coming up through the rain.
 	_wiping = true
@@ -620,24 +636,24 @@ func _night_one() -> void:
 	var wipe := sound("wiper", -12.0)
 	(wipe as AudioStreamPlayer).finished.connect(func(): if is_instance_valid(wipe) and _wiping: (wipe as AudioStreamPlayer).play())
 	say(N1_SUROVA)
-	await ride(5.0, ext.zhiguli)
+	await ride(6.0, ext.zhiguli)
 	# Down in the footwell: his old shoes on the pedals, the rubber mat.
-	await inside(4.0, ext.zhiguli, Vector3(-0.34, 1.0, 0.02), Vector3(-0.4, 0.4, -0.55))
+	await inside(4.5, ext.zhiguli, Vector3(-0.34, 1.0, 0.02), Vector3(-0.4, 0.4, -0.55))
 	_wiping = false
 	inside.queue_free()
 	wipe.queue_free()
 	# Outside, by the steps: he pulls up beside the «Волга», lights off.
 	say(N1_NINA)
-	await shot(5.5, Vector3(-5.5, 1.5, -18.5), ext.zhiguli, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), 40.0)
+	await shot(6.0, Vector3(-5.5, 1.5, -18.5), ext.zhiguli, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), 40.0)
 	Vehicles.set_lights(ext.zhiguli, false)
 	sound("click", -8.0, ext.zhiguli)
 	if is_instance_valid(_engine):
 		_tween().tween_property(_engine, "volume_db", -60.0, 1.5)
-	await shot(5.0, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
+	await shot(5.5, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
 	# The letters over the canopy, the arrow, the rain in the lamplight.
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
 	say(N1_VOLGA)
-	await shot(6.5, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
+	await shot(7.0, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
 	# Up the steps to the doors; Ковпак waits behind the glass.
 	say(N1_GO)
 	await shot(6.0, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),

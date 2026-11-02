@@ -170,6 +170,14 @@ static func build(car: Node3D, s: Dictionary) -> void:
 	car.add_child(legs)
 	for mi: MeshInstance3D in legs.find_children("*", "MeshInstance3D", true, false):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The skirts of his coat over his lap.
+	var lap := MeshBuilder.Kit.new()
+	lap.ao = false
+	var wool := lap.b("guard_wool")
+	wool.ellipsoid(Props.at(-0.36, 0.6, 0.16), Vector3(0.23, 0.075, 0.2), 20, 10)
+	for sx: float in [-0.12, 0.12]:
+		wool.ellipsoid(Props.rot(Vector3.RIGHT, 0.12, Vector3(-0.36 + sx, 0.6, 0.0)), Vector3(0.1, 0.06, 0.16), 16, 8)
+	lap.build(car, false)
 
 	# A little of the dash's light falls into the footwell.
 	var well := OmniLight3D.new()
