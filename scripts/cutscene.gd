@@ -81,9 +81,18 @@ func _init(m: Main, kind_: String) -> void:
 			shot_dir = a.get_slice("=", 1)
 
 
+## Dev: `--vertical` frames everything for a 1080×1920 phone video (run with
+## `--resolution 1080x1920 --write-movie FILE.avi -- --cut=night1
+## --cutonly=night1 --cutquit --vertical`): no letterbox bars, the camera
+## keeps its width, the caption and subtitles move to fit.
+static func vertical() -> bool:
+	return "--vertical" in OS.get_cmdline_user_args()
+
+
 func _ready() -> void:
+	var size := Vector2(1080, 1920) if vertical() else Vector2(1920, 1080)
 	view = SubViewport.new()
-	view.size = Vector2i(Main.RENDER_W, Main.RENDER_H)
+	view.size = Vector2i(size)
 	view.own_world_3d = true
 	view.msaa_3d = Viewport.MSAA_4X
 	view.audio_listener_enable_3d = true
@@ -92,13 +101,13 @@ func _ready() -> void:
 	add_child(view)
 	var screen := TextureRect.new()
 	screen.texture = view.get_texture()
-	screen.size = Vector2(1920, 1080)
+	screen.size = size
 	screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	screen.stretch_mode = TextureRect.STRETCH_SCALE
 	post = main.post.duplicate()
 	screen.material = post
 	add_child(screen)
-	for y: float in [0.0, 1080.0 - 118.0]:
+	for y: float in ([] if vertical() else [0.0, 1080.0 - 118.0]):
 		var bar := ColorRect.new()
 		bar.color = Color.BLACK
 		bar.position = Vector2(0, y)
@@ -114,11 +123,15 @@ func _ready() -> void:
 	_caption.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	_caption.add_theme_constant_override("shadow_offset_x", 2)
 	_caption.add_theme_constant_override("shadow_offset_y", 2)
+	if vertical():
+		_caption.position = Vector2(70, 230)
+		_caption.size = Vector2(940, 200)
+		_caption.add_theme_font_size_override("font_size", 40)
 	_caption.modulate.a = 0.0
 	add_child(_caption)
 	_black = ColorRect.new()
 	_black.color = Color.BLACK
-	_black.size = Vector2(1920, 1080)
+	_black.size = size
 	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_black)
 
@@ -127,6 +140,8 @@ func _ready() -> void:
 	cam = Camera3D.new()
 	cam.fov = 45.0
 	cam.far = 400.0
+	if vertical():
+		cam.keep_aspect = Camera3D.KEEP_WIDTH
 	root.add_child(cam)
 	cam.current = true
 	_play.call_deferred()
@@ -192,7 +207,7 @@ func wait(t: float) -> void:
 func shot(dur: float, p0: Vector3, l0: Variant, p1: Vector3, l1: Variant, fov := 45.0, sway := 0.6) -> void:
 	_shot = {"dur": dur, "p0": p0, "l0": l0, "p1": p1, "l1": l1, "sway": sway}
 	_shot_t = 0.0
-	cam.fov = fov
+	cam.fov = fov * 1.1 if vertical() else fov
 	_place_camera()
 	_shot_n += 1
 	if shot_dir != "":
@@ -209,7 +224,7 @@ func shot(dur: float, p0: Vector3, l0: Variant, p1: Vector3, l1: Variant, fov :=
 func ride(dur: float, car: Node3D, fov := 62.0) -> void:
 	_shot = {"dur": dur, "car": car}
 	_shot_t = 0.0
-	cam.fov = fov
+	cam.fov = fov * 1.1 if vertical() else fov
 	_place_camera()
 	_shot_n += 1
 	if shot_dir != "":
@@ -553,7 +568,15 @@ func _night_one() -> void:
 		45.0, 0.4)
 	# The slogan on the roof of the block beside the store.
 	say(N1_SLOGAN)
-	await shot(7.0, Vector3(25, 1.6, -24), Vector3(38, 8, 2), Vector3(25.5, 2.0, -25), Vector3(46, 28.5, 3.3), 46.0, 0.3)
+	var flood := SpotLight3D.new()  # the floodlight on the roof edge
+	flood.light_color = Color(1.0, 0.85, 0.7)
+	flood.light_energy = 6.0
+	flood.spot_range = 9.0
+	flood.spot_angle = 50.0
+	root.add_child(flood)
+	flood.global_position = Vector3(46, 25.0, -3.0)
+	flood.look_at(Vector3(46, 27.8, 3.3))
+	await shot(7.0, Vector3(36, 2.5, -24), Vector3(42, 14, 2), Vector3(38, 9, -22), Vector3(46, 27.8, 3.3), 42.0, 0.3)
 	# The phone booths by the store.
 	say(N1_PHONE)
 	var booth := OmniLight3D.new()  # the bulb under the booth's roof
