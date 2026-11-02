@@ -23,23 +23,32 @@ const ZHIGULI_SPOT := Vector3(4.6, 0, -11.4)
 const ROAD_Z := -27.0
 
 var look := "night"
+## Built into the night store as the square Gordeev can walk out onto: no
+## sky or sun of its own (the store's environment serves), no lobby behind the
+## glass (the real store is there), a gap in the glazing for the real doors.
+var embedded := false
 var zhiguli: Node3D
 var volga: Node3D
 var env: Environment
 var sun: DirectionalLight3D
 var rain: CPUParticles3D
 var sign_mats: Array[ShaderMaterial] = []
+## The phone booths' node; in the night store the right one's handset is
+## left off its hook for the call of night one (see Outdoors).
+var booths: Node3D
 var _lit_windows: Array[Node3D] = []
 var _rng := RandomNumberGenerator.new()
 
 
-func _init(look_: String = "night") -> void:
+func _init(look_: String = "night", embedded_ := false) -> void:
 	look = look_
+	embedded = embedded_
 	_rng.seed = 1988
 
 
 func _ready() -> void:
-	_build_env()
+	if not embedded:
+		_build_env()
 	_build_ground()
 	_build_store()
 	_build_blocks()
@@ -53,6 +62,13 @@ func _ready() -> void:
 	add_child(volga)
 	volga.position = VOLGA_SPOT
 	volga.rotation.y = PI  # nose to the steps
+	if embedded:
+		# The store has its own «Волга» that comes and goes; Gordeev's
+		# «Жигули» stands where he parked it at 22:20.
+		volga.visible = false
+		zhiguli.visible = true
+		zhiguli.position = ZHIGULI_SPOT
+		zhiguli.rotation.y = PI
 	if look == "night":
 		_build_rain()
 
@@ -172,15 +188,22 @@ func _build_store() -> void:
 	# The glazed front under the canopy: the store's own doors at x -2..2.
 	var gx0 := -4.5
 	var gx1 := 9.5
-	box(Vector3((gx0 + gx1) * 0.5, PORCH, 0.05), Vector3(gx1 - gx0, CANOPY_Y - PORCH, 0.06), "glass",
-		Color(0.55, 0.62, 0.62, 0.35), Vector2(1.95, 2.4), MeshFactory.NZ, Color.BLACK, 2.0, Mats.GLASS)
+	# Built into the store, the real doors fill x -2..2 and the glass above them.
+	var panes: Array = [Vector2(gx0, gx1)] if not embedded else [Vector2(gx0, -2.0), Vector2(2.0, gx1)]
+	for pn: Vector2 in panes:
+		box(Vector3((pn.x + pn.y) * 0.5, PORCH, 0.05), Vector3(pn.y - pn.x, CANOPY_Y - PORCH, 0.06), "glass",
+			Color(0.55, 0.62, 0.62, 0.35), Vector2(1.95, 2.4), MeshFactory.NZ, Color.BLACK, 2.0, Mats.GLASS)
+	if embedded:
+		box(Vector3(0, PORCH + 2.4, 0.05), Vector3(4.0, CANOPY_Y - PORCH - 2.4, 0.06), "glass",
+			Color(0.55, 0.62, 0.62, 0.35), Vector2(1.95, 2.4), MeshFactory.NZ, Color.BLACK, 2.0, Mats.GLASS)
 	var x := gx0
 	while x <= gx1 + 0.01:
 		box(Vector3(x, PORCH, 0.0), Vector3(0.08, CANOPY_Y - PORCH, 0.12), "chrome", Color(0.75, 0.75, 0.75), 1.0)
 		x += 2.0
 	for y: float in [PORCH + 0.05, PORCH + 2.45, CANOPY_Y - 0.1]:
 		box(Vector3((gx0 + gx1) * 0.5, y, 0.0), Vector3(gx1 - gx0, 0.07, 0.12), "chrome", Color(0.75, 0.75, 0.75), 1.0)
-	_build_lobby()
+	if not embedded:
+		_build_lobby()
 	# Canopy: a flat slab on square white posts, fascia painted dark.
 	box(Vector3(2.5, CANOPY_Y, -2.9), Vector3(15, 0.35, 6.2), "paint", Color(0.82, 0.82, 0.8), 2.0)
 	box(Vector3(2.5, CANOPY_Y + 0.35, -5.95), Vector3(15, 0.25, 0.1), "paint", Color(0.3, 0.3, 0.3), 1.0)
@@ -231,7 +254,9 @@ func _build_store() -> void:
 	box(Vector3(-14.2, 10.5, 0.15), Vector3(19.4, 0.3, 0.5), "paint", Color(0.3, 0.3, 0.3), 1.0)
 	box(Vector3(12.75, 0, 0.15), Vector3(6.5, 6.8, 0.3), "ext_profnastil", red, sheet_m, MeshFactory.NZ | MeshFactory.PX)
 	box(Vector3(12.75, 6.8, 0.15), Vector3(6.5, 0.25, 0.5), "paint", Color(0.3, 0.3, 0.3), 1.0)
-	box(Vector3(-4, 0, 26.5), Vector3(39.6, 12.5, 35), "ext_profnastil", grey, sheet_m, MeshFactory.NZ | MeshFactory.PX | MeshFactory.NX)
+	# Inside the night store this would stand across the hall: start it above the roof.
+	var gy := 7.3 if embedded else 0.0
+	box(Vector3(-4, gy, 26.5), Vector3(39.6, 12.5 - gy, 35), "ext_profnastil", grey, sheet_m, MeshFactory.NZ | MeshFactory.PX | MeshFactory.NX)
 	box(Vector3(2.5, 8.5, 0.15), Vector3(14, 0.25, 0.5), "paint", Color(0.3, 0.3, 0.3), 1.0)
 	# Flat roof between the front and the set-back upper storey.
 	box(Vector3(-4, 8.45, 4.6), Vector3(39.6, 0.1, 8.9), "concrete", Color(0.3, 0.3, 0.3), 4.0, MeshFactory.PY)
@@ -480,7 +505,7 @@ func _build_lamps() -> void:
 func _build_street() -> void:
 	Street.kiosk(self, Vector3(-15.5, 0, -16.8), 0.0)
 	Street.bus_stop(self, Vector3(-38.0, 0.12, ROAD_Z + 6.4), 0.0)
-	Street.phone_booths(self, Vector3(14.3, 0, -2.0), 0.0)
+	booths = Street.phone_booths(self, Vector3(14.3, 0, -2.0), 0.0, 1 if embedded else -1)
 	for u: Vector3 in [Vector3(-4.6, 0, -7.7), Vector3(9.6, 0, -7.7), Vector3(-13.5, 0, -13.4), Vector3(-37.0, 0.12, ROAD_Z + 4.9)]:
 		Street.urn(self, u)
 	Street.bench(self, Vector3(-10.5, 0, -13.5), 0.0)

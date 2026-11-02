@@ -8,7 +8,11 @@ extends Node
 ## 22:50  the rows go dark one by one.
 ## 23:10  the storage door: the killer is in.
 ## 23:30  first round: storage door, fuse panel, signature in the journal.
-## 00:40  the phone at the post.
+## 00:34  the storage door: he goes out.  00:40  the phone at the post: breathing,
+##        and behind it rain and tyres. It is the payphone by the end of the
+##        building; out there the handset hangs on its cord, a «Космос» end on
+##        the floor (the spare key in the booth opens the glass doors).
+## 01:00  the storage door: he is back.
 ## 01:10  бакалея lights up for a second: somebody is at the panel.
 ## 01:40  the killer leaves; 01:50 Kovpak comes back at night, goes into the
 ##        storage room with his own key and carries out a heavy carton.
@@ -123,6 +127,18 @@ const PH_STOP := "Перестал звонить."
 const PH_ANSWER := "— Пост охраны, Гордеев. Слушаю."
 const PH_BREATH := "В трубке молчат. Потом кто-то дышит, ровно, никуда не торопясь."
 const PH_HANGUP := "Короткие гудки. Где-то в зале скрипнула тележка."
+# The street: the spare key, the glass doors, the call from the payphone.
+const DOOR_LOCKED := "Заперто снаружи до шести. Так положено. За стеклом дождь и пустой Сиреневый бульвар."
+const DOOR_NO_KEY := "Заперто снаружи до шести. Запасной ключ от входа висит у меня в будке, под стеклом «При пожаре»."
+const KEY_TAKEN := "Запасной ключ от входа. Под стеклом «Ключ при пожаре», на пломбе. Пломбу потом поправлю, Ковпак не заметит."
+const DOOR_OUT := "Отпер. Пахнет мокрым асфальтом. Пост пустой, пока я снаружи: надолго лучше не уходить."
+const PH_STREET := "За дыханием шумит дождь и шуршат шины. Звонят не из квартиры. Из автомата."
+const G_BOOTH := "Ближние автоматы у торца, справа от крыльца. Две минуты ходу. Запасной ключ от входа в будке."
+const G_CALLER_OUT := "Хлопнула дверь склада. Ушёл? В час ночи, под дождь."
+const G_CALLER_BACK := "Опять дверь склада. Кто звонил из автомата, тот вернулся. Своим ключом, через задний двор."
+const G_FIGURE := "У торца кто-то есть. Ушёл за угол, к заднему двору. Быстро, не оглядываясь."
+const CLUE_BOOTH := "Правая будка. Трубка висит на шнуре и ещё качается, лампочка горит. На полу свежий окурок «Космоса», фильтр примят зубами. Звонили мне отсюда, пять минут назад. Повесил трубку."
+const BOOTH_AGAIN := "Будка пустая. Трубку я повесил, окурок у меня."
 # Morning.
 const V_MORNING := "Вася Кран: — Открывай, служба! Живой, дед?"
 const K_END_OK := "Ковпак: — Подписи на месте. Свободен, Гордеев. До понедельника."
@@ -147,6 +163,16 @@ var kovpak: Npc
 var tamara: Npc
 var vasya: Npc
 
+## The square outside, and what Gordeev did out there: booth_call (heard the
+## street in the receiver), booth (looked into the booth), figure (saw him go).
+var outdoors: Outdoors
+var street := {}
+var has_key := false
+## The call now ringing is the one from the payphone (night one, 00:40).
+var _booth_call := false
+var _figure: Npc
+var _key_mesh: Node3D
+var _butt: Node3D
 ## Places to hide from him: the spot he crouches in, the way he faces, where
 ## he steps back out, the prompt.
 const HIDES := {
@@ -200,6 +226,59 @@ func _ready() -> void:
 		main.store.add_interactable(id, h[2], h[3], 1.0, false)
 	main.store.add_interactable("talk_kovpak", Vector3.ZERO, "Спросить про Нину", 1.6, false, false)
 	main.store.add_interactable("talk_tamara", Vector3.ZERO, "Спросить про седьмое октября", 1.6, false, false)
+	_build_street()
+
+
+## The square round the store, the spare key in the booth, the doors both ways.
+func _build_street() -> void:
+	var store: Store = main.store
+	outdoors = Outdoors.new(main)
+	main.world.add_child(outdoors)
+	store.embed_street(Outdoors.GROUND)
+	# A red box with a glass front on the booth's front wall, the key on a hook inside.
+	var kx := 9.9
+	var kit := MeshBuilder.Kit.new()
+	kit.b("paint", Color(0.6, 0.1, 0.08)).box(Props.at(kx, 1.4, 0.04), Vector3(0.24, 0.3, 0.08))
+	kit.b("glass", Color(0.6, 0.66, 0.66, 0.3), Color.BLACK, Mats.GLASS).box(Props.at(kx, 1.42, 0.085), Vector3(0.2, 0.26, 0.01))
+	kit.build(store, false)
+	var label := Label3D.new()
+	label.text = "КЛЮЧ\nПРИ ПОЖАРЕ"
+	label.font_size = 28
+	label.pixel_size = 0.0018
+	label.modulate = Color(0.95, 0.92, 0.85)
+	label.shaded = true
+	label.position = Vector3(kx, 1.8, 0.09)
+	store.add_child(label)
+	_key_mesh = Node3D.new()
+	var k2 := MeshBuilder.Kit.new()
+	k2.b("chrome", Color(1.1, 0.95, 0.6)).box(Props.at(kx, 1.45, 0.06), Vector3(0.025, 0.09, 0.01))
+	k2.b("chrome", Color(1.1, 0.95, 0.6)).cylinder(Props.rot(Vector3.RIGHT, PI * 0.5, Vector3(kx, 1.56, 0.06)), 0.022, 0.022, 0.008, 12)
+	k2.build(_key_mesh, false)
+	store.add_child(_key_mesh)
+	store.add_interactable("spare_key", Vector3(kx, 0, 0.45), "Взять запасной ключ от входа", 1.2, false)
+	store.add_interactable("door_out", Vector3(-1.0, 0, -1.3), "Запереть дверь", 1.6, false)
+	store.add_interactable("booth", Outdoors.BOOTH + Vector3(0, 0, -1.0), "Осмотреть будку", 1.5, false, false)
+	_door_prompts()
+
+
+func _door_prompts() -> void:
+	var store: Store = main.store
+	var open := store.front_open
+	store.set_interactable("door_front", true,
+		("Запереть дверь" if open else "Отпереть дверь запасным ключом") if has_key else "Подёргать дверь")
+	store.set_interactable("door_out", has_key, "Запереть дверь" if open else "Отпереть дверь")
+	store.set_interactable("spare_key", not has_key)
+
+
+func _toggle_door() -> void:
+	var store: Store = main.store
+	var opening := not store.front_open
+	store.set_front_door(opening)
+	main.on_noise(Vector3(0, 0, 0.6), 6.0)
+	if opening and not street.has("door_said"):
+		street["door_said"] = true
+		main.hud.say(DOOR_OUT, -1.0, true)
+	_door_prompts()
 
 
 func _person(role: String) -> Npc:
@@ -234,7 +313,9 @@ func build_timeline() -> void:
 		var idx := i
 		var r: Dictionary = rounds[i]
 		m.at_min(r.start, func(): _round_start(idx))
-	m.at(0, 40, _ring_phone)
+	m.at(0, 34, _caller_out)
+	m.at(0, 40, _booth_ring)
+	m.at(1, 0, _caller_back)
 	m.at(1, 10, func():
 		store.flicker(0)
 		panel_warm = true
@@ -454,8 +535,29 @@ func interact(id: String) -> bool:
 			hud.say("Касса № 3. Не работает с августа. Под ней окурки «Беломора».", -1.0, true)
 		"journal":
 			_journal()
-		"door_front":
-			hud.say("Заперто снаружи до шести. Так положено. За стеклом дождь и пустой Сиреневый бульвар.", -1.0, true)
+		"door_front", "door_out":
+			if has_key:
+				_toggle_door()
+			else:
+				hud.say(DOOR_NO_KEY, -1.0, true)
+		"spare_key":
+			has_key = true
+			_key_mesh.visible = false
+			Sfx.play_3d(main.view, "keys", main.player.global_position + Vector3(0, 1.2, 0), -8.0)
+			hud.say(KEY_TAKEN, -1.0, true)
+			_door_prompts()
+			update_notebook()
+		"booth":
+			if street.get("booth", false):
+				hud.say(BOOTH_AGAIN, -1.0, true)
+			else:
+				street["booth"] = true
+				Sfx.play_3d(main.view, "pickup", main.player.global_position, -6.0)
+				outdoors.replace_handset()
+				if _butt:
+					_butt.visible = false
+				hud.say(CLUE_BOOTH, -1.0, true)
+				update_notebook()
 		"phone":
 			_answer_phone()
 		"storage_door":
@@ -626,6 +728,11 @@ func update_notebook() -> void:
 	if not clues.values().has(false):
 		lines.append("")
 		lines.append(FINAL_ENTRY)
+	var sn := street_notes()
+	if not sn.is_empty():
+		lines.append("")
+		lines.append("Улица:")
+		lines.append_array(sn)
 	lines.append("")
 	lines.append("Подозреваемые: Ковпак (директор), Вася Кран (грузчик), Ринат (мясник), Колесников (участковый), Эдик (фарцовщик), Тамара Ивановна (кассир).")
 	lines.append("")
@@ -670,9 +777,17 @@ func objectives() -> Array:
 			if k == "invoice" and kovpak_state != "done":
 				continue   # nobody knows about the delivery note before Kovpak drops it
 			out.append(task(CLUE_TASKS[k], clues[k], true))
+	_street_tasks(out)
 	_round_tasks(out)
 	_killer_task(out)
 	return out
+
+
+func _street_tasks(out: Array) -> void:
+	if street.get("booth_call", false) and not street.get("booth", false):
+		out.append(task("Звонили из автомата у торца: сходить посмотреть"))
+		out.append(task("Запасной ключ от входа (в будке)", has_key, true))
+		out.append(task("Будки справа от крыльца", false, true))
 
 
 func _phone_task(out: Array) -> void:
@@ -719,7 +834,15 @@ func clue_marks() -> Array:
 		out.append(store.chests[Store.CLUE_CHEST].pos + Vector3(0, 0.85, 0))
 	if not clues.invoice and kovpak_state == "done":
 		out.append(Vector3(9.5, 0.03, 26.6))
+	_street_marks(out)
 	return out
+
+
+func _street_marks(out: Array) -> void:
+	if street.get("booth_call", false) and not street.get("booth", false):
+		out.append(Outdoors.BOOTH + Vector3(0, 1.1, 0))
+		if not has_key:
+			out.append(Vector3(9.9, 1.45, 0.1))
 
 
 # --- the phone --------------------------------------------------------------------
@@ -760,6 +883,7 @@ func _update_radio(delta: float) -> void:
 
 
 func update(delta: float) -> void:
+	_watch_street()
 	_update_radio(delta)
 	if _phone_t <= 0.0:
 		return
@@ -783,6 +907,11 @@ func _answer_phone() -> void:
 	Sfx.play_3d(main.view, "pickup", main.store.phone_pos, -4.0)
 	hud.say(PH_ANSWER, 2.5, true)
 	hud.say(PH_BREATH, 4.0)
+	var from_booth := _booth_call
+	_booth_call = false
+	if from_booth:
+		hud.say(PH_STREET, 4.5)
+		Sfx.play_2d(self, "rain", -22.0)
 	Sfx.play_2d(self, "breath", -6.0)
 	if main.killer.is_active():
 		main.killer.wander_to(main.store.random_patrol_point())
@@ -791,6 +920,86 @@ func _answer_phone() -> void:
 		return
 	hud.say(PH_HANGUP)
 	main.player.busy = false
+	if from_booth:
+		street["booth_call"] = true
+		hud.say(G_BOOTH)
+		update_notebook()
+
+
+# --- the call from the payphone -----------------------------------------------------
+
+func _caller_out() -> void:
+	if killer_phase != "in":
+		return
+	if main.chasing:
+		main.after(2.0, _caller_out)
+		return
+	if not main.killer.is_active():
+		return
+	main.killer.leave()
+	await main.killer.left
+	main.store.close_storage_door()
+	door_shut_by = "killer"
+	killer_phase = "out"
+	main.hud.say(G_CALLER_OUT, -1.0, true)
+
+
+func _booth_ring() -> void:
+	if killer_phase == "in" and main.minutes < Main.clock(1, 20):
+		main.after(2.0, _booth_ring)
+		return
+	if killer_phase == "out":
+		# He rings from the payphone and leaves the handset hanging.
+		_booth_call = true
+		outdoors.hang_handset()
+		_butt = outdoors.drop_butt(Outdoors.BOOTH + Vector3(0.12, 0.05, -0.12))
+		main.store.set_interactable("booth", true)
+	_ring_phone()
+
+
+func _caller_back() -> void:
+	if killer_phase != "out" or main.minutes >= Main.clock(1, 40):
+		return
+	_killer_in()
+	main.hud.say(G_CALLER_BACK, -1.0, true)
+
+
+## Gordeev out of the doors while the caller is still about: a man in black
+## going round the corner of the building, towards the back yard.
+func _watch_street() -> void:
+	if street.has("figure") or not street.get("booth_call", false) or killer_phase != "out":
+		return
+	if not Outdoors.is_out(main.player.global_position):
+		return
+	street["figure"] = true
+	_figure = Npc.new().setup_body(Characters.build_killer())
+	main.world.add_child(_figure)
+	_figure.speed = 1.7
+	_figure.global_position = Vector3(17.2, Outdoors.GROUND, -6.0)
+	_figure.walk(PackedVector3Array([Vector3(17.4, 0, -2.0), Vector3(17.8, 0, 2.5)]))
+	main.hud.say(G_FIGURE, -1.0, true)
+	await _figure.arrived
+	_figure.queue_free()
+	_figure = null
+
+
+## Gordeev is let back in for the morning scene if he is still outside.
+func _come_in() -> void:
+	if Outdoors.is_out(main.player.global_position):
+		main.player.global_position = Vector3(0.6, 0, 2.4)
+		main.player.face(Vector3(0, 0, -1))
+
+
+## What the square added to the notebook.
+func street_notes() -> PackedStringArray:
+	var out := PackedStringArray()
+	if street.get("booth", false):
+		out.append("— В 00:40 звонили из автомата у торца. Трубка брошена, на полу свежий «Космос», фильтр примят зубами.")
+	elif street.get("booth_call", false):
+		out.append("— В 00:40 звонили из уличного автомата: в трубке дождь. Ближние будки у торца.")
+	if street.get("figure", false):
+		out.append("— Кто-то в чёрном ушёл от будок за угол, к заднему двору.")
+	return out
 
 
 func stop_sounds() -> void:
@@ -804,6 +1013,7 @@ func stop_sounds() -> void:
 func _morning() -> void:
 	var store: Store = main.store
 	var hud: Hud = main.hud
+	_come_in()
 	main.begin_morning()
 	if main.killer.is_active():
 		main.killer.deactivate()
@@ -851,7 +1061,7 @@ func save_state() -> Dictionary:
 			lifted.append(id)
 	return {"clues": clues.duplicate(), "rounds": rounds.duplicate(true), "killer_phase": killer_phase,
 		"kovpak_state": kovpak_state, "panel_warm": panel_warm, "lifted": lifted, "talked": _talked.duplicate(),
-		"leaving": main.killer.leaving, "door_shut_by": door_shut_by}
+		"leaving": main.killer.leaving, "door_shut_by": door_shut_by, "street": street.duplicate(), "has_key": has_key}
 
 
 func restore_state(d: Dictionary) -> void:
@@ -863,6 +1073,14 @@ func restore_state(d: Dictionary) -> void:
 	panel_warm = d.panel_warm
 	door_shut_by = d.get("door_shut_by", "")
 	_talked = d.talked.duplicate()
+	street = d.get("street", {}).duplicate()
+	has_key = d.get("has_key", false)
+	_key_mesh.visible = not has_key
+	_door_prompts()
+	if street.get("booth_call", false) and not street.get("booth", false):
+		outdoors.hang_handset()
+		_butt = outdoors.drop_butt(Outdoors.BOOTH + Vector3(0.12, 0.05, -0.12))
+		store.set_interactable("booth", true)
 	_talked["kovpak_walk"] = true
 	_talked["tamara_walk"] = true
 	for id: String in d.lifted:

@@ -129,3 +129,111 @@ static func set_lights(car: Node3D, on: bool, energy := HEADLIGHT) -> void:
 	(car.get_meta("tail") as ShaderMaterial).set_shader_parameter("emission",
 		Color(1.6, 0.1, 0.05) if on else Color(0.2, 0.01, 0.0))
 	CarCabin.set_dash(car, on)
+
+
+## The участковый's «бобик»: a militia УАЗ-469 of 1988, built from boxes
+## here rather than in Blender (it is only ever seen at night, parked).
+## Yellow body with the blue band and «МИЛИЦИЯ», a hard white-grey top, the
+## spare wheel on the tailgate, the blue lamp on the roof. Nose towards -Z,
+## wheels on the ground at y = 0, driver on the left (-X). Same metas as the
+## other cars: "beams", "lamps", "tail"; and "seat", the driver's hip point.
+static func bobik() -> Node3D:
+	var car := Node3D.new()
+	var kit := MeshBuilder.Kit.new()
+	var yellow := kit.b("paint", Color(0.78, 0.62, 0.2))
+	var blue := kit.b("paint", Color(0.12, 0.2, 0.42))
+	var top := kit.b("paint", Color(0.72, 0.72, 0.68))
+	var black := kit.b("rubber", Color(0.06, 0.06, 0.06))
+	var metal := kit.b("metal", Color(0.3, 0.31, 0.3))
+	var glass := kit.b("glass", Color(0.1, 0.12, 0.14, 0.45), Color.BLACK, Mats.GLASS)
+	var hw := 0.88
+	# Body tub below the belt: the bonnet in front, the cab and the boot behind.
+	yellow.box(Props.at(0, 0.48, 0.15), Vector3(hw * 2, 0.62, 3.1))                 # cab and boot
+	yellow.box(Props.at(0, 0.5, -1.55), Vector3(hw * 2 - 0.1, 0.55, 1.2))          # bonnet
+	yellow.box(Props.rot(Vector3.RIGHT, -0.05, Vector3(0, 1.05, -1.55)), Vector3(hw * 2 - 0.12, 0.04, 1.18))
+	# Wings over the wheels.
+	for sx: float in [-1.0, 1.0]:
+		for wz: float in [-1.2, 1.15]:
+			yellow.box(Props.at(sx * (hw - 0.04), 0.78, wz), Vector3(0.2, 0.16, 0.95))
+	# The blue band along both sides and the word on it.
+	for sx: float in [-1.0, 1.0]:
+		blue.box(Props.at(sx * (hw + 0.005), 0.72, 0.15), Vector3(0.01, 0.13, 3.0))
+	var word := Label3D.new()
+	word.text = "МИЛИЦИЯ"
+	word.font_size = 64
+	word.pixel_size = 0.0028
+	word.modulate = Color(0.92, 0.92, 0.88)
+	word.shaded = true
+	word.position = Vector3(-hw - 0.012, 0.785, 0.35)
+	word.rotation.y = -PI * 0.5
+	car.add_child(word)
+	var word2 := word.duplicate() as Label3D
+	word2.position = Vector3(hw + 0.012, 0.785, 0.35)
+	word2.rotation.y = PI * 0.5
+	car.add_child(word2)
+	# Upper cab: pillars, the hard top, glass all round.
+	var belt := 1.1
+	var roof := 1.95
+	var ws := -0.92   # windscreen
+	for sx: float in [-1.0, 1.0]:
+		top.box(Props.at(sx * (hw - 0.04), belt, ws), Vector3(0.06, roof - belt, 0.06))
+		top.box(Props.at(sx * (hw - 0.04), belt, 0.05), Vector3(0.07, roof - belt, 0.08))
+		top.box(Props.at(sx * (hw - 0.04), belt, 1.66), Vector3(0.08, roof - belt, 0.08))
+	top.box(Props.at(0, roof, 0.38), Vector3(hw * 2, 0.06, 2.65))
+	top.box(Props.at(0, belt, 1.67), Vector3(hw * 2, 0.12, 0.06))
+	glass.box(Props.at(0, belt, ws), Vector3(hw * 2 - 0.1, roof - belt, 0.02))
+	for sx: float in [-1.0, 1.0]:
+		glass.box(Props.at(sx * (hw - 0.03), belt, -0.44), Vector3(0.02, roof - belt - 0.05, 0.88))
+		glass.box(Props.at(sx * (hw - 0.03), belt, 0.86), Vector3(0.02, roof - belt - 0.1, 1.55))
+	glass.box(Props.at(0, belt + 0.12, 1.68), Vector3(hw * 2 - 0.2, roof - belt - 0.2, 0.02))
+	metal.box(Props.at(0, belt, ws + 0.02), Vector3(hw * 2, 0.04, 0.04))   # wiper bar
+	# Seats and the wheel, just enough to read through the glass.
+	var seat := kit.b("leather", Color(0.1, 0.09, 0.08))
+	for sx: float in [-0.42, 0.42]:
+		seat.box(Props.at(sx, 0.75, 0.25), Vector3(0.5, 0.12, 0.5))
+		seat.box(Props.rot(Vector3.RIGHT, -0.15, Vector3(sx, 0.85, 0.52)), Vector3(0.5, 0.6, 0.1))
+	black.cylinder(Props.rot(Vector3.RIGHT, -1.1, Vector3(-0.42, 1.08, -0.5)), 0.19, 0.19, 0.03, 16)
+	# Front: the grille between round lamps, bumpers, the number plates.
+	metal.box(Props.at(0, 0.45, -2.16), Vector3(hw * 2 - 0.2, 0.55, 0.04))
+	for k in 7:
+		black.box(Props.at(-0.48 + k * 0.16, 0.5, -2.18), Vector3(0.05, 0.42, 0.02))
+	black.box(Props.at(0, 0.3, -2.25), Vector3(hw * 2 + 0.1, 0.12, 0.1))
+	black.box(Props.at(0, 0.3, 1.72), Vector3(hw * 2 + 0.1, 0.12, 0.1))
+	kit.b("ext_plate").box(Props.at(0, 0.38, -2.31), Vector3(0.52, 0.11, 0.01), Color.WHITE, Rect2(0, 0, 1, 1), Vector2.ONE,
+		MeshFactory.NZ)
+	var lamp_mat := Mats.unique("white", Color(0.85, 0.85, 0.8), Color.BLACK)
+	var tail_mat := Mats.unique("white", Color(0.7, 0.08, 0.06), Color(0.2, 0.01, 0.0))
+	var lamps := kit.custom(lamp_mat)
+	var tails := kit.custom(tail_mat)
+	for sx: float in [-0.62, 0.62]:
+		lamps.cylinder(Props.rot(Vector3.RIGHT, -PI * 0.5, Vector3(sx, 0.72, -2.14)), 0.09, 0.09, 0.04, 14)
+		tails.box(Props.at(sx * 1.25, 0.62, 1.71), Vector3(0.1, 0.16, 0.03))
+	# Spare wheel on the tailgate, four wheels with their grey rims.
+	var tyre := kit.b("rubber", Color(0.07, 0.07, 0.07))
+	var rim := kit.b("metal", Color(0.45, 0.47, 0.42))
+	tyre.cylinder(Props.rot(Vector3.RIGHT, PI * 0.5, Vector3(0.1, 0.95, 1.74)), 0.36, 0.36, 0.22, 16)
+	for sx: float in [-1.0, 1.0]:
+		for wz: float in [-1.2, 1.15]:
+			tyre.cylinder(Props.rot(Vector3.BACK, PI * 0.5, Vector3(sx * (hw - 0.0) + sx * 0.12, 0.38, wz)), 0.38, 0.38, 0.26, 18)
+			rim.cylinder(Props.rot(Vector3.BACK, PI * 0.5, Vector3(sx * (hw + 0.135), 0.38, wz)), 0.2, 0.2, 0.02, 14)
+	# The blue lamp on the roof, dark tonight.
+	kit.b("glass", Color(0.15, 0.3, 0.8, 0.8), Color.BLACK, Mats.GLASS).cylinder(Props.at(0, roof + 0.06, -0.55), 0.09, 0.08,
+		0.16, 14)
+	kit.build(car)
+	var beams: Array[SpotLight3D] = []
+	for sx: float in [-0.62, 0.62]:
+		var l := SpotLight3D.new()
+		l.position = Vector3(sx, 0.72, -2.2)
+		l.rotation.x = deg_to_rad(-4.0)
+		l.spot_range = 30.0
+		l.spot_angle = 30.0
+		l.light_energy = 0.0
+		l.light_color = Color(1.0, 0.92, 0.75)
+		l.shadow_enabled = sx < 0.0
+		car.add_child(l)
+		beams.append(l)
+	car.set_meta("beams", beams)
+	car.set_meta("lamps", [lamp_mat])
+	car.set_meta("tail", tail_mat)
+	car.set_meta("seat", Vector3(-0.42, 0.81, 0.25))
+	return car

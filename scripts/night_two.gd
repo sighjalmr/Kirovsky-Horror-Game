@@ -7,7 +7,15 @@ extends NightOne
 ##        has come «to look at the new guard»; he smokes «Космос» in the hall,
 ##        talks to Gordeev and takes Nina's bag out of locker 31 as evidence,
 ##        with no record and no witnesses. Then both leave by the front.
-## 22:50  the rows go dark.  23:05 the storage door: the killer is in.
+##        Колесников does not go home: his «бобик» stands behind the kiosk
+##        on the square, lights off, and he sits in it smoking, watching the
+##        store. Gordeev can go out (spare key) and creep up to see him; if
+##        Колесников sees him, he sends him back to the post, and the killer
+##        comes back early that night (02:00 instead of 02:40).
+## 22:50  the rows go dark.  23:03 Колесников gets out and goes round the
+##        building to the back yard (later if the prologue ran long; then he
+##        still sits ~12 min first).  Two minutes on, the storage door: he is in.
+## 01:46  after the killer has gone, the «бобик» drives off without lights.
 ## 23:30, 02:20, 04:20  rounds, as on night one.
 ## 00:40  the phone: the duty officer at the security desk says Пахомов, the
 ##        guard of the night of the 7th, was pulled out of Шарташ yesterday.
@@ -53,7 +61,17 @@ const N2_G_SILENT := "Промолчал. Пусть думает, что ста
 const N2_G_TAKES := "Сам открыл тридцать первую, сам вынул сумку. Дорогу к ячейке не спрашивал."
 const N2_KL_BYE := "Колесников: — Спокойной ночи, Гордеев. Не засыпай на посту."
 const N2_K_LOCK := "Ковпак: — Запираю. До шести."
-const N2_G_WALKS := "Колесников ушёл пешком, мимо «Волги». Опорный пункт в двух кварталах."
+const N2_G_WALKS := "Колесников ушёл пешком, мимо «Волги», к киоску. А опорный пункт в другой стороне. Запасной ключ от входа у меня в будке."
+# The square: the «бобик» behind the kiosk.
+const N2_KL_GO := "Колесников (из машины): — Иди на пост, отец. Простудишься."
+const N2_G_SEEN := "Увидел. Теперь он знает, что я за ним смотрю. Этой ночью надо быть осторожнее."
+const N2_G_WATCH := "Милицейский «бобик» за киоском, фары погашены, мотор заглушён. За рулём Колесников. Курит и смотрит не на дорогу, а на наш магазин. Ушёл, значит, пешком."
+const N2_G_SNEAKS := "Колесников вылез из машины и пошёл вдоль стены, к заднему двору. Без фонаря. Дорогу знает."
+const N2_G_CAR := "«Бобик» пустой. Капот ещё тёплый. В пепельнице окурки «Космоса», на заднем сиденье сумка Нины. До отделения он её так и не довёз."
+## The same when he went away without Nina's bag (Gordeev had hidden it).
+const N2_G_CAR_NO_BAG := "«Бобик» пустой. Капот ещё тёплый. В пепельнице окурки «Космоса», на сиденье планшет с чистыми бланками протоколов. Чистыми."
+const N2_G_CAR_AGAIN := "«Бобик» стоит, где стоял. Хозяина нет."
+const N2_G_DRIVES := "За киоском завёлся мотор. «Бобик» уехал без фар."
 const N2_G_2245 := "Понедельник, двадцать два сорок пять. Магазин снова мой до шести. Только сумки Нины в нём больше нет."
 const N2_G_0010 := "В пятницу я выучил: замолчал компрессор, значит, рядом кто-то стоит. Сегодня они молчат чаще."
 const N2_G_PAPER := "У склада что-то блестит на полу."
@@ -88,6 +106,12 @@ const N2_K_END_OK := "Ковпак: — Подписи на месте. Слых
 const N2_G_END := "Ковпак говорит про Пахомова, а смотрит в пол. Днём схожу к Ринату: седьмого он задерживался, мясо рубил."
 
 var kolesnikov: Npc
+## Колесников in the driver's seat of the «бобик» (a second body, seated).
+var koles_seat: Npc
+## before, walking (to the car), sitting, empty (he went round the back), gone
+var koles_car := "before"
+var _sat_at := -INF
+var _seen_t := 0.0
 ## before, talk, gone
 var koles_state := "before"
 ## Gordeev moved Nina's bag to his own locker before Колесников came in.
@@ -121,6 +145,46 @@ func _ready() -> void:
 	_talked["torn"] = true
 	main.store.add_interactable("talk_kolesnikov", Vector3.ZERO, "Заговорить с участковым", 1.7, false, false)
 	main.store.add_interactable("locker12", OWN_LOCKER, N2_OWN_PROMPT, 1.2, false, false)
+	_park_bobik()
+
+
+func _park_bobik() -> void:
+	var car := outdoors.park_bobik()
+	koles_seat = Npc.new().setup("kolesnikov")
+	car.add_child(koles_seat)
+	var seat: Vector3 = car.get_meta("seat")
+	koles_seat.position = seat - Vector3(0, 0.5, 0)
+	koles_seat.pose = "sit"
+	koles_seat.visible = false
+	# His «Космос»: an ember at the fingers that glows up as he draws on it.
+	var ember := OmniLight3D.new()
+	ember.light_color = Color(1.0, 0.45, 0.15)
+	ember.omni_range = 1.2
+	ember.light_energy = 0.6
+	var tip := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.008
+	sm.height = 0.016
+	tip.mesh = sm
+	tip.material_override = Mats.get_mat("white", Color(1, 0.5, 0.2), Color(4.0, 1.4, 0.3))
+	var cig := Node3D.new()
+	cig.add_child(tip)
+	cig.add_child(ember)
+	cig.position = Vector3(0.0, -0.1, -0.06)
+	koles_seat.body.attach("Bip01 R Hand", cig)
+	var glow := ember.create_tween().set_loops()
+	glow.tween_property(ember, "light_energy", 1.5, 0.8)
+	glow.tween_property(ember, "light_energy", 0.4, 2.2)
+	var dome := OmniLight3D.new()
+	dome.name = "Dome"
+	dome.position = Vector3(0, 1.75, 0.2)
+	dome.light_color = Color(1.0, 0.85, 0.6)
+	dome.omni_range = 2.6
+	dome.light_energy = 0.0
+	car.add_child(dome)
+	main.store.add_interactable("bobik_watch", outdoors.bobik_point(Vector3.ZERO), "Присмотреться к машине за киоском", 8.0,
+		false, false)
+	main.store.add_interactable("bobik_car", outdoors.bobik_point(Vector3(-1.3, 0, 0.2)), "Заглянуть в «бобик»", 1.6, true, false)
 
 
 # --- timeline -----------------------------------------------------------------
@@ -137,12 +201,12 @@ func build_timeline() -> void:
 		m.at(22, 50 + i * 3, func():
 			store.switch_off(idx)
 			hud.say(ROW_LINES[idx]))
-	m.at(23, 5, func():
-		_killer_in()
-		hud.say(G_DOOR, -1.0, true)
-		if bag_hidden:
-			# The bag he did not get: first he goes to look at the lockers.
-			main.killer.wander_to(Vector3(-6.5, 0, 1.8)))
+	m.at(23, 3, _koles_leaves_car)
+	m.at(1, 46, _bobik_leaves)
+	m.at(2, 0, func():
+		if street.get("spotted", false):
+			_killer_return())
+	m.at(23, 5, _killer_enters)
 	m.at(0, 10, func(): hud.say(N2_G_0010))
 	for i in rounds.size():
 		var idx := i
@@ -243,7 +307,7 @@ func _prologue() -> void:
 	hud.say(N2_K_LOCK)
 	store.set_front_door(true)
 	await get_tree().create_timer(2.2).timeout
-	kolesnikov.walk(PackedVector3Array([Vector3(-1.0, 0, 0.4), Vector3(-1.0, 0, -2.0), Vector3(-6.0, 0, -6.5)]))
+	_koles_to_car()
 	await get_tree().create_timer(1.2).timeout
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, 0.4), Vector3(-1.0, 0, -2.0)]))
 	await kovpak.arrived
@@ -253,7 +317,6 @@ func _prologue() -> void:
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -6.5)]))
 	await kovpak.arrived
 	kovpak.visible = false
-	kolesnikov.visible = false
 	koles_state = "gone"
 	update_locker_prompt()
 	store.car_start()
@@ -261,6 +324,158 @@ func _prologue() -> void:
 	await get_tree().create_timer(2.5).timeout
 	store.car_leave()
 	hud.say(G_LOCKED)
+
+
+# --- the «бобик» behind the kiosk -------------------------------------------------
+
+## Out of the doors, down the steps and across the square to his car.
+func _koles_to_car() -> void:
+	koles_car = "walking"
+	kolesnikov.walk(PackedVector3Array([Vector3(-1.0, 0, 0.4), Vector3(-1.0, 0, -2.0), Vector3(-1.0, 0, -5.6),
+		Vector3(-1.6, 0, -7.8), Vector3(-5.0, 0, -13.8), Vector3(-12.6, 0, -18.9), outdoors.bobik_point(Vector3(-1.25, 0, 0.3))]))
+	await kolesnikov.arrived
+	if koles_car != "walking":
+		return
+	Sfx.play_3d(main.view, "car_door", kolesnikov.global_position + Vector3(0, 1, 0), -6.0)
+	kolesnikov.visible = false
+	koles_seat.visible = true
+	koles_car = "sitting"
+	_sat_at = main.minutes
+	main.store.set_interactable("bobik_watch", true)
+
+
+## 23:05, the storage door: he is in. He is Колесников, so not before he
+## has got out of the «бобик».
+func _killer_enters() -> void:
+	if koles_car in ["before", "walking", "sitting"]:
+		main.after(1.0, _killer_enters)
+		return
+	_killer_in()
+	main.hud.say(G_DOOR, -1.0, true)
+	if bag_hidden:
+		# The bag he did not get: first he goes to look at the lockers.
+		main.killer.wander_to(Vector3(-6.5, 0, 1.8))
+
+
+func _koles_leaves_car() -> void:
+	# A long talk in the prologue keeps him in the store past 23:03: then he
+	# still sits in the car a while (time to spot him) before he gets out.
+	if koles_car in ["before", "walking"] or (koles_car == "sitting" and main.minutes < _sat_at + 12.0):
+		main.after(1.0, _koles_leaves_car)
+		return
+	if koles_car != "sitting":
+		return
+	koles_car = "empty"
+	street["out_at"] = main._fmt(main.minutes)
+	koles_seat.visible = false
+	main.store.set_interactable("bobik_watch", false)
+	main.store.set_interactable("bobik_car", true)
+	var door := outdoors.bobik_point(Vector3(-1.25, 0, 0.3))
+	Sfx.play_3d(main.view, "car_door", door + Vector3(0, 1, 0), -6.0)
+	if kolesnikov.body.bag:
+		kolesnikov.body.bag.visible = false
+	kolesnikov.visible = true
+	kolesnikov.global_position = door
+	kolesnikov.walk(PackedVector3Array([Vector3(-21.5, 0, -16.5), Vector3(-23.0, 0, -12.0), Vector3(-25.5, 0, -4.0),
+		Vector3(-25.5, 0, 4.0)]))
+	var p: Vector3 = main.player.global_position
+	if Outdoors.is_out(p) and p.distance_to(door) < 35.0:
+		main.hud.say(N2_G_SNEAKS, -1.0, true)
+		street["sneaks"] = true
+		update_notebook()
+	await kolesnikov.arrived
+	kolesnikov.visible = false
+
+
+func _bobik_leaves() -> void:
+	if killer_phase == "in" or main.killer.state == Killer.State.LEAVE:
+		main.after(1.0, _bobik_leaves)
+		return
+	if koles_car == "gone" or outdoors.bobik == null:
+		return
+	koles_car = "gone"
+	main.store.set_interactable("bobik_watch", false)
+	main.store.set_interactable("bobik_car", false)
+	var car := outdoors.bobik
+	var engine := AudioStreamPlayer3D.new()
+	engine.stream = Sfx.get_stream("engine")
+	engine.bus = Sfx.BUS
+	engine.max_distance = 50.0
+	engine.unit_size = 6.0
+	engine.volume_db = -4.0
+	car.add_child(engine)
+	engine.play()
+	var p: Vector3 = main.player.global_position
+	if Outdoors.is_out(p) or p.z < 3.0:
+		main.hud.say(N2_G_DRIVES, -1.0, true)
+	var tw := create_tween()
+	tw.tween_interval(2.0)
+	tw.tween_property(car, "position", car.position + Vector3(-45.0, 0, 0), 9.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(engine, "volume_db", -40.0, 9.0)
+	tw.tween_callback(func():
+		if is_instance_valid(car):
+			car.queue_free()
+		outdoors.bobik = null)
+
+
+## While he sits in the car: does he see Gordeev out on the square?
+func _watch_car(delta: float) -> void:
+	if koles_car != "sitting" or street.get("spotted", false):
+		return
+	var pl: Player = main.player
+	if not Outdoors.is_out(pl.global_position) or not main.phase == Main.Phase.PLAY:
+		_seen_t = maxf(0.0, _seen_t - delta)
+		return
+	var eye := koles_seat.global_position + Vector3(0, 1.15, 0)
+	var tgt := pl.global_position + Vector3(0, pl.sight_height(), 0)
+	var d := eye.distance_to(tgt)
+	var limit := 4.0 if pl.crouching else 9.0
+	if pl.flashlight_on:
+		limit = 24.0
+	var to := (tgt - eye)
+	to.y = 0.0
+	# He watches the store (+z); behind the car he only notices you close by.
+	var facing := to.normalized().dot(Vector3.BACK) > -0.3 or d < 2.5
+	var seen := d < limit and facing
+	if seen:
+		var q := PhysicsRayQueryParameters3D.create(eye, tgt, 1)
+		q.exclude = [pl.get_rid()]
+		seen = main.world.get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+	_seen_t = clampf(_seen_t + (delta if seen else -delta * 0.5), 0.0, 2.0)
+	if _seen_t > 1.1:
+		_spotted()
+
+
+func _spotted() -> void:
+	street["spotted"] = true
+	street["bobik"] = true
+	Vehicles.set_lights(outdoors.bobik, true, 30.0)
+	var dome: OmniLight3D = outdoors.bobik.get_node("Dome")
+	dome.light_energy = 1.4
+	Sfx.play_2d(self, "stinger", -10.0)
+	main.hud.say(N2_KL_GO, -1.0, true)
+	main.hud.say(N2_G_WATCH)
+	main.hud.say(N2_G_SEEN)
+	main.store.set_interactable("bobik_watch", false)
+	update_notebook()
+	await get_tree().create_timer(3.5).timeout
+	if is_instance_valid(outdoors.bobik):
+		Vehicles.set_lights(outdoors.bobik, false)
+		(outdoors.bobik.get_node("Dome") as OmniLight3D).light_energy = 0.0
+
+
+func street_notes() -> PackedStringArray:
+	var out := PackedStringArray()
+	if street.get("bobik", false):
+		out.append("— Колесников не ушёл домой: сидел в «бобике» за киоском, без фар, и смотрел на магазин.")
+	if street.get("spotted", false):
+		out.append("— Он меня видел.")
+	if street.get("sneaks", false):
+		out.append("— В %s вылез и пошёл вдоль стены к заднему двору. Через пару минут хлопнула дверь склада." % street.get("out_at", "23:03"))
+	if street.get("car", false):
+		out.append("— В «бобике» окурки «Космоса» и сумка Нины. В отделение он её не повёз." if street.get("car_bag", false)
+			else "— В «бобике» окурки «Космоса».")
+	return out
 
 
 ## Waits `dm` minutes of game time.
@@ -315,6 +530,7 @@ func _ring(kind: String) -> void:
 func update(delta: float) -> void:
 	var was := _phone_t
 	super(delta)
+	_watch_car(delta)
 	if was > 0.0 and _phone_t <= 0.0 and _call == "dispatch":
 		_calls_missed += 1
 		if _calls_missed == 1:
@@ -372,6 +588,21 @@ func interact(id: String) -> bool:
 				hud.say(N2_LOCKER_OWN, -1.0, true)
 		"register2":
 			hud.say(N2_REGISTER2 if known.get("tape", false) else N2_REGISTER2_LOST, -1.0, true)
+		"bobik_watch":
+			if not street.get("bobik", false):
+				street["bobik"] = true
+				hud.say(N2_G_WATCH, -1.0, true)
+				update_notebook()
+			main.store.set_interactable("bobik_watch", false)
+		"bobik_car":
+			if street.get("car", false):
+				hud.say(N2_G_CAR_AGAIN, -1.0, true)
+			else:
+				street["car"] = true
+				street["car_bag"] = kolesnikov.body.bag != null
+				Sfx.play_3d(main.view, "cloth", main.player.global_position + Vector3(0, 1, 0), -10.0)
+				hud.say(N2_G_CAR if street.car_bag else N2_G_CAR_NO_BAG, -1.0, true)
+				update_notebook()
 		"talk_kolesnikov":
 			kolesnikov.look_at_point(main.player.global_position)
 			hud.say(N2_KL_LATER, -1.0, true)
@@ -450,9 +681,18 @@ func objectives() -> Array:
 			out.append(task("Блестит у двери склада (нужен свет)", clues.token, true))
 		if clues.butt or store.find_by_id("butt").get("active", false):
 			out.append(task("На полу у двери в подвал (нужен свет)", clues.butt, true))
+	_street_tasks(out)
 	_round_tasks(out)
 	_killer_task(out)
 	return out
+
+
+func _street_tasks(out: Array) -> void:
+	if koles_state == "gone" and koles_car in ["walking", "sitting"] and not street.get("bobik", false):
+		out.append(task("Куда пошёл участковый? Выйти на крыльцо"))
+		out.append(task("Запасной ключ от входа (в будке)", has_key, true))
+	elif koles_car == "empty" and street.get("bobik", false) and not street.get("car", false):
+		out.append(task("Заглянуть в «бобик» за киоском (нужен свет)"))
 
 
 func clue_marks() -> Array:
@@ -468,7 +708,13 @@ func clue_marks() -> Array:
 		out.append(Vector3(8.3, 0.02, 26.9))
 	if not clues.butt and store.find_by_id("butt").get("active", false):
 		out.append(Vector3(-2.25, 0.02, 27.5))
+	_street_marks(out)
 	return out
+
+
+func _street_marks(out: Array) -> void:
+	if koles_car == "empty" and not street.get("car", false) and outdoors.bobik:
+		out.append(outdoors.bobik_point(Vector3(-0.9, 1.3, 0.6)))
 
 
 func final_entry() -> String:
@@ -520,6 +766,11 @@ func update_notebook() -> void:
 	if not clues.values().has(false):
 		lines.append("")
 		lines.append(final_entry())
+	var sn := street_notes()
+	if not sn.is_empty():
+		lines.append("")
+		lines.append("Улица:")
+		lines.append_array(sn)
 	lines.append("")
 	lines.append("Подозреваемые: Ковпак (директор), Вася Кран (грузчик), Ринат (мясник), Колесников (участковый), Эдик (фарцовщик), Тамара Ивановна (кассир).")
 	lines.append("")
@@ -557,6 +808,7 @@ func _past_notes() -> PackedStringArray:
 func _morning() -> void:
 	var store: Store = main.store
 	var hud: Hud = main.hud
+	_come_in()
 	main.begin_morning()
 	if main.killer.is_active():
 		main.killer.deactivate()
@@ -611,11 +863,20 @@ func save_state() -> Dictionary:
 func restore_state(d: Dictionary) -> void:
 	var store: Store = main.store
 	koles_state = "gone"
+	var was_gone := koles_car == "gone"
+	koles_car = "empty"
 	bag_hidden = d.get("bag_hidden", false)
 	_calls_missed = int(d.get("calls_missed", 0))
 	super(d)
 	kovpak_state = "done"
 	store.empty_locker31()
+	if was_gone or (main.minutes >= Main.clock(1, 46) and killer_phase != "in"):
+		if is_instance_valid(outdoors.bobik) and not was_gone:
+			outdoors.bobik.queue_free()
+			outdoors.bobik = null
+		koles_car = "gone"
+	else:
+		store.set_interactable("bobik_car", true)
 	if not d.get("duty_on", true):
 		store.set_duty(false, true)
 	if main.minutes >= Main.clock(1, 44) and killer_phase != "before":
