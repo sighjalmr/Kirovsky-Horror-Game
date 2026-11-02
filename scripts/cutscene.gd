@@ -649,7 +649,7 @@ func _night_one() -> void:
 	sound("click", -8.0, ext.zhiguli)
 	if is_instance_valid(_engine):
 		_tween().tween_property(_engine, "volume_db", -60.0, 1.5)
-	await shot(5.5, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
+	await shot(7.0, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
 	# The letters over the canopy, the arrow, the rain in the lamplight.
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
 	say(N1_VOLGA)
