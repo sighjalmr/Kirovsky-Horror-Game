@@ -391,63 +391,11 @@ func _build_fridge() -> void:
 ## Nina, as he left her: folded up on the floor of the cabinet, knees to her
 ## chest, wrapped in the brown paper of the meat counter and tied with
 ## butcher's twine. Her hair has come out at the top, one bare hand at the side.
+## Nina, folded up in the cabinet and wrapped in meat paper (NinaBody).
 func _build_body(base: Vector3) -> void:
-	var kit := MeshBuilder.Kit.new()
-	# Brown meat-counter paper gone dark with damp and grease, a heap folded
-	# in on itself rather than a shape: torso slumped, knees drawn up into it,
-	# the head fallen against the side wall.
-	var paper := kit.b("cardboard", Color(0.4, 0.36, 0.3))
-	var wet := kit.b("cardboard", Color(0.27, 0.22, 0.17))
-	var b := base
-	var tilt := Props.rot(Vector3.BACK, -0.12, Vector3(b.x, b.y + 0.4, b.z + 0.1))
-	paper.ellipsoid(tilt, Vector3(0.22, 0.33, 0.17), 16, 10)
-	paper.ellipsoid(Props.rot(Vector3.RIGHT, 1.05, Vector3(b.x + 0.01, b.y + 0.28, b.z - 0.05)), Vector3(0.2, 0.21, 0.13), 14, 8)
-	paper.ellipsoid(Props.at(b.x, b.y + 0.1, b.z), Vector3(0.26, 0.11, 0.25), 14, 8)
-	# The head, over to the left, against the cabinet wall.
-	var head := Vector3(b.x - 0.13, b.y + 0.76, b.z + 0.05)
-	paper.ellipsoid(Props.rot(Vector3.BACK, 0.45, head), Vector3(0.1, 0.12, 0.11), 12, 8)
-	# Crumples: lumps where the paper bunched up under the twine.
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1988
-	for k in 14:
-		var ang := rng.randf() * TAU
-		var h := rng.randf_range(0.12, 0.62)
-		var c := Vector3(b.x + cos(ang) * 0.19, b.y + h, b.z + 0.1 + sin(ang) * 0.15)
-		(wet if k % 4 == 0 else paper).ellipsoid(Props.rot(Vector3(rng.randf(), rng.randf(), rng.randf()).normalized(),
-			rng.randf() * PI, c), Vector3(rng.randf_range(0.04, 0.08), rng.randf_range(0.03, 0.06), rng.randf_range(0.02, 0.04)), 8, 5)
-	# Grease and what has seeped through, darkest low down.
-	var seep := kit.b("blood", Color(0.22, 0.08, 0.06))
-	seep.ellipsoid(Props.at(b.x + 0.05, b.y + 0.14, b.z - 0.16), Vector3(0.13, 0.07, 0.04), 10, 6)
-	seep.ellipsoid(Props.at(b.x - 0.12, b.y + 0.66, b.z - 0.03), Vector3(0.05, 0.04, 0.03), 8, 5)
-	var twine := kit.b("cloth", Color(0.42, 0.37, 0.28))
-	for k in 3:
-		var r := 0.225 - absf(k - 1) * 0.025
-		twine.cylinder(Props.rot(Vector3.BACK, -0.12, Vector3(b.x, b.y + 0.2 + k * 0.17, b.z + 0.1)), r, r, 0.01, 16)
-	# Hair out of the tear over the head, hanging down over the shoulder.
-	var hair := kit.b("hair", Color(0.3, 0.2, 0.15))
-	for k in 11:
-		var off := -0.05 + k * 0.012
-		var long := 0.26 - absf(off) * 0.8
-		# Strands hang from the tear: each box's base is its lower end.
-		hair.box(Props.rot(Vector3.BACK, 0.15 + off, Vector3(head.x + 0.05 + off, head.y - 0.02 - long, head.z - 0.09)),
-			Vector3(0.012, long, 0.006))
-	# The hand slipped out below the knees: grey-white, nails dark.
-	var skin := kit.b("skin", Color(0.66, 0.66, 0.68))
-	var hand := Vector3(b.x + 0.2, b.y + 0.14, b.z - 0.17)
-	skin.ellipsoid(Props.rot(Vector3.BACK, 0.6, hand), Vector3(0.03, 0.075, 0.02), 10, 6)
-	for k in 4:
-		skin.box(Props.rot(Vector3.BACK, 0.75, hand + Vector3(0.035 + k * 0.004, -0.07 + k * 0.011, 0.0)),
-			Vector3(0.01, 0.055, 0.01))
-	kit.build(self)
-	var mark := Label3D.new()
-	mark.text = "Р."
-	mark.font_size = 40
-	mark.pixel_size = 0.0018
-	mark.modulate = Color(0.12, 0.11, 0.12)
-	mark.position = Vector3(b.x + 0.06, b.y + 0.5, b.z - 0.075)
-	mark.rotation = Vector3(0, PI, 0.12)
-	mark.shaded = true
-	add_child(mark)
+	var body := NinaBody.new()
+	add_child(body)
+	body.position = base
 
 
 func open_fridge(instant := false) -> void:

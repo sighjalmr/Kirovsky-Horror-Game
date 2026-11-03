@@ -348,6 +348,9 @@ scripts/dev_night2test.gd проверка второй ночи (--night2 --nig
 scripts/dev_night3test.gd проверка третьей ночи (--night3 --nighttest)
 scripts/night_three.gd   третья ночь: звонок из кабинета, провод, лом, подвал, тело Нины, утро с Колесниковым
 scripts/back_rooms.gd    кабинет директора, лестница и подвал с холодильным шкафом
+scripts/nina_body.gd     тело Нины в шкафу: модель, сложенная по костям, мятая бумага по фигуре
+scripts/dev_body.gd      крупный план тела (-s scripts/dev_body.gd -- /tmp/dir [nopaper])
+tools/make_kraft.py      текстура обёрточной бумаги (textures/kraft.png)
 tools/make_kolesnikov.py перекраска модели Колесникова в советскую милицейскую форму
 scripts/dev_daytest.gd   проверка дня: Эдик, три вопроса, выход (--daytest, кадры: --shots=DIR)
 shaders/                 материалы (обычный, двусторонний, стекло) и пост-эффект кадра
