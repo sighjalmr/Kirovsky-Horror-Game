@@ -22,12 +22,14 @@ func _ready() -> void:
 	await _wait(1.0)
 	_use("talk_kovpak", Vector3(7.2, 0, 2.7))
 	_use("talk_tamara", Vector3(0.4, 0, 9.4))
+	await _until_true(func(): return not Main.checkpoint.is_empty(), 120.0)
+	_check(not Main.checkpoint.is_empty(), "saved once locked in (%s)" % main._fmt(Main.checkpoint.get("minutes", 0.0)))
 	await _until(23, 31)
 	for id in ["locker31", "register2", "journal", "chest_A3", "chest_D3", "storage_door", "panel", "journal"]:
 		_use(id)
 		await _wait(0.3)
 	_check(main.night.rounds[0].signed, "round 1 signed")
-	_check(not Main.checkpoint.is_empty(), "checkpoint saved")
+	_check(not Main.checkpoint.is_empty() and Main.checkpoint.minutes > Main.clock(23, 30), "checkpoint saved")
 	if "--restore" in OS.get_cmdline_user_args():
 		# Die and press R: the scene reloads at the signature.
 		main.killer.activate(main.player.global_position + Vector3(0, 0, 1.5))
@@ -50,6 +52,9 @@ func _ready() -> void:
 		return
 	_use("chair")
 	_check(main.player.sitting, "sitting on the chair")
+	await _until(0, 13)
+	_check(main.killer._lurk_t > 0.0 or not main.killer.is_active(), "he goes to stand at an aisle end (00:12)")
+	print("   lurk at ", main.killer._path[-1] if not main.killer._path.is_empty() else "-", " from ", main.player.global_position)
 	await _until(1, 12)
 	_check(not main.player.sitting, "stood up for an event")
 	await _until_true(func(): return main.night.kovpak_state == "done", 400.0)

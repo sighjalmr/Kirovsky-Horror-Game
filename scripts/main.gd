@@ -30,8 +30,11 @@ const G_WINDED := "Сердце колотится в горле. Мне не т
 const G_HIDE_LATE := "Он смотрит прямо на меня. Прятаться поздно."
 const G_ESCAPE := "Ударил его фонарём в лицо и вырвался. Второй раз так не повезёт."
 ## E presses needed in STRUGGLE_TIME seconds to tear free, once a night.
-const STRUGGLE_PRESSES := 8
-const STRUGGLE_TIME := 1.8
+const STRUGGLE_PRESSES := 7
+const STRUGGLE_TIME := 2.2
+## Gordeev's own pulse once he is near: it starts within DREAD_RANGE metres,
+## and quickens and grows louder as the man closes in.
+const DREAD_RANGE := 10.0
 ## The progress file: the chapter, what was found and asked, the last signature.
 const SAVE_PATH := "user://save.json"
 
@@ -74,6 +77,7 @@ var time_scale := 1.0
 var _timeline: Array = []
 var _chase_music: AudioStreamPlayer
 var _heart: AudioStreamPlayer
+var _dread: AudioStreamPlayer
 var _lit := 1.0
 var _flash := 0.0
 var _morning := false
@@ -171,7 +175,7 @@ func _ready() -> void:
 func _continue_line() -> String:
 	if checkpoint.is_empty():
 		return ""
-	return "C — продолжить с подписи в журнале (%s)\n" % _fmt(checkpoint.minutes)
+	return "C — продолжить с последнего сохранения (%s)\n" % _fmt(checkpoint.minutes)
 
 
 func _night_name() -> String:
@@ -338,6 +342,12 @@ func _build_world() -> void:
 	_chase_music.volume_db = -80.0
 	_chase_music.autoplay = true
 	add_child(_chase_music)
+	_dread = AudioStreamPlayer.new()
+	_dread.stream = Sfx.get_stream("heartbeat")
+	_dread.volume_db = -80.0
+	_dread.bus = "Master"
+	_dread.process_mode = Node.PROCESS_MODE_PAUSABLE
+	add_child(_dread)
 	var room := AudioStreamPlayer.new()
 	room.stream = Sfx.get_stream("room")
 	room.volume_db = -14.0
@@ -395,6 +405,26 @@ func _process(delta: float) -> void:
 	store.update_compressors(killer.global_position if killer.is_active() else Vector3(999, 0, 999), delta)
 	var music_target := -6.0 if chasing else -80.0
 	_chase_music.volume_db = move_toward(_chase_music.volume_db, music_target, delta * (60.0 if chasing else 12.0))
+	_update_dread(delta)
+
+
+## The pulse in his ears: nothing while the hall is empty, a slow thud when
+## the man is a shelf or two away, racing in a chase.
+func _update_dread(delta: float) -> void:
+	var near := 0.0
+	if killer.is_active() and killer.visible and not _morning:
+		var d := Vector2(killer.global_position.x - player.global_position.x,
+			killer.global_position.z - player.global_position.z).length()
+		near = clampf((DREAD_RANGE - d) / (DREAD_RANGE - 2.0), 0.0, 1.0)
+		if chasing:
+			near = maxf(near, 0.8)
+	var vol := -80.0 if near <= 0.0 or player._pant.playing else lerpf(-26.0, -7.0, near)
+	_dread.volume_db = move_toward(_dread.volume_db, vol, delta * (30.0 if vol > _dread.volume_db else 10.0))
+	_dread.pitch_scale = lerpf(_dread.pitch_scale, lerpf(0.9, 1.45, near), delta * 0.8)
+	if _dread.volume_db > -79.0 and not _dread.playing:
+		_dread.play()
+	elif _dread.volume_db <= -79.0 and _dread.playing:
+		_dread.stop()
 
 
 func _update_env(delta: float) -> void:
@@ -448,9 +478,12 @@ func _update_tasks() -> void:
 	var cam := player.camera
 	var eye := cam.global_position
 	var space := player.get_world_3d().direct_space_state
-	for p: Vector3 in chap.clue_marks():
+	for m: Variant in chap.clue_marks():
+		# A point, or [point, range] for things seen from further off.
+		var p: Vector3 = m[0] if m is Array else m
+		var reach: float = m[1] if m is Array else CLUE_MARK_RANGE
 		var d := eye.distance_to(p)
-		if d > CLUE_MARK_RANGE or cam.is_position_behind(p):
+		if d > reach or cam.is_position_behind(p):
 			continue
 		var q := PhysicsRayQueryParameters3D.create(eye, p)
 		q.exclude = [player.get_rid()]
@@ -460,7 +493,7 @@ func _update_tasks() -> void:
 			continue
 		var at := cam.unproject_position(p)
 		if Rect2(0, 0, RENDER_W, RENDER_H).has_point(at):
-			pts.append([at, 1.0 - clampf((d - 1.2) / (CLUE_MARK_RANGE - 1.2), 0.0, 1.0)])
+			pts.append([at, 1.0 - clampf((d - 1.2) / (reach - 1.2), 0.0, 1.0)])
 	hud.marks.points = pts
 
 
@@ -492,7 +525,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_go_to("day1", night.clues.duplicate(), [])
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
 		_go_to("night2", night_clues.duplicate(), day.asked.duplicate())
-	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible:
+	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible and not _struggling:
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
 		get_tree().paused = open
@@ -645,7 +678,7 @@ func _restore() -> void:
 	start_now()
 	hud.fade.color.a = 1.0
 	hud.fade_to(0.0, 1.5)
-	hud.flash_note("Продолжение с подписи в журнале: %s" % _fmt(minutes))
+	hud.flash_note("Продолжение с сохранения: %s" % _fmt(minutes))
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
@@ -735,6 +768,7 @@ func _kill() -> void:
 	var tw := create_tween().set_parallel()
 	tw.tween_property(player, "rotation:y", player.rotation.y + angle_difference(player.rotation.y, atan2(-to.x, -to.z)), 0.25)
 	tw.tween_property(player.head, "rotation:x", deg_to_rad(8.0), 0.25)
+	_dread.stop()
 	Sfx.play_2d(self, "attack_sting", -2.0)
 	_heart = Sfx.play_2d(self, "heartbeat", -4.0, "Master", 1.7)
 	killer.play_attack(_on_hit)
@@ -773,7 +807,7 @@ func _show_death() -> void:
 	hud.fade_to(0.75, 2.0)
 	var again := "R: начать смену заново"
 	if not checkpoint.is_empty():
-		again = "R: продолжить с подписи в журнале (%s)\nN: начать ночь сначала" % _fmt(checkpoint.minutes)
+		again = "R: продолжить с последнего сохранения (%s)\nN: начать ночь сначала" % _fmt(checkpoint.minutes)
 	hud.show_title("ГОРДЕЕВ НЕ ДОЖИЛ ДО УТРА",
 		"В 6:10 его нашли грузчики, у %s. Рядом лежал топорик из мясного отдела.\nУчастковый Колесников в тот же день задержал мясника Рината. Дело закрыли за неделю.\n\n%s" % [_where(player.global_position), again],
 		Hud.RED)
