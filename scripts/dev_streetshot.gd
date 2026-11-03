@@ -27,7 +27,10 @@ func _ready() -> void:
 		main.store.switch_off(i, true)
 	n.interact("spare_key")
 	main.store.set_front_door(true)
-	if n is NightTwo:
+	if n is NightThree:
+		main.store.set_front_door(false)
+		await _night_three(n as NightThree)
+	elif n is NightTwo:
 		await _night_two(n as NightTwo)
 	else:
 		await _night_one(n)
@@ -85,6 +88,47 @@ func _night_two(n: NightTwo) -> void:
 	main.player.force_flashlight = true
 	await _shot("t07_empty_car", n.outdoors.bobik_point(Vector3(-2.0, 0, -0.2)), Vector3.FORWARD, -0.25,
 		n.outdoors.bobik_point(Vector3(0, 1.0, 0.3)))
+
+
+## Night three: the wire, the office, the cellar, Nina, the morning.
+##   ... -- --night3 --streetshot=/tmp/n3
+func _night_three(n: NightThree) -> void:
+	n.kovpak.visible = false
+	n.line = "open"
+	main.store.open_office(true)
+	main.night.update_notebook()
+	await _shot("u01_wire", Vector3(9.4, 0, 21.0), Vector3(0.45, 0, 1), 0.28)
+	await _shot("u02_office_door", Vector3(2.4, 0, 24.2), Vector3(0.05, 0, 1), 0.02)
+	main.player.force_flashlight = true
+	await _shot("u03_office_desk", Vector3(1.75, 0, 29.0), Vector3.FORWARD, -0.42, BackRooms.HANDSET)
+	main.player.force_flashlight = false
+	await _shot("u04_cellar_padlock", Vector3(Store.CELLAR_X + 0.2, 0, 26.4), Vector3(0, 0, 1), -0.1)
+	n._talked["cellar"] = true
+	n.interact("crowbar")
+	await _shot("u05_crowbar_gone", Vector3(-8.6, 0, 26.6), Vector3(-0.5, 0, 1), 0.1)
+	n.rooms.show_broken_lock()
+	main.store.open_cellar(true)
+	main.player.force_flashlight = true
+	await _shot("u06_stairs", Vector3(Store.CELLAR_X, 0, 28.15), Vector3(0, 0, 1), -0.45)
+	await _shot("u07_cellar", Vector3(Store.CELLAR_X + 0.3, BackRooms.FLOOR, 32.3), Vector3(-0.1, 0, 1), -0.12)
+	n.rooms.open_fridge(true)
+	await _shot("u08_body", Vector3(BackRooms.FRIDGE.x + 0.15, BackRooms.FLOOR, BackRooms.FRIDGE.z - 1.25), Vector3(0, 0, 1), -0.38)
+	await _shot("u09_boots", Vector3(Store.CELLAR_X - 0.1, BackRooms.FLOOR, 32.7), Vector3(0, 0, 1), -0.9)
+	main.player.force_flashlight = false
+	for i in main.store.rows.size():
+		main.store.switch_on(i)
+	var koles := Npc.new().setup("kolesnikov")
+	main.world.add_child(koles)
+	koles.global_position = Vector3(5.6, 0, 3.0)
+	koles.look_at_point(Vector3(7.6, 0, 3.6))
+	n.kovpak.visible = true
+	n.kovpak.global_position = Vector3(4.6, 0, 4.6)
+	n.kovpak.look_at_point(koles.global_position)
+	await _frames(10)
+	await _shot("u10_morning", Vector3(7.6, 0, 3.6), Vector3.FORWARD, 0.04, Vector3(5.6, 0, 3.0))
+	n.update_notebook()
+	main.hud.notebook.visible = true
+	await _shot("u11_notebook", Vector3(0, 0, 5), Vector3(0, 0, 1))
 
 
 func _shot(id: String, pos: Vector3, dir: Vector3, pitch := 0.0, look := Vector3.INF) -> void:

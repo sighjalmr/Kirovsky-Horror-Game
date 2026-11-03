@@ -20,7 +20,7 @@ extends CanvasLayer
 signal finished
 
 ## Which cutscenes play before each chapter, in order.
-const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": ["night2"]}
+const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": ["night2"], "night3": ["night3"]}
 
 const NINA_1 := "Нина: — Вот. Пробила, как вы сказали. Сорок килограммов говядины, без реализации."
 const NINA_2 := "Нина: — Теперь вы им всё покажете? Правда?"
@@ -39,6 +39,9 @@ const D1_DAY := "Днём «Кировский» не узнать: очеред
 const D1_TAMARA := "Тамара Ивановна сегодня на второй кассе. При Ковпаке она молчала. Посмотрим, что скажет при людях."
 const N2_RAIN := "Понедельник. Дождь не перестаёт с пятницы."
 const N2_KOLES := "На крыльце курит милиционер. Участковый Колесников, хозяин МЖК. Ждёт не Ковпака. Ждёт меня."
+const N3_FROST := "Четверг. К ночи дождь перешёл в снежную крупу. Через неделю у нас всегда зима."
+const N3_CALL := "Ковпак позвонил мне в обед. Попросил прийти пораньше. Голос как у человека, который не спал."
+const N3_VOLGA := "«Волга» стоит с работающим мотором. Он уже в пальто. Домой торопится, или подальше отсюда."
 const N2_BAG := "Сумка Нины всё ещё лежит в тридцать первой ячейке. Если он пришёл за ней, надо успеть её убрать, пока он курит."
 
 ## Till 2 in the store, where Nina punched the receipt.
@@ -159,6 +162,8 @@ func _play() -> void:
 			await _day_one()
 		"night2":
 			await _night_two()
+		"night3":
+			await _night_three()
 	_finish()
 
 
@@ -758,5 +763,40 @@ func _night_two() -> void:
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
 	await shot(5.0, Vector3(3.8, 1.65, -10.0), kp + Vector3(0, 1.5, 0), Vector3(1.5, Exterior.PORCH + 1.62, -5.6),
 		kp + Vector3(0, 1.6, 0), 45.0, 1.0)
+	fade(1.0, 1.0)
+	await wait(1.2)
+
+
+# --- Thursday 20 October: Ковпак in a hurry ------------------------------------------
+
+func _night_three() -> void:
+	_street("night")
+	sound("rain", -14.0)
+	var kovpak := Npc.new().setup("kovpak")
+	ext.add_child(kovpak)
+	kovpak.global_position = Vector3(0.6, Exterior.PORCH, 1.2)
+	kovpak.rotation.y = 0.0  # behind the glass, watching for the car
+	kovpak.pose = "idle"
+	_black.color.a = 1.0
+	fade(0.0, 2.0)
+	caption("Четверг, 20 октября 1988 года, 22:20", 4.5)
+	_drive(0.15, 20.0)
+	say(N3_FROST)
+	await shot(7.0, Vector3(-24, 26, -70), Vector3(0, 3, -8), Vector3(-10, 12, -40), Vector3(1, 2.5, -4), 42.0, 0.2)
+	_wiping = true
+	var inside := sound("rain_car", -8.0)
+	say(N3_CALL)
+	await ride(10.0, ext.zhiguli)
+	_wiping = false
+	inside.queue_free()
+	Vehicles.set_lights(ext.zhiguli, false)
+	sound("click", -8.0, ext.zhiguli)
+	if is_instance_valid(_engine):
+		_tween().tween_property(_engine, "volume_db", -60.0, 1.5)
+	say(N3_VOLGA)
+	await shot(6.5, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.2, 1.5, -16.4), Vector3(3.0, 1.8, -6.5), 40.0)
+	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	await shot(6.0, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),
+		Vector3(0.5, Exterior.PORCH + 1.5, 1.2), 50.0, 1.0)
 	fade(1.0, 1.0)
 	await wait(1.2)
