@@ -35,6 +35,10 @@ var busy := false
 var dead := false
 var flashlight_on := false
 var force_flashlight := false  # dev screenshots
+## Dev (trailer footage): walks him as if the stick were held this way.
+var drive := Vector2.ZERO
+## Dev (vertical trailer): the narrow phone frame needs the fist nearer the middle.
+var hand_shift := Vector3.ZERO
 ## C toggles: low behind a chest he is hard to see, slow and quiet.
 var crouching := false
 ## On the chair at the post, waiting out the night.
@@ -143,6 +147,8 @@ func _physics_process(delta: float) -> void:
 			if Input.is_action_just_pressed("crouch"):
 				crouching = not crouching
 			running = Input.is_action_pressed("run") and move.y < -0.1 and not crouching and not winded
+	elif drive != Vector2.ZERO and not dead:
+		move = drive
 	_set_flashlight(want_light and not dead)
 	_update_breath(running, delta)
 
@@ -342,5 +348,5 @@ func _update_hand(delta: float) -> void:
 	if not hit.is_empty():
 		want_pull = HAND_REACH - camera.global_position.distance_to(hit.position)
 	_pull = lerpf(_pull, want_pull, 1.0 - exp(-delta * 12.0))
-	hand.position = HAND_POS + Vector3(0, -(1.0 - lift) * 0.32, _pull)
+	hand.position = HAND_POS + hand_shift + Vector3(0, -(1.0 - lift) * 0.32, _pull)
 	hand.rotation.x = HAND_ROT.x - (1.0 - lift) * 0.6

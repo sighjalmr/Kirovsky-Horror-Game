@@ -151,6 +151,13 @@ func _ready() -> void:
 		var test := "res://scripts/dev_night2test.gd" if chapter == "night2" else "res://scripts/dev_nighttest.gd"
 		add_child(load(test).new().with(self))
 		return
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--trailer="):
+			var tr: Node = load("res://scripts/dev_trailer.gd").new()
+			tr.set("main", self)
+			tr.set("shot", a.get_slice("=", 1))
+			add_child(tr)
+			return
 	if shot_dir != "":
 		var dev: Node = load("res://scripts/dev_autoshot.gd").new()
 		dev.set("main", self)
@@ -270,7 +277,9 @@ func _build_view() -> void:
 	layer.layer = 0
 	add_child(layer)
 	view = SubViewport.new()
-	view.size = Vector2i(RENDER_W, RENDER_H)
+	# Dev: --vertical draws the hall itself for a phone (the trailer footage).
+	var frame := Vector2(1080, 1920) if Cutscene.vertical() else Vector2(RENDER_W, RENDER_H)
+	view.size = Vector2i(frame)
 	view.msaa_3d = Viewport.MSAA_4X
 	view.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	view.audio_listener_enable_3d = true
@@ -281,7 +290,7 @@ func _build_view() -> void:
 	var screen := TextureRect.new()
 	screen.texture = view.get_texture()
 	screen.position = Vector2.ZERO
-	screen.size = Vector2(1920, 1080)
+	screen.size = frame
 	screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	screen.stretch_mode = TextureRect.STRETCH_SCALE
 	screen.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
