@@ -13,6 +13,7 @@ scripts/characters.gd) and the goatee shaved, leaving the moustache.
     git -C rb sparse-checkout set --no-cone 'Assets/Avatars/Professions/Police_Male_01/*'
     pip install opencv-python-headless pillow
     python tools/make_kolesnikov.py rb
+    python tools/make_kolesnikov.py --cap   # only cut the patrol cap out again
 """
 
 import shutil
@@ -99,7 +100,31 @@ def uniform() -> None:
 
 
 
+def cut_cap() -> None:
+    """The avatar's own patrol cap is part of the head mesh and stood up out of
+    the militia furazhka, which had to be built far too big to cover it. Cut it
+    away: head_cut.png is the head texture with the cap (the blue-grey parts in
+    the lower half, and the dark inside of its band) transparent, and Person
+    draws the head as a cut-out when the file is there. The new cap sits
+    straight on the hair."""
+    im = cv2.imread(str(OUT / 'head_color.jpg'))
+    b, g, r = [im[..., i].astype(int) for i in range(3)]
+    m = ((b > r + 15) & (np.arange(im.shape[0])[:, None] >= 540)).astype(np.uint8) * 255
+    # the band's dark inside: fill the holes the blue outline leaves
+    flood = m.copy()
+    cv2.floodFill(flood, np.zeros((m.shape[0] + 2, m.shape[1] + 2), np.uint8), (0, 0), 255)
+    m = m | cv2.bitwise_not(flood)
+    m = cv2.dilate(m, np.ones((5, 5), np.uint8))
+    rgba = cv2.cvtColor(im, cv2.COLOR_BGR2BGRA)
+    rgba[..., 3] = 255 - m
+    cv2.imwrite(str(OUT / 'head_cut.png'), rgba)
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--cap"]:  # only re-cut the cap from the textures already made
+        cut_cap()
+        sys.exit()
     convert(Path(sys.argv[1]) / "Assets/Avatars/Professions/Police_Male_01")
     shave()
     uniform()
+    cut_cap()

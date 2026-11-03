@@ -99,17 +99,21 @@ static func build_killer() -> Person:
 
 
 ## A militia officer's peaked cap, 1988: a blue-grey crown flaring out over a
-## red band, a black lacquered peak and a gold cockade. It sits over the
-## patrol cap the avatar was photographed in.
+## red band, a black lacquered peak and a gold cockade. Sized to his head: the
+## band sits on the hair two fingers above the brows (the avatar's own patrol
+## cap is cut out of the head texture, see tools/make_kolesnikov.py).
 static func furazhka() -> Node3D:
 	var k := MeshBuilder.Kit.new()
 	k.ao = false
+	# Cylinders grow up from their base: band 10.4–15 cm over the head bone,
+	# the crown flaring out above it, the top just clearing the crown of the head.
 	var crown := k.b("cloth", Color(0.62, 0.68, 0.78))
-	crown.cylinder(_oval(Vector3(0, 0.185, -0.015), 1.12), 0.12, 0.152, 0.05, 24)
-	crown.ellipsoid(Props.at(0, 0.235, -0.015), Vector3(0.152, 0.018, 0.17), 24, 6)
-	k.b("cloth", Color(0.85, 0.14, 0.1)).cylinder(_oval(Vector3(0, 0.118, -0.015), 1.12), 0.121, 0.122, 0.068, 24)
-	k.b("rubber", Color(0.08, 0.08, 0.08)).box(Props.rot(Vector3.RIGHT, 0.32, Vector3(0, 0.122, -0.15)), Vector3(0.19, 0.008, 0.08))
-	k.b("chrome", Color(1.0, 0.8, 0.35)).box(Props.at(0, 0.142, -0.144), Vector3(0.026, 0.026, 0.008))
+	crown.cylinder(_oval(Vector3(0, 0.149, -0.022), 1.14), 0.097, 0.124, 0.054, 24)
+	crown.ellipsoid(Props.at(0, 0.203, -0.022), Vector3(0.124, 0.018, 0.141), 24, 6)
+	k.b("cloth", Color(0.85, 0.14, 0.1)).cylinder(_oval(Vector3(0, 0.104, -0.022), 1.14), 0.096, 0.097, 0.046, 24)
+	# The peak dips a little to the front, as worn.
+	k.b("rubber", Color(0.08, 0.08, 0.08)).box(Props.rot(Vector3.RIGHT, -0.18, Vector3(0, 0.112, -0.152)), Vector3(0.15, 0.006, 0.05))
+	k.b("chrome", Color(1.0, 0.8, 0.35)).box(Props.at(0, 0.124, -0.131), Vector3(0.022, 0.022, 0.008))
 	return _built(k)
 
 

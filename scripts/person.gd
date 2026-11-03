@@ -77,6 +77,10 @@ func _dress(mi: MeshInstance3D) -> void:
 			# Hair, lashes and spectacle glass are cut-out cards seen from both sides.
 			kind = Mats.DOUBLE
 			color = "%s%s/%s%s_color.png" % [DIR, who, part, "_opacity" if part == "glasses" else ""]
+		elif ResourceLoader.exists("%s%s/%s_cut.png" % [DIR, who, part]):
+			# Part of the mesh cut away (Колесников's own patrol cap, under the furazhka).
+			kind = Mats.DOUBLE
+			color = "%s%s/%s_cut.png" % [DIR, who, part]
 		var m := ShaderMaterial.new()
 		m.shader = load("res://shaders/%s.gdshader" % kind)
 		m.set_shader_parameter("albedo_tex", load(color))
