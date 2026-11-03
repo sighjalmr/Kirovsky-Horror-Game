@@ -91,6 +91,8 @@ static func is_out(p: Vector3) -> bool:
 
 
 func ground_y(p: Vector3) -> float:
+	if p.z > 28.05:
+		return BackRooms.floor_y(p)  # behind the back wall: the cellar stairs go down
 	if p.z >= PORCH.position.y + PORCH.size.y:
 		return 0.0  # the hall and the door sill
 	var q := Vector2(p.x, p.z)

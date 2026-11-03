@@ -37,6 +37,11 @@ const COUNTER_TOP := Color(1.45, 0.66, 0.26)  # orange formica, like the photo
 const TUBE_COLOR := Color(0.79, 0.84, 0.65)
 const WARM_COLOR := Color(1.0, 0.78, 0.5)
 const CLUE_CHEST := "A3"
+## The doors in the back wall besides the storage room's: the cellar (by the
+## fuse panel) and the director's office. Behind them, rooms only night three
+## builds (BackRooms).
+const CELLAR_X := -1.95
+const OFFICE_X := 2.6
 ## The «Волга» headlights have to carry eight metres into the hall.
 const HEADLIGHT := 40.0
 
@@ -97,7 +102,16 @@ var _token: Node3D
 var _butt: Node3D
 
 var _patrol_ids: Array[int] = []
+## "cellar" / "office" -> the waypoint ids behind that door (BackRooms).
+var _back_ways: Dictionary = {}
+## Waypoint name (NODES) -> astar id.
+var way_ids: Dictionary = {}
 var _storage_hinge: Node3D
+var _cellar_hinge: Node3D
+var _office_hinge: Node3D
+var _padlock: Node3D
+var cellar_open := false
+var office_open := false
 var _upper_lights: Array[OmniLight3D] = []
 var _upper_tube: ShaderMaterial
 var _row_mats: Dictionary = {}
@@ -192,10 +206,15 @@ func _build_shell() -> void:
 		box(Vector3(cx + 2, H, 28.15), Vector3(4, H2 - H, 0.3), "corrugated", UPPER_WALL, 1.2, false, MeshFactory.NZ)
 		box(Vector3(cx + 2, H, -0.15), Vector3(4, H2 - H, 0.3), "corrugated", UPPER_WALL, 1.2, false,
 			MeshFactory.PZ).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
-	# Back wall with the storage door gap at x 8.4–9.6.
-	for span: Vector2 in [Vector2(-12, -8), Vector2(-8, -4), Vector2(-4, 0), Vector2(0, 4), Vector2(4, 8.4), Vector2(9.6, 12)]:
+	# Back wall with the storage door gap at x 8.4–9.6, the cellar door at
+	# CELLAR_X and the director's office door at OFFICE_X (both 1 m).
+	for span: Vector2 in [Vector2(-12, -8), Vector2(-8, -4), Vector2(-4, CELLAR_X - 0.5), Vector2(CELLAR_X + 0.5, 0),
+			Vector2(0, OFFICE_X - 0.5), Vector2(OFFICE_X + 0.5, 4), Vector2(4, 8.4), Vector2(9.6, 12)]:
 		box(Vector3((span.x + span.y) * 0.5, 0, 28.15), Vector3(span.y - span.x, H, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.NZ)
 	box(Vector3(9.0, 2.2, 28.15), Vector3(1.2, H - 2.2, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.NZ)
+	for x: float in [CELLAR_X, OFFICE_X]:
+		box(Vector3(x, 2.1, 28.15), Vector3(1.0, H - 2.1, 0.3), "wall", Color.WHITE, wall_m, true, MeshFactory.NZ | MeshFactory.PZ)
+	_build_back_doors()
 	box(Vector3(9.0, 0, 30.5), Vector3(3, H, 1), "fabric", Color(0.02, 0.02, 0.02), 1.0, false, MeshFactory.NZ)
 	for dx: float in [-0.64, 0.64]:
 		box(Vector3(9.0 + dx, 0, 27.98), Vector3(0.08, 2.28, 0.06), "paint", Color(0.4, 0.3, 0.25), 1.0, false)
@@ -268,7 +287,9 @@ func _build_shell() -> void:
 func _dress_walls() -> void:
 	Fittings.wall_run(self, Vector3(-12, 0, 0), Vector3(-12, 0, 28), Vector3.RIGHT)
 	Fittings.wall_run(self, Vector3(12, 0, 0), Vector3(12, 0, 28), Vector3.LEFT)
-	Fittings.wall_run(self, Vector3(-12, 0, 28), Vector3(8.32, 0, 28), Vector3.FORWARD)
+	Fittings.wall_run(self, Vector3(-12, 0, 28), Vector3(CELLAR_X - 0.54, 0, 28), Vector3.FORWARD)
+	Fittings.wall_run(self, Vector3(CELLAR_X + 0.54, 0, 28), Vector3(OFFICE_X - 0.54, 0, 28), Vector3.FORWARD)
+	Fittings.wall_run(self, Vector3(OFFICE_X + 0.54, 0, 28), Vector3(8.32, 0, 28), Vector3.FORWARD)
 	Fittings.wall_run(self, Vector3(9.68, 0, 28), Vector3(12, 0, 28), Vector3.FORWARD)
 	Fittings.wall_run(self, Vector3(-12, 0, 0), Vector3(-2.04, 0, 0), Vector3.BACK)
 	Fittings.wall_run(self, Vector3(2.04, 0, 0), Vector3(2.3, 0, 0), Vector3.BACK)
@@ -739,7 +760,7 @@ func _glow_mat(title: String, tex := Equip.TEX) -> ShaderMaterial:
 
 
 func _build_waypoints() -> void:
-	var ids := {}
+	var ids := way_ids
 	var next := 0
 	for key: String in NODES:
 		var p: Vector2 = NODES[key]
@@ -826,6 +847,75 @@ func _build_panel() -> void:
 	_invoice.visible = false
 	add_child(_invoice)
 	add_interactable("invoice", Vector3(9.5, 0, 26.6), "Поднять бумагу", 1.3, true, false)
+
+
+## The cellar door (grey steel, hinged on the left) and the director's
+## office door (veneer, a «ДИРЕКТОР» plate, hinged on the right) in the back
+## wall. Both open away from the hall; until night three they stay shut.
+func _build_back_doors() -> void:
+	for x: float in [CELLAR_X, OFFICE_X]:
+		for dx: float in [-0.52, 0.52]:
+			box(Vector3(x + dx, 0, 27.98), Vector3(0.07, 2.13, 0.06), "paint", Color(0.4, 0.3, 0.25), 1.0, false)
+		box(Vector3(x, 2.1, 27.98), Vector3(1.11, 0.07, 0.06), "paint", Color(0.4, 0.3, 0.25), 1.0, false)
+	_cellar_hinge = Node3D.new()
+	_cellar_hinge.position = Vector3(CELLAR_X - 0.48, 0, 28.0)
+	add_child(_cellar_hinge)
+	box(Vector3(0.48, 0.02, 0), Vector3(0.95, 2.06, 0.05), "metal", Color(0.42, 0.45, 0.4), 1.0, true, MeshFactory.ALL,
+		_cellar_hinge)
+	box(Vector3(0.85, 1.0, -0.05), Vector3(0.1, 0.03, 0.04), "chrome", Color.WHITE, 1.0, false, MeshFactory.ALL, _cellar_hinge)
+	_office_hinge = Node3D.new()
+	_office_hinge.position = Vector3(OFFICE_X + 0.48, 0, 28.0)
+	add_child(_office_hinge)
+	# Veneered leaf with two raised panels, a padded-door look the directors liked.
+	box(Vector3(-0.48, 0.02, 0), Vector3(0.95, 2.06, 0.05), "wood", Color(0.62, 0.42, 0.3), Vector2(0.6, 1.4), true,
+		MeshFactory.ALL, _office_hinge)
+	for py: float in [0.18, 1.12]:
+		box(Vector3(-0.48, py, -0.03), Vector3(0.72, 0.8, 0.012), "wood", Color(0.5, 0.33, 0.24), Vector2(0.5, 0.6), false,
+			MeshFactory.ALL, _office_hinge)
+	box(Vector3(-0.85, 1.0, -0.05), Vector3(0.1, 0.03, 0.04), "chrome", Color.WHITE, 1.0, false, MeshFactory.ALL, _office_hinge)
+	box(Vector3(-0.48, 1.6, -0.045), Vector3(0.34, 0.1, 0.01), "white", Color(0.92, 0.9, 0.84), 1.0, false, MeshFactory.ALL,
+		_office_hinge)
+	var plate := Label3D.new()
+	plate.text = "ДИРЕКТОР"
+	plate.font_size = 30
+	plate.pixel_size = 0.0017
+	plate.modulate = Color(0.1, 0.1, 0.1)
+	plate.position = Vector3(-0.48, 1.65, -0.051)
+	plate.rotation.y = PI
+	plate.shaded = true
+	_office_hinge.add_child(plate)
+	add_interactable("office_door", Vector3(OFFICE_X, 0, 27.3), "Кабинет директора", 1.3, false)
+
+
+## The steel cellar door swings in, towards the stairs.
+func open_cellar(instant := false) -> void:
+	cellar_open = true
+	if _padlock:
+		_padlock.visible = false
+	if instant:
+		_cellar_hinge.rotation.y = deg_to_rad(-95)
+	else:
+		Sfx.play_3d(self, "clank", Vector3(CELLAR_X, 1.2, 28.0), 0.0, 0.7)
+		create_tween().tween_property(_cellar_hinge, "rotation:y", deg_to_rad(-95), 2.2) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	set_back_way("cellar", true)
+
+
+## The office door, left ajar by whoever was in there.
+func open_office(instant := false) -> void:
+	office_open = true
+	if instant:
+		_office_hinge.rotation.y = deg_to_rad(70)
+	else:
+		create_tween().tween_property(_office_hinge, "rotation:y", deg_to_rad(70), 1.6) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	set_back_way("office", true)
+
+
+## Waypoints through a back door are walkable only while it stands open.
+func set_back_way(which: String, open: bool) -> void:
+	for id: int in _back_ways.get(which, []):
+		astar.set_point_disabled(id, not open)
 
 
 # --- runtime ------------------------------------------------------------------
@@ -1028,22 +1118,21 @@ func hide_invoice() -> void:
 ## brass token of locker 31 on its cord by the storage door, a cigarette end
 ## by the cellar door.
 func add_cellar() -> void:
-	var x := -1.95
+	var x := CELLAR_X
+	# Stencilled lines and the hasp on the door itself; the padlock, new and
+	# bright, hangs from it (night three breaks it off).
 	var kit := MeshBuilder.Kit.new()
-	var frame := kit.b("paint", Color(0.4, 0.3, 0.25))
-	for dx: float in [-0.5, 0.5]:
-		frame.box(Props.at(x + dx, 0, 27.97), Vector3(0.07, 2.1, 0.05))
-	frame.box(Props.at(x, 2.06, 27.97), Vector3(1.07, 0.07, 0.05))
-	kit.b("metal", Color(0.42, 0.45, 0.4)).box(Props.at(x, 0.02, 27.975), Vector3(0.93, 2.03, 0.04))
 	var stencil := kit.b("white", Color(0.9, 0.88, 0.8))
-	stencil.box(Props.at(x, 1.55, 27.95), Vector3(0.5, 0.012, 0.003))
-	stencil.box(Props.at(x, 1.47, 27.95), Vector3(0.5, 0.012, 0.003))
-	# The hasp, and the padlock hanging from it, new and bright.
-	var steel := kit.b("chrome", Color(0.9, 0.9, 0.88))
-	steel.box(Props.at(x + 0.38, 1.0, 27.94), Vector3(0.16, 0.035, 0.02))
-	steel.box(Props.at(x + 0.43, 0.9, 27.925), Vector3(0.012, 0.09, 0.012))
-	kit.b("chrome", Color(1.0, 0.85, 0.5)).box(Props.at(x + 0.43, 0.84, 27.925), Vector3(0.065, 0.075, 0.025))
-	kit.build(self)
+	stencil.box(Props.at(0.48, 1.55, -0.027), Vector3(0.5, 0.012, 0.003))
+	stencil.box(Props.at(0.48, 1.47, -0.027), Vector3(0.5, 0.012, 0.003))
+	kit.b("chrome", Color(0.9, 0.9, 0.88)).box(Props.at(0.86, 1.0, -0.035), Vector3(0.16, 0.035, 0.02))
+	kit.build(_cellar_hinge, false)
+	_padlock = Node3D.new()
+	var lock := MeshBuilder.Kit.new()
+	lock.b("chrome", Color(0.9, 0.9, 0.88)).box(Props.at(x + 0.43, 0.9, 27.925), Vector3(0.012, 0.09, 0.012))
+	lock.b("chrome", Color(1.0, 0.85, 0.5)).box(Props.at(x + 0.43, 0.84, 27.925), Vector3(0.065, 0.075, 0.025))
+	lock.build(_padlock, false)
+	add_child(_padlock)
 	var sign := Label3D.new()
 	sign.text = "ПОДВАЛ"
 	sign.font_size = 48
@@ -1149,6 +1238,8 @@ func closest_node(pos: Vector3) -> int:
 	var best_d := INF
 	var flat := Vector3(pos.x, 0, pos.z)
 	for id in astar.get_point_ids():
+		if astar.is_point_disabled(id):
+			continue
 		var p := astar.get_point_position(id)
 		var d := p.distance_squared_to(flat)
 		if d < best_d and walkable(flat, p):
@@ -1159,9 +1250,14 @@ func closest_node(pos: Vector3) -> int:
 	return best
 
 
+## Knee height over the floor at a point: the hall, or down the cellar stairs.
+static func _knee(p: Vector3) -> float:
+	return 0.5 + (BackRooms.floor_y(p) if p.z > 28.05 else 0.0)
+
+
 ## Knee-height ray: true when nothing solid stands between two floor points.
 func walkable(a: Vector3, b: Vector3) -> bool:
-	var q := PhysicsRayQueryParameters3D.create(Vector3(a.x, 0.5, a.z), Vector3(b.x, 0.5, b.z), 1)
+	var q := PhysicsRayQueryParameters3D.create(Vector3(a.x, _knee(a), a.z), Vector3(b.x, _knee(b), b.z), 1)
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 

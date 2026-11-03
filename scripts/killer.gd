@@ -353,7 +353,9 @@ func _move(speed: float, delta: float) -> void:
 	_face(global_position + dir, delta * 8.0)
 	var before := global_position
 	move_and_slide()
-	global_position.y = 0.0
+	# The hall floor, or the cellar stairs behind the back wall (night three).
+	var g := Outdoors.ground_for(self)
+	global_position.y = 0.0 if is_nan(g) else g
 	if before.distance_to(global_position) < speed * delta * 0.25:
 		_stuck_t += delta
 		if _stuck_t > 1.0:
