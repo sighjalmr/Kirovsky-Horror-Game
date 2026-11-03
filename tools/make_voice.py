@@ -89,7 +89,9 @@ SAY_AS = {
 
 def silero_text(line: dict) -> str:
     # Silero reads Cyrillic with its own stresses; "+" before a vowel forces one.
-    text = line.get("say", line["text"])
+    # Each line's "stress" field has every stress marked that way (checked by
+    # ear for the words Silero gets wrong), so it is spoken when present.
+    text = line.get("stress") or line.get("say", line["text"])
     for word, said in SAY_AS.items():
         text = re.sub(rf"(?<!\w){word}(?!\w)", said, text)
     return text.replace("«", "").replace("»", "").replace("—", "").replace("№", "номер").strip()

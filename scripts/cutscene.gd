@@ -240,7 +240,7 @@ func ride(dur: float, car: Node3D, fov := 62.0) -> void:
 func _ride(dur: float, car: Node3D, fov: float) -> void:
 	_shot = {"dur": dur, "car": car}
 	_shot_t = 0.0
-	cam.fov = fov * 1.1 if vertical() else fov
+	cam.fov = 44.0 if vertical() else fov
 	_place_camera()
 	_shot_n += 1
 	if shot_dir != "":
@@ -317,7 +317,14 @@ func _place_camera() -> void:
 			return
 		var seat: Vector3 = car.get_meta("seat")
 		var bob := Vector3(sin(_shot_t * 7.0) * 0.004, sin(_shot_t * 11.0) * 0.006, 0)
-		cam.global_transform = car.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-10.0)), seat + bob)
+		# On a tall phone frame the same view would reach down to his knees and
+		# the pedals: sit back a little and look level, so the frame ends below
+		# his hands on the rim and shows the road and the store ahead.
+		var pitch := -10.0
+		if vertical():
+			seat += Vector3(0, 0.02, 0.15)
+			pitch = 4.0
+		cam.global_transform = car.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(pitch)), seat + bob)
 		return
 	var k := clampf(_shot_t / maxf(_shot.dur, 0.01), 0.0, 1.0)
 	k = k * k * (3.0 - 2.0 * k) * 0.6 + k * 0.4
