@@ -861,11 +861,14 @@ func switch_off(i: int, instant := false) -> void:
 		return
 	Sfx.play_3d(self, "click", row.center, -2.0)
 	var tw := create_tween()
-	for k in 3:
+	# The last row, over Gordeev's head, dies hard: the tubes stutter for a
+	# couple of seconds, hold, and only then give out.
+	var last := i == rows.size() - 1
+	for k in (7 if last else 3):
 		tw.tween_callback(_set_row_light.bind(row, false))
-		tw.tween_interval(0.05 + 0.05 * k)
+		tw.tween_interval(0.05 + 0.05 * k + (randf() * 0.25 if last else 0.0))
 		tw.tween_callback(_set_row_light.bind(row, true))
-		tw.tween_interval(0.12)
+		tw.tween_interval(0.12 if not last or k < 5 else 0.9)
 	tw.tween_callback(_set_row_light.bind(row, false))
 	tw.tween_callback(row.hum.stop)
 

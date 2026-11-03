@@ -252,7 +252,7 @@ func _prologue() -> void:
 	kolesnikov.visible = true
 	kolesnikov.global_position = Vector3(-1.0, 0, -2.0)
 	kolesnikov.walk(PackedVector3Array([Vector3(-1.0, 0, 0.6), Vector3(2.4, 0, 2.6)]))
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(2.0, false).timeout
 	store.set_front_door(false)
 	kovpak.walk(PackedVector3Array([Vector3(1.5, 0, 3.4), Vector3(4.25, 0, 4.0)]))
 	await kolesnikov.arrived
@@ -283,14 +283,14 @@ func _prologue() -> void:
 	kolesnikov.walk(PackedVector3Array([Vector3(0, 0, 3.4), Vector3(-5.0, 0, 1.8), Vector3(-7.75, 0, 1.2)]))
 	await kolesnikov.arrived
 	kolesnikov.look_at_point(Vector3(-7.75, 0, 0))
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	Sfx.play_3d(store, "clank", Vector3(-7.75, 0.7, 0.6), -6.0, 1.5)
 	if bag_hidden:
 		kolesnikov.look_at_point(main.player.global_position)
 		hud.say(N2_KL_EMPTY, -1.0, true)
-		await get_tree().create_timer(3.0).timeout
+		await get_tree().create_timer(3.0, false).timeout
 		hud.say(N2_G_LIE, -1.0, true)
-		await get_tree().create_timer(3.0).timeout
+		await get_tree().create_timer(3.0, false).timeout
 		hud.say(N2_KL_NUNU, -1.0, true)
 		hud.say(N2_G_NOT_BELIEVE)
 	else:
@@ -298,7 +298,7 @@ func _prologue() -> void:
 		kolesnikov.body.bag = kolesnikov.body.attach("Bip01 L Hand", Characters.handbag(Color(0.45, 0.2, 0.18)))
 		_find_clue("seizure", N2_CLUE_SEIZURE)
 		hud.say(N2_G_TAKES)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(2.0, false).timeout
 	kolesnikov.walk(PackedVector3Array([Vector3(-3.0, 0, 1.8), Vector3(-0.6, 0, 1.4)]))
 	kovpak.walk(PackedVector3Array([Vector3(4.25, 0, 4.0), Vector3(0.4, 0, 2.6)]))
 	await kolesnikov.arrived
@@ -306,14 +306,14 @@ func _prologue() -> void:
 	hud.say(N2_KL_BYE)
 	hud.say(N2_K_LOCK)
 	store.set_front_door(true)
-	await get_tree().create_timer(2.2).timeout
+	await get_tree().create_timer(2.2, false).timeout
 	_koles_to_car()
-	await get_tree().create_timer(1.2).timeout
+	await get_tree().create_timer(1.2, false).timeout
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, 0.4), Vector3(-1.0, 0, -2.0)]))
 	await kovpak.arrived
 	store.set_front_door(false)
 	kovpak.look_at_point(Vector3(-1, 0, 2))
-	await get_tree().create_timer(3.0).timeout
+	await get_tree().create_timer(3.0, false).timeout
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -6.5)]))
 	await kovpak.arrived
 	kovpak.visible = false
@@ -321,7 +321,7 @@ func _prologue() -> void:
 	update_locker_prompt()
 	store.car_start()
 	hud.say(N2_G_WALKS)
-	await get_tree().create_timer(2.5).timeout
+	await get_tree().create_timer(2.5, false).timeout
 	store.car_leave()
 	hud.say(G_LOCKED)
 
@@ -458,7 +458,7 @@ func _spotted() -> void:
 	main.hud.say(N2_G_SEEN)
 	main.store.set_interactable("bobik_watch", false)
 	update_notebook()
-	await get_tree().create_timer(3.5).timeout
+	await get_tree().create_timer(3.5, false).timeout
 	if is_instance_valid(outdoors.bobik):
 		Vehicles.set_lights(outdoors.bobik, false)
 		(outdoors.bobik.get_node("Dome") as OmniLight3D).light_energy = 0.0
@@ -553,7 +553,7 @@ func _answer_phone() -> void:
 	Sfx.play_3d(main.view, "pickup", main.store.phone_pos, -4.0)
 	hud.say(N2_PH_ANSWER, 2.5, true)
 	hud.say(N2_PH_DISPATCH)
-	await get_tree().create_timer(3.0).timeout
+	await get_tree().create_timer(3.0, false).timeout
 	main.player.busy = false
 	_find_clue("pahomov", N2_CLUE_PAHOMOV)
 
@@ -647,7 +647,7 @@ func _lift(chest: String) -> void:
 	main.player.busy = true
 	Sfx.play_3d(main.view, "cloth", c.pos + Vector3(0, 0.8, 0), 0.0)
 	main.on_noise(c.pos, 8.0)
-	await get_tree().create_timer(1.3).timeout
+	await get_tree().create_timer(1.3, false).timeout
 	if main.phase != Main.Phase.PLAY:
 		return
 	store.lift_cloth(chest)
@@ -709,6 +709,7 @@ func clue_marks() -> Array:
 	if not clues.butt and store.find_by_id("butt").get("active", false):
 		out.append(Vector3(-2.25, 0.02, 27.5))
 	_street_marks(out)
+	_round_marks(out)
 	return out
 
 
@@ -817,10 +818,10 @@ func _morning() -> void:
 	if not store.duty_on:
 		store.set_duty(true, true)
 	store.car_arrive()
-	await get_tree().create_timer(5.0).timeout
+	await get_tree().create_timer(5.0, false).timeout
 	for i in 3:
 		Sfx.play_3d(store, "knock", Vector3(0.6, 1.4, -0.1), -2.0, randf_range(0.95, 1.05))
-		await get_tree().create_timer(0.45).timeout
+		await get_tree().create_timer(0.45, false).timeout
 	vasya.visible = true
 	vasya.global_position = Vector3(-0.2, 0, -2.0)
 	vasya.look_at_point(Vector3(0, 0, 3))
@@ -830,16 +831,16 @@ func _morning() -> void:
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -1.2)]))
 	await kovpak.arrived
 	store.set_front_door(true)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(2.0, false).timeout
 	vasya.walk(PackedVector3Array([Vector3(-0.8, 0, 0.6), Vector3(0.6, 0, 2.6), Vector3(2.0, 0, 5.0)]))
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, 0.6), Vector3(-0.6, 0, 2.0)]))
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	store.switch_on(5)
 	await kovpak.arrived
 	kovpak.look_at_point(main.player.global_position)
 	hud.say(N2_K_END_OK if rounds_signed() == rounds.size() else K_END_BAD)
 	hud.say(N2_G_END)
-	await get_tree().create_timer(14.0).timeout
+	await get_tree().create_timer(14.0, false).timeout
 	main.end_shift()
 
 

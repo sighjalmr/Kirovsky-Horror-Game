@@ -27,6 +27,9 @@ const SIGHT_DARK_LOW := 1.3
 const SIGHT_LIT_LOW := 9.0
 const FOV_COS := 0.42
 const REACH := 1.2
+## How fast he makes Gordeev out once he sees him: within 4 m, and further off.
+const SUSPECT_NEAR := 2.6
+const SUSPECT_FAR := 1.1
 
 ## Developer runs: he never notices Gordeev.
 static var blind := false
@@ -48,6 +51,11 @@ var _repath_t := 0.0
 var _stuck_t := 0.0
 var _keys_t := 6.0
 var _steps: AudioStreamPlayer3D
+## Seconds he still stands stock-still where he got to (lurk_at), staring
+## down the aisle; 0 when he is not lurking.
+var _lurk_t := 0.0
+## The breath he catches when he first half-notices Gordeev, once per alarm.
+var _alerted := false
 
 
 func setup(s: Store, p: Player) -> void:
@@ -118,8 +126,11 @@ func hear(pos: Vector3, radius: float) -> void:
 		return
 	if global_position.distance_to(pos) > radius or Outdoors.is_out(pos):
 		return  # out on the square, behind glass and rain
+	if is_lurking() and global_position.distance_to(pos) > radius * 0.6:
+		return  # standing in wait, he lets a small sound come closer
 	state = State.INVESTIGATE
 	_wait = 0.0
+	_lurk_t = 0.0
 	_go_to(pos)
 
 
@@ -157,18 +168,46 @@ func wander_to(pos: Vector3) -> void:
 		_go_to(pos)
 
 
+## Walks to `pos` and stands there without moving for `t` seconds, facing
+## down the aisle, like a man waiting. Sight still works: a light or a
+## careless step in front of him and he comes.
+func lurk_at(pos: Vector3, t: float) -> void:
+	if state in [State.PATROL, State.SEARCH, State.INVESTIGATE] and not leaving:
+		state = State.INVESTIGATE
+		_wait = 0.0
+		_lurk_t = t
+		_go_to(pos)
+
+
+## True while he stands still at the end of an aisle (lurk_at).
+func is_lurking() -> bool:
+	return state == State.INVESTIGATE and _lurk_t > 0.0 and _path_done()
+
+
 func _physics_process(delta: float) -> void:
 	if state == State.INACTIVE or state == State.ATTACK:
 		return
 	var sees := _sees_player()
+	var staring := false
 	if state != State.CHASE:
 		if sees:
-			suspicion += delta * (3.0 if _dist_to_player() < 6.0 else 1.4)
+			# Close by he is sure at once; further off he stops dead and
+			# stares first, which gives Gordeev a moment to back into the dark.
+			# Standing in wait (lurk_at) he takes his time: he lets the light
+			# come to him.
+			suspicion += delta * (SUSPECT_NEAR if _dist_to_player() < 4.0 else SUSPECT_FAR) \
+				* (0.55 if is_lurking() else 1.0)
 			_face(player.global_position, delta * 3.0)
+			staring = suspicion > 0.12
+			if suspicion > 0.3 and not _alerted:
+				_alerted = true
+				Sfx.play_3d(get_parent(), "killer_breath", global_position + Vector3(0, 1.7, 0), -10.0, 0.9, 14.0)
 			if suspicion >= 1.0:
 				_start_chase()
 		else:
-			suspicion = maxf(0.0, suspicion - delta * 0.4)
+			suspicion = maxf(0.0, suspicion - delta * 0.35)
+			if suspicion <= 0.0:
+				_alerted = false
 
 	var speed := 0.0
 	match state:
@@ -190,7 +229,12 @@ func _physics_process(delta: float) -> void:
 			else:
 				speed = PATROL_SPEED
 		State.INVESTIGATE:
-			if _path_done():
+			if _path_done() and _lurk_t > 0.0:
+				_lurk_t -= delta
+				_face(player.global_position, delta * 0.6)
+				if leaving:
+					_lurk_t = 0.0
+			elif _path_done():
 				_wait += delta
 				rotation.y += sin(_wait * 1.7) * delta * 1.5
 				if _wait > 3.5:
@@ -236,10 +280,13 @@ func _physics_process(delta: float) -> void:
 						_start_leave()
 			else:
 				speed = INVESTIGATE_SPEED
+	if staring:
+		speed = 0.0
 	_move(speed, delta)
 
 
 func _start_chase() -> void:
+	_lurk_t = 0.0
 	state = State.CHASE
 	suspicion = 1.0
 	_lost_t = 0.0

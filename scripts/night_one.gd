@@ -145,6 +145,12 @@ const K_END_OK := "Ковпак: — Подписи на месте. Свобо�
 const K_END_BAD := "Ковпак: — Обходы пропущены. Ещё раз, Гордеев, и пойдёшь сторожить овощебазу."
 const G_END := "Ковпак смотрит не на меня, а на дверь склада. Днём поговорю с Тамарой Ивановной. Она знает больше, чем сказала."
 
+## When he stops dead at the end of an aisle down which Gordeev can see.
+const LURKS := [[0, 12], [3, 48], [4, 44]]
+const LURK_TIME := 26.0
+const G_LURK := "В конце ряда кто-то стоит. Не двигается. Смотрит сюда."
+const G_LURK_GONE := "Ушёл. Или просто отступил в темноту."
+
 ## Where the cans fall, by the pyramid of peas in консервы.
 const CANS_POS := Vector3(1.6, 0, 19.0)
 
@@ -192,6 +198,8 @@ var radio_on := false
 var _radio_noise_t := 0.0
 var _phone_t := 0.0
 var _phone_noise_t := 0.0
+var _lurk_seen := true
+var _lurk_said := false
 var _talked := {}
 
 
@@ -202,6 +210,8 @@ func _init(m: Node) -> void:
 
 
 func _ready() -> void:
+	# The story waits while the notebook is open: Main itself runs always.
+	process_mode = Node.PROCESS_MODE_PAUSABLE
 	_phone = AudioStreamPlayer3D.new()
 	_phone.stream = Sfx.get_stream("phone")
 	_phone.bus = Sfx.BUS
@@ -309,6 +319,9 @@ func build_timeline() -> void:
 		_killer_in()
 		hud.say(G_DOOR, -1.0, true))
 	m.at(23, 14, func(): hud.say(G_COMPRESSORS))
+	# He stops at the end of an aisle and just stands there, waiting.
+	for t: Array in LURKS:
+		m.at(t[0], t[1], _lurk)
 	for i in rounds.size():
 		var idx := i
 		var r: Dictionary = rounds[i]
@@ -381,23 +394,27 @@ func _prologue() -> void:
 		kovpak.walk(PackedVector3Array([Vector3(4.25, 0, 4.0), Vector3(0, 0, 3.0), Vector3(-0.6, 0, 1.2)]))
 		await kovpak.arrived
 		store.set_front_door(true)
-		await get_tree().create_timer(2.2).timeout
+		await get_tree().create_timer(2.2, false).timeout
 		tamara.walk(PackedVector3Array([Vector3(-1.0, 0, 0.4), Vector3(-1.0, 0, -2.0), Vector3(-3.0, 0, -6.0)]))
-		await get_tree().create_timer(1.2).timeout
+		await get_tree().create_timer(1.2, false).timeout
 		kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, 0.4), Vector3(-1.0, 0, -2.0)]))
 		await kovpak.arrived
 		store.set_front_door(false)
 		kovpak.look_at_point(Vector3(-1, 0, 2))
-		await get_tree().create_timer(3.0).timeout
+		await get_tree().create_timer(3.0, false).timeout
 		kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -6.5)]))
 		await kovpak.arrived
 		kovpak.visible = false
 		tamara.visible = false
 		kovpak_state = "none"
 		store.car_start()
-		await get_tree().create_timer(2.5).timeout
+		await get_tree().create_timer(2.5, false).timeout
 		store.car_leave()
-		hud.say(G_LOCKED))
+		hud.say(G_LOCKED)
+		# Locked in for the night: a death before the first round no longer
+		# sends him back through the cutscenes and the note.
+		if main.phase == Main.Phase.PLAY:
+			main.save_checkpoint())
 
 
 ## The people of the prologue and the night visit can be spoken to.
@@ -412,6 +429,64 @@ func _process(_delta: float) -> void:
 
 
 # --- the killer's comings and goings -------------------------------------------
+
+## Sends him to stand where Gordeev has a clear line to him, five or six
+## metres off: far enough to back away, near enough to make out in
+## a torch beam or under the duty light (further the dark swallows him).
+func _lurk() -> void:
+	var k: Killer = main.killer
+	if not k.is_active() or k.leaving or main.chasing or main.player.hidden \
+			or Outdoors.is_out(main.player.global_position):
+		return
+	var store: Store = main.store
+	var me: Vector3 = main.player.global_position
+	var best := Vector3.INF
+	var best_score := -INF
+	var fwd: Vector3 = -main.player.global_transform.basis.z
+	for i in 16:
+		var dir := Vector3.FORWARD.rotated(Vector3.UP, TAU * i / 16.0)
+		for d: float in [4.8, 5.5, 6.3]:
+			var p := Vector3(me.x, 0, me.z) + dir * d
+			# A clear line both ways, and not right where he would block a door.
+			if not store.walkable(me, p) or not store.walkable(p, p + dir * 0.6):
+				continue
+			# Rather where Gordeev is looking, so that he has a chance to see him.
+			var score := dir.dot(Vector3(fwd.x, 0, fwd.z).normalized()) * 2.0 - absf(d - 5.5) + randf() * 1.5
+			if score > best_score:
+				best_score = score
+				best = p
+	if best == Vector3.INF:
+		return
+	_lurk_seen = false
+	k.lurk_at(best, LURK_TIME)
+
+
+## Gordeev catches sight of him standing there: the sting, a line, once.
+func _watch_lurk() -> void:
+	var k: Killer = main.killer
+	if _lurk_seen or not k.is_lurking():
+		if _lurk_seen and _lurk_said and not k.is_lurking() and not main.chasing and k.is_active():
+			_lurk_said = false
+			main.hud.say(G_LURK_GONE)
+		return
+	var cam: Camera3D = main.player.camera
+	var head := k.global_position + Vector3(0, 1.5, 0)
+	var d := cam.global_position.distance_to(head)
+	var shown: bool = main.player.flashlight_on or main.store.is_lit(k.global_position)
+	if d > 8.0 or cam.is_position_behind(head) or not (shown or d < 4.0):
+		return
+	var at := cam.unproject_position(head)
+	var r := Rect2(Vector2(Main.RENDER_W, Main.RENDER_H) * 0.2, Vector2(Main.RENDER_W, Main.RENDER_H) * 0.6)
+	if not r.has_point(at):
+		return
+	var q := PhysicsRayQueryParameters3D.create(cam.global_position, head, 1)
+	if not main.player.get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+		return
+	_lurk_seen = true
+	_lurk_said = true
+	Sfx.play_2d(self, "stinger", -9.0)
+	main.hud.say(G_LURK, -1.0, true)
+
 
 func _killer_in() -> void:
 	door_shut_by = ""
@@ -452,32 +527,32 @@ func _kovpak_visit() -> void:
 	kovpak_state = "visit"
 	store.car_arrive()
 	hud.say(G_HEADLIGHTS, -1.0, true)
-	await get_tree().create_timer(6.0).timeout
+	await get_tree().create_timer(6.0, false).timeout
 	kovpak.visible = true
 	kovpak.global_position = Vector3(-1.2, 0, -6.5)
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -1.2)]))
 	await kovpak.arrived
 	store.set_front_door(true)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(2.0, false).timeout
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, 0.6), Vector3(-0.2, 0, 2.2)]))
 	await kovpak.arrived
 	store.set_front_door(false)
 	kovpak.look_at_point(main.player.global_position)
 	hud.say(K_NIGHT, -1.0, true)
-	await get_tree().create_timer(5.5).timeout
+	await get_tree().create_timer(5.5, false).timeout
 	hud.say(G_TO_STORAGE)
 	kovpak.walk(store.route(kovpak.global_position, store.killer_spawn))
 	await kovpak.arrived
 	Sfx.play_3d(store, "keys", store.killer_spawn + Vector3(0, 1, 0), -6.0)
-	await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(1.0, false).timeout
 	store.open_storage_door()
-	await get_tree().create_timer(1.2).timeout
+	await get_tree().create_timer(1.2, false).timeout
 	kovpak.walk(PackedVector3Array([store.storage_inside]))
 	await kovpak.arrived
 	kovpak.visible = false
 	# Boxes shifted about in the dark storage room.
 	for k in 5:
-		await get_tree().create_timer(randf_range(5.0, 9.0)).timeout
+		await get_tree().create_timer(randf_range(5.0, 9.0), false).timeout
 		Sfx.play_3d(store, ["clank", "cloth", "pickup", "keys", "cloth"][k], store.storage_inside + Vector3(randf_range(-2, 2), 1, 1),
 			-10.0, randf_range(0.7, 0.9))
 	kovpak.visible = true
@@ -492,9 +567,9 @@ func _kovpak_visit() -> void:
 	await kovpak.arrived
 	kovpak.look_at_point(main.player.global_position)
 	hud.say(K_NOT_HERE, -1.0, true)
-	await get_tree().create_timer(5.0).timeout
+	await get_tree().create_timer(5.0, false).timeout
 	store.set_front_door(true)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(2.0, false).timeout
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, 0.4), Vector3(-1.0, 0, -2.0)]))
 	await kovpak.arrived
 	store.set_front_door(false)
@@ -506,7 +581,7 @@ func _kovpak_visit() -> void:
 	store.car_leave()
 	store.show_invoice()
 	kovpak_state = "done"
-	await get_tree().create_timer(3.0).timeout
+	await get_tree().create_timer(3.0, false).timeout
 	hud.say(G_PAPER)
 
 
@@ -663,7 +738,7 @@ func _lift(chest: String) -> void:
 	main.player.busy = true
 	Sfx.play_3d(main.view, "cloth", c.pos + Vector3(0, 0.8, 0), 0.0)
 	main.on_noise(c.pos, 8.0)
-	await get_tree().create_timer(1.3).timeout
+	await get_tree().create_timer(1.3, false).timeout
 	if main.phase != Main.Phase.PLAY:
 		return
 	store.lift_cloth(chest)
@@ -747,10 +822,10 @@ func update_notebook() -> void:
 
 const ROUND_NAMES := ["23:30", "02:20", "04:20"]
 const CLUE_TASKS := {
-	"bag": "Ячейка № 31 в камере хранения",
-	"tape": "Касса № 2, контрольная лента",
-	"page": "Журнал обходов на посту",
-	"clip": "Лари в заморозке, под покрывалами",
+	"bag": "Ячейка № 31: камера хранения, справа от входа",
+	"tape": "Касса № 2, средняя: контрольная лента",
+	"page": "Журнал обходов на посту, у входа слева",
+	"clip": "Лари в заморозке у правой стены, под покрывалами",
 	"invoice": "Бумага у двери склада (нужен свет)",
 }
 
@@ -803,9 +878,10 @@ func _round_tasks(out: Array) -> void:
 	var rd: Dictionary = rounds[r]
 	if not rd.signed:
 		out.append(task("Обход %s" % ROUND_NAMES[r]))
-		out.append(task("Дверь склада", rd.door, true))
-		out.append(task("Щиток в заднем проходе", rd.panel, true))
-		out.append(task("Подпись в журнале на посту", false, true))
+		out.append(task("Дверь склада: в самой глубине зала, прямо за постом", rd.door, true))
+		out.append(task("Щиток: задний проход, посередине", rd.panel, true))
+		out.append(task("Подпись в журнале на посту" if rd.door and rd.panel
+			else "Потом подпись в журнале на посту", false, true))
 	elif r + 1 < rounds.size():
 		out.append(task("Обход %s подписан" % ROUND_NAMES[r], true))
 		out.append(task("Следующий обход в %s" % ROUND_NAMES[r + 1]))
@@ -835,7 +911,25 @@ func clue_marks() -> Array:
 	if not clues.invoice and kovpak_state == "done":
 		out.append(Vector3(9.5, 0.03, 26.6))
 	_street_marks(out)
+	_round_marks(out)
 	return out
+
+
+## Rings for the round under way and the ringing phone; these are seen from
+## further off than the clues: [point, range].
+func _round_marks(out: Array) -> void:
+	if _phone_t > 0.0:
+		out.append([main.store.phone_pos + Vector3(0, 0.15, 0), 12.0])
+	var r := current_round()
+	if r < 0 or rounds[r].signed or main.chasing:
+		return
+	var rd: Dictionary = rounds[r]
+	if not rd.door:
+		out.append([Vector3(9.5, 1.3, 27.6), 9.0])
+	if not rd.panel:
+		out.append([Vector3(-0.5, 1.3, 27.7), 9.0])
+	if rd.door and rd.panel:
+		out.append([Vector3(10.9, 0.95, 2.6), 9.0])
 
 
 func _street_marks(out: Array) -> void:
@@ -884,6 +978,7 @@ func _update_radio(delta: float) -> void:
 
 func update(delta: float) -> void:
 	_watch_street()
+	_watch_lurk()
 	_update_radio(delta)
 	if _phone_t <= 0.0:
 		return
@@ -915,7 +1010,7 @@ func _answer_phone() -> void:
 	Sfx.play_2d(self, "breath", -6.0)
 	if main.killer.is_active():
 		main.killer.wander_to(main.store.random_patrol_point())
-	await get_tree().create_timer(6.0).timeout
+	await get_tree().create_timer(6.0, false).timeout
 	if main.phase != Main.Phase.PLAY:
 		return
 	hud.say(PH_HANGUP)
@@ -1020,10 +1115,10 @@ func _morning() -> void:
 		main.killer.visible = false
 	store.close_storage_door()
 	store.car_arrive()
-	await get_tree().create_timer(5.0).timeout
+	await get_tree().create_timer(5.0, false).timeout
 	for i in 3:
 		Sfx.play_3d(store, "knock", Vector3(0.6, 1.4, -0.1), -2.0, randf_range(0.95, 1.05))
-		await get_tree().create_timer(0.45).timeout
+		await get_tree().create_timer(0.45, false).timeout
 	vasya.visible = true
 	vasya.global_position = Vector3(-0.2, 0, -2.0)
 	vasya.look_at_point(Vector3(0, 0, 3))
@@ -1033,16 +1128,16 @@ func _morning() -> void:
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -1.2)]))
 	await kovpak.arrived
 	store.set_front_door(true)
-	await get_tree().create_timer(2.0).timeout
+	await get_tree().create_timer(2.0, false).timeout
 	vasya.walk(PackedVector3Array([Vector3(-0.8, 0, 0.6), Vector3(0.6, 0, 2.6), Vector3(2.0, 0, 5.0)]))
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, 0.6), Vector3(-0.6, 0, 2.0)]))
-	await get_tree().create_timer(1.5).timeout
+	await get_tree().create_timer(1.5, false).timeout
 	store.switch_on(5)
 	await kovpak.arrived
 	kovpak.look_at_point(main.player.global_position)
 	hud.say(K_END_OK if rounds_signed() == rounds.size() else K_END_BAD)
 	hud.say(G_END)
-	await get_tree().create_timer(14.0).timeout
+	await get_tree().create_timer(14.0, false).timeout
 	main.end_shift()
 
 

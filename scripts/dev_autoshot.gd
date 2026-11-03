@@ -23,6 +23,10 @@ func _ready() -> void:
 		await _hand_shots(p, store, night)
 		get_tree().quit()
 		return
+	if "--polishshot" in OS.get_cmdline_user_args():
+		await _polish_shots(p, store, night)
+		get_tree().quit()
+		return
 	if "--taskshot" in OS.get_cmdline_user_args():
 		await _task_shots(p, store, night)
 		get_tree().quit()
@@ -371,6 +375,48 @@ func _task_shots(p: Player, store: Store, night: NightOne) -> void:
 	main.hud.toggle_tasks()
 	await _wait(0.3)
 	await _shot("t04_hidden")
+
+
+## The night-one polish: the round's rings and directions, and him standing
+## still at the end of a dark aisle.
+func _polish_shots(p: Player, store: Store, night: NightOne) -> void:
+	Killer.blind = true
+	main._timeline.clear()
+	night.kovpak.visible = false
+	night.tamara.visible = false
+	night.kovpak_state = "none"
+	night._talked["kovpak_walk"] = true
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	main.minutes = Main.clock(23, 40)
+	night.clues.bag = true
+	night.clues.tape = true
+	night.clues.page = true
+	_place(p, Vector3(5.2, 0, 26.4), Vector3(1, 0, 0.12))
+	p.force_flashlight = true
+	await _wait(1.5)
+	await _shot("p01_round_door")
+	night.rounds[0].door = true
+	_place(p, Vector3(-6.5, 0, 26.4), Vector3(1, 0, 0.1))
+	await _wait(1.0)
+	await _shot("p02_round_panel")
+	main.killer.activate(Vector3(-3.0, 0, 16.8))
+	_place(p, Vector3(-3.0, 0, 11.0), Vector3(0, 0, 1))
+	p.head.rotation.x = 0.02
+	main.killer.lurk_at(Vector3(-3.0, 0, 16.4), 120.0)
+	night._lurk_seen = false
+	await _until(func(): return main.killer.is_lurking(), 60.0)
+	print("lurking ", main.killer.is_lurking(), " at ", main.killer.global_position, " state ", main.killer.state)
+	await _wait(1.5)
+	await _shot("p03_lurk")
+	await _wait(2.5)
+	await _shot("p04_lurk_said")
+
+
+func _until(f: Callable, limit: float) -> void:
+	var end := Time.get_ticks_msec() + int(limit * 1000.0)
+	while not f.call() and Time.get_ticks_msec() < end:
+		await get_tree().process_frame
 
 
 func _place(p: Player, pos: Vector3, dir: Vector3) -> void:
