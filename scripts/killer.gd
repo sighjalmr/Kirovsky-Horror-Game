@@ -56,6 +56,12 @@ var _steps: AudioStreamPlayer3D
 var _lurk_t := 0.0
 ## The breath he catches when he first half-notices Gordeev, once per alarm.
 var _alerted := false
+## Night four: his own torch, a militia «фонарь» held low at the hip. Gordeev
+## sees the beam coming down the aisle; anybody caught in it is seen too.
+var torch: SpotLight3D
+var _torch_t := 0.0
+const TORCH_RANGE := 12.0
+const TORCH_COS := 0.93
 
 
 func setup(s: Store, p: Player) -> void:
@@ -106,6 +112,48 @@ func activate(pos: Vector3) -> void:
 func deactivate() -> void:
 	state = State.INACTIVE
 	velocity = Vector3.ZERO
+	set_torch(false)
+
+
+func set_torch(on: bool) -> void:
+	if on and torch == null:
+		torch = SpotLight3D.new()
+		torch.position = Vector3(0.24, 1.15, -0.3)
+		torch.spot_range = TORCH_RANGE + 2.0
+		torch.spot_angle = 19.0
+		torch.spot_attenuation = 0.8
+		torch.light_energy = 3.2
+		torch.light_color = Color(1.0, 0.9, 0.72)
+		torch.light_specular = 0.3
+		torch.shadow_enabled = true
+		add_child(torch)
+		var lens := MeshInstance3D.new()
+		var m := CylinderMesh.new()
+		m.top_radius = 0.028
+		m.bottom_radius = 0.022
+		m.height = 0.2
+		lens.mesh = m
+		lens.rotation.x = PI * 0.5
+		lens.position = Vector3(0, 0, 0.1)
+		lens.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		lens.material_override = Mats.get_mat("metal", Color(0.15, 0.15, 0.15))
+		torch.add_child(lens)
+		# The glass itself glows: from the front the torch is a bright point in the dark.
+		var glass := MeshInstance3D.new()
+		var g := SphereMesh.new()
+		g.radius = 0.03
+		g.height = 0.02
+		glass.mesh = g
+		glass.position = Vector3(0, 0, -0.005)
+		glass.material_override = Mats.get_mat("white", Color(1, 0.95, 0.8), Color(6.0, 5.2, 3.8))
+		glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		torch.add_child(glass)
+	if torch:
+		torch.visible = on
+
+
+func torch_on() -> bool:
+	return torch != null and torch.visible
 
 
 ## Walks back out through the storage door and is gone (emits `left`).
@@ -209,6 +257,10 @@ func _physics_process(delta: float) -> void:
 			if suspicion <= 0.0:
 				_alerted = false
 
+	if torch_on():
+		# The beam swings a little with his step and sweeps when he looks round.
+		_torch_t += delta
+		torch.rotation = Vector3(deg_to_rad(-6.0) + sin(_torch_t * 1.3) * 0.05, sin(_torch_t * 0.7) * 0.12, 0)
 	var speed := 0.0
 	match state:
 		State.LEAVE:
@@ -313,6 +365,8 @@ func _sees_player() -> bool:
 		limit = SIGHT_FLASH
 	elif store.is_lit(player.global_position):
 		limit = SIGHT_LIT_LOW if low else SIGHT_LIT
+	elif torch_on() and (-torch.global_transform.basis.z).dot((tgt - torch.global_position).normalized()) > TORCH_COS:
+		limit = TORCH_RANGE * (0.75 if low else 1.0)  # caught in his beam
 	if d > limit:
 		return false
 	var to := tgt - eye

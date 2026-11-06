@@ -1214,10 +1214,31 @@ func lift_cloth(id: String) -> void:
 
 
 ## "If a compressor goes quiet, somebody is standing next to it."
+## Night four: the main switch pulled at the panel. The duty light, the
+## booth lamp and the freezer compressors go with it; only the battery
+## radio and the torch are left.
+var power := true
+
+
+func power_cut() -> void:
+	power = false
+	for i in rows.size():
+		switch_off(i, true)
+	set_duty(false)
+	set_upper_lights(false)
+	Sfx.play_3d(self, "clank", Vector3(-0.5, 1.3, 27.8), 0.0, 0.6)
+
+
+## Morning: the spare handle from the director's desk, and the mains back.
+func power_on() -> void:
+	power = true
+	set_duty(true)
+
+
 func update_compressors(killer_pos: Vector3, delta: float) -> void:
 	for id: String in chests:
 		var c: Dictionary = chests[id]
-		var near := (c.pos as Vector3).distance_to(killer_pos) < 4.5
+		var near := (c.pos as Vector3).distance_to(killer_pos) < 4.5 or not power
 		var hum: AudioStreamPlayer3D = c.hum
 		hum.volume_db = move_toward(hum.volume_db, -60.0 if near else -14.0, delta * 40.0)
 

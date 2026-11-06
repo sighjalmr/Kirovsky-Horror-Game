@@ -21,6 +21,11 @@ const CELLAR := Rect2(-5.4, 31.6, 6.3, 5.2)
 const OFFICE := Rect2(0.15, 28.3, 4.5, 3.35)
 ## The cabinet against the cellar's back wall, its doors facing the stairs.
 const FRIDGE := Vector3(-2.0, FLOOR, 36.35)
+## The ventilation grille in the cellar's back wall, left of the cabinet
+## (night four): its middle at this point, facing the stairs.
+const VENT := Vector3(-4.35, FLOOR + 1.45, 36.78)
+## The crate under it, where the tin box is opened.
+const VENT_CRATE := Vector3(-4.35, FLOOR, 36.3)
 ## The office phone, its handset lying off the cradle on the desk.
 const HANDSET := Vector3(2.62, 0.77, 30.28)
 const DESK := Vector3(2.4, 0, 30.55)
@@ -34,6 +39,11 @@ const WIRE := [
 ]
 
 var store: Store
+## Night four: Nina has been taken away (the cabinet stands open and empty),
+## the telephone wire is cut at `wire_cut` and his tin box waits in the vent.
+var with_body := true
+var vent := false
+var wire_cut := Vector3.INF
 var fridge_open := false
 var _fridge_doors: Array[Node3D] = []
 var _bulb: OmniLight3D
@@ -66,6 +76,8 @@ func _ready() -> void:
 	_build_stairs()
 	_build_cellar()
 	_build_fridge()
+	if vent:
+		_build_vent()
 	_build_ways()
 
 
@@ -76,8 +88,31 @@ func _box(pos: Vector3, size: Vector3, tex: String, tint := Color.WHITE, tex_m: 
 
 # --- the wire ----------------------------------------------------------------------
 
-## A black twin cable on porcelain clips, a little sag between them.
+## A black twin cable on porcelain clips, a little sag between them. With
+## `wire_cut` set, a second, cut version is built too and shown by cut_wire().
 func _build_wire() -> void:
+	_wire_whole = Node3D.new()
+	store.add_child(_wire_whole)
+	_wire_mesh(_wire_whole, false)
+	if wire_cut != Vector3.INF:
+		_wire_broken = Node3D.new()
+		_wire_broken.visible = false
+		store.add_child(_wire_broken)
+		_wire_mesh(_wire_broken, true)
+
+
+var _wire_whole: Node3D
+var _wire_broken: Node3D
+
+
+## Night four: the line goes dead; the cable hangs in two ends.
+func cut_wire() -> void:
+	if _wire_broken:
+		_wire_whole.visible = false
+		_wire_broken.visible = true
+
+
+func _wire_mesh(parent: Node3D, cut: bool) -> void:
 	var kit := MeshBuilder.Kit.new()
 	var cable := kit.b("rubber", Color(0.12, 0.12, 0.12))
 	var clip := kit.b("white", Color(0.85, 0.83, 0.78))
@@ -90,10 +125,22 @@ func _build_wire() -> void:
 			var p0 := a + d * (float(k) / n)
 			var p1 := a + d * (float(k + 1) / n)
 			var sag := Vector3(0, -0.012, 0) if absf(d.y) < 0.01 else Vector3.ZERO
+			clip.box(Props.at(p0.x, p0.y - 0.012, p0.z), Vector3(0.025, 0.024, 0.025))
+			if cut and ((p0 + p1) * 0.5).distance_to(wire_cut) < 0.55:
+				continue
 			_strand(cable, p0, (p0 + p1) * 0.5 + sag, 0.009)
 			_strand(cable, (p0 + p1) * 0.5 + sag, p1, 0.009)
-			clip.box(Props.at(p0.x, p0.y - 0.012, p0.z), Vector3(0.025, 0.024, 0.025))
-	kit.build(store, false)
+	if cut:
+		# Cut clean through: two ends hang down off the last clips, a bare
+		# copper tip on each, and a «Космос» end on the floor under them.
+		for sx: float in [-0.45, 0.45]:
+			var top := wire_cut + Vector3(sx, 0, 0)
+			var low := top + Vector3(-sx * 0.25, -0.75 - absf(sx) * 0.3, -0.03)
+			_strand(cable, top, low, 0.009)
+			kit.b("chrome", Color(1.3, 0.75, 0.4)).box(Props.at(low.x, low.y - 0.02, low.z), Vector3(0.006, 0.02, 0.006))
+		var butt := kit.b("white", Color(0.95, 0.93, 0.88))
+		butt.cylinder(Props.rot(Vector3.BACK, PI * 0.5, Vector3(wire_cut.x + 0.1, 0.005, wire_cut.z - 0.5)), 0.005, 0.005, 0.03, 8)
+	kit.build(parent, false)
 
 
 static func _strand(mb: MeshBuilder, a: Vector3, b: Vector3, w: float) -> void:
@@ -319,6 +366,12 @@ func _build_cellar() -> void:
 		var t := float(k) / 6.0
 		var p := Vector3(x, FLOOR, 31.9).lerp(FRIDGE + Vector3(0, 0, -0.7), t) + Vector3(0.12 if k % 2 == 0 else -0.12, 0, 0)
 		Equip.decal(self, p + Vector3(0, 0.003, 0), 0.32, "boots", 0.0 if k % 2 == 0 else PI)
+	if vent:
+		# Fresher prints, over the others: from the stairs into the left corner, to the vent.
+		for k in 8:
+			var t := float(k) / 7.0
+			var p := Vector3(x - 0.2, FLOOR, 32.1).lerp(VENT + Vector3(0.2, 0, -0.75), t) + Vector3(0.12 if k % 2 == 0 else -0.12, 0, 0)
+			Equip.decal(self, Vector3(p.x, FLOOR + 0.006, p.z), 0.32, "boots", 0.45 if k % 2 == 0 else PI + 0.45)
 	Equip.decal(self, Vector3(-3.6, FLOOR + 0.003, 35.0), 1.1, "puddle", 0.8)
 	store.add_interactable("boots", Vector3(x - 0.1, FLOOR, 33.6), "Посмотреть следы на полу", 1.3, true, false)
 	_lock_on_floor = Node3D.new()
@@ -362,7 +415,8 @@ func _build_fridge() -> void:
 	# Maker's plate.
 	kit.b("chrome").box(Props.at(f.x, f.y + hgt - 0.2, f.z - d * 0.5 - 0.01), Vector3(0.3, 0.06, 0.005))
 	kit.build(self)
-	_build_body(f + Vector3(0, 0.32, 0.05))
+	if with_body:
+		_build_body(f + Vector3(0, 0.32, 0.05))
 	var plate := Label3D.new()
 	plate.text = "ШХ-1,12"
 	plate.font_size = 22
@@ -417,7 +471,7 @@ func open_fridge(instant := false) -> void:
 func _build_ways() -> void:
 	var x := Store.CELLAR_X
 	var ways := {
-		"cellar": [Vector3(x, 0, 27.3), Vector3(x, 0, 28.6), Vector3(x, 0, 31.5), Vector3(x, 0, 33.4), Vector3(FRIDGE.x, 0, 35.3)],
+		"cellar": [Vector3(x, 0, 26.6), Vector3(x, 0, 27.3), Vector3(x, 0, 28.6), Vector3(x, 0, 31.5), Vector3(x, 0, 33.4), Vector3(FRIDGE.x, 0, 35.3)],
 		"office": [Vector3(Store.OFFICE_X, 0, 27.3), Vector3(Store.OFFICE_X, 0, 28.9), Vector3(1.6, 0, 29.8)],
 	}
 	var next := store.astar.get_available_point_id()
@@ -428,11 +482,146 @@ func _build_ways() -> void:
 			store.astar.add_point(next, p)
 			ids.append(next)
 			next += 1
-		# From the back aisle to the door, then through.
-		for key: String in ["BB", "BC"]:
+		# From the back aisle to the door, then through: the cellar from the
+		# left, so that nobody walks into the panel box on the way.
+		for key: String in (["BB"] if which == "cellar" else ["BB", "BC"]):
 			store.astar.connect_points(store.way_ids[key], ids[0])
 		for k in ids.size() - 1:
 			store.astar.connect_points(ids[k], ids[k + 1])
 		store._back_ways[which] = ids.slice(1)
 		for id in ids.slice(1):
 			store.astar.set_point_disabled(id, true)
+
+
+# --- the vent and the tin box (night four) ---------------------------------------------
+
+var vent_open := false
+var _grille: Node3D
+var _tin_in_duct: Node3D
+var _tin_open: Node3D
+
+
+## A square duct in the back wall behind a galvanised grille on four wing
+## nuts (scratched bright: turned by hand, and often). Inside, at arm's
+## length, a flat round tin of «Монпансье». A crate under it to stand the tin on.
+func _build_vent() -> void:
+	var v := VENT
+	var kit := MeshBuilder.Kit.new()
+	# The duct mouth: a dark square hole with a galvanised lining.
+	kit.b("rubber", Color(0.02, 0.02, 0.02)).box(Props.at(v.x, v.y - 0.2, v.z + 0.12), Vector3(0.4, 0.4, 0.02))
+	var galv := kit.b("galv", Color(0.5, 0.5, 0.47))
+	galv.box(Props.at(v.x, v.y - 0.21, v.z - 0.02), Vector3(0.42, 0.02, 0.14))
+	galv.box(Props.at(v.x, v.y + 0.19, v.z - 0.02), Vector3(0.42, 0.02, 0.14))
+	for sx: float in [-1.0, 1.0]:
+		galv.box(Props.at(v.x + sx * 0.2, v.y - 0.2, v.z - 0.02), Vector3(0.02, 0.4, 0.14))
+	# Grey dust streaks under it on the wall.
+	kit.b("concrete", Color(0.35, 0.34, 0.32)).box(Props.at(v.x, v.y - 0.75, v.z - 0.09), Vector3(0.3, 0.5, 0.004))
+	# The crate under the vent.
+	kit.b("wood", Color(0.6, 0.48, 0.34)).box(Props.at(VENT_CRATE.x, FLOOR, VENT_CRATE.z), Vector3(0.5, 0.42, 0.36))
+	kit.b("wood", Color(0.45, 0.35, 0.25)).box(Props.at(VENT_CRATE.x, FLOOR + 0.42, VENT_CRATE.z), Vector3(0.52, 0.015, 0.38))
+	kit.build(self)
+	_grille = Node3D.new()
+	_grille.position = Vector3(v.x, v.y, v.z - 0.095)
+	add_child(_grille)
+	var g := MeshBuilder.Kit.new()
+	var bar := g.b("galv", Color(0.62, 0.62, 0.58))
+	bar.box(Props.at(0, -0.24, 0), Vector3(0.48, 0.03, 0.012))
+	bar.box(Props.at(0, 0.21, 0), Vector3(0.48, 0.03, 0.012))
+	for sx: float in [-1.0, 1.0]:
+		bar.box(Props.at(sx * 0.225, -0.24, 0), Vector3(0.03, 0.48, 0.012))
+	for k in 7:
+		bar.box(Props.rot(Vector3.RIGHT, 0.6, Vector3(0, -0.2 + k * 0.06, -0.005)), Vector3(0.42, 0.012, 0.035))
+	var nut := g.b("chrome", Color(1.1, 1.05, 0.95))
+	for sx: float in [-1.0, 1.0]:
+		for sy: float in [-0.21, 0.18]:
+			nut.box(Props.at(sx * 0.2, sy, -0.012), Vector3(0.05, 0.012, 0.012))
+	g.build(_grille)
+	_tin_in_duct = _tin(false)
+	_tin_in_duct.scale = Vector3.ONE * 1.4
+	_tin_in_duct.position = Vector3(v.x - 0.03, v.y - 0.19, v.z + 0.1)
+	_tin_in_duct.rotation.y = 0.4
+	add_child(_tin_in_duct)
+	_tin_open = _tin(true)
+	_tin_open.position = Vector3(VENT_CRATE.x + 0.04, FLOOR + 0.435, VENT_CRATE.z - 0.04)
+	_tin_open.scale = Vector3.ONE * 1.4  # a big tin, 17 cm across: the kind sold by weight
+	_tin_open.visible = false
+	add_child(_tin_open)
+	store.add_interactable("vent", Vector3(v.x, FLOOR, v.z - 0.85), "Открутить решётку вентиляции", 1.1, true, false)
+	store.add_interactable("tinbox", Vector3(v.x, FLOOR, v.z - 0.8), "Достать, что лежит в трубе", 1.1, true, false)
+	store.add_interactable("earring", Vector3(VENT_CRATE.x, FLOOR, VENT_CRATE.z - 0.65), "Рассмотреть серьги", 1.0, true, false)
+	store.add_interactable("take_tin", Vector3(VENT_CRATE.x, FLOOR, VENT_CRATE.z - 0.6), "Забрать коробку", 1.0, true, false)
+
+
+## The flat round sweet tin: dented, the paint worn at the
+## rim. Open, its lid leans against it and inside lie four locks of hair,
+## each tied round with red cotton thread, and a pair of amber earrings.
+static func _tin(open: bool) -> Node3D:
+	var n := Node3D.new()
+	var kit := MeshBuilder.Kit.new()
+	var tin := kit.b("paint", Color(0.55, 0.12, 0.1))
+	var rim := kit.b("chrome", Color(0.95, 0.85, 0.55))
+	var r := 0.06
+	tin.cylinder(Props.at(0, 0, 0), r, r, 0.022, 20)
+	if open:
+		kit.b("chrome", Color(0.8, 0.78, 0.7)).cylinder(Props.at(0, 0.004, 0), r - 0.004, r - 0.004, 0.019, 20)
+		# The lid, propped against the tin's back edge.
+		var lid := Props.rot(Vector3.RIGHT, -1.1, Vector3(0, 0.005, r + 0.03))
+		tin.cylinder(lid, r + 0.002, r + 0.002, 0.008, 20)
+		rim.cylinder(lid.translated_local(Vector3(0, 0.008, 0)), r - 0.01, r - 0.01, 0.001, 20)
+		# Four locks: fair, dark, auburn, and Nina's light brown on top.
+		var hair := [Color(0.62, 0.5, 0.32), Color(0.12, 0.09, 0.07), Color(0.42, 0.2, 0.1), Color(0.45, 0.32, 0.2)]
+		for i in 4:
+			var c := Vector3(-0.033 + i * 0.022, 0.021 + i * 0.001, 0.008)
+			var xf := Props.rot(Vector3.UP, -0.25 + i * 0.17, c)
+			kit.b("cloth", hair[i]).ellipsoid(xf, Vector3(0.0085, 0.0045, 0.034), 8, 6)
+			kit.b("cloth", hair[i] * 0.8).ellipsoid(xf.translated_local(Vector3(0.003, 0.002, 0.008)), Vector3(0.006, 0.0035, 0.026), 8, 6)
+			kit.b("paint", Color(0.8, 0.06, 0.05)).cylinder(xf.translated_local(Vector3(0, -0.005, -0.016)), 0.0095, 0.0095, 0.007, 8)
+		# The earrings, in front of the locks: amber drops on silver hooks.
+		for k in 2:
+			var e := Vector3(-0.012 + k * 0.026, 0.026, -0.038)
+			kit.b("glass", Color(1.1, 0.55, 0.12, 0.85), Color(0.35, 0.14, 0.0), Mats.GLASS).ellipsoid(Props.at(e.x, e.y, e.z),
+				Vector3(0.0065, 0.0065, 0.009), 8, 6)
+			kit.b("chrome", Color(1.0, 1.0, 1.02)).box(Props.at(e.x, e.y + 0.004, e.z + 0.012), Vector3(0.0015, 0.0015, 0.012))
+	else:
+		tin.cylinder(Props.at(0, 0.02, 0), r + 0.002, r + 0.002, 0.008, 20)
+	kit.build(n, false)
+	var label := Label3D.new()
+	label.text = "МОНПАНСЬЕ"
+	label.font_size = 18
+	label.pixel_size = 0.0007
+	label.modulate = Color(0.95, 0.85, 0.55)
+	label.shaded = true
+	if open:
+		label.position = Vector3(0, 0.035, r + 0.03 + 0.012)
+		label.rotation = Vector3(-1.1 - PI * 0.5, PI, 0)
+	else:
+		label.position = Vector3(0, 0.0285, 0)
+		label.rotation = Vector3(-PI * 0.5, 0, 0)
+	n.add_child(label)
+	return n
+
+
+## The four wing nuts off by hand: the grille comes away and is stood
+## against the wall below.
+func open_vent(instant := false) -> void:
+	vent_open = true
+	var to := Vector3(VENT.x + 0.42, FLOOR + 0.25, VENT.z - 0.12)
+	if instant:
+		_grille.position = to
+		_grille.rotation.x = 0.25
+	else:
+		var tw := create_tween().set_parallel()
+		tw.tween_property(_grille, "position", to, 0.9).set_trans(Tween.TRANS_QUAD)
+		tw.tween_property(_grille, "rotation:x", 0.25, 0.9)
+
+
+## The tin out of the duct and open on the crate.
+func open_tin() -> void:
+	_tin_in_duct.visible = false
+	_tin_open.visible = true
+
+
+## Gordeev puts it in his coat; or he got there first and the duct is empty.
+func take_tin() -> void:
+	_tin_in_duct.visible = false
+	_tin_open.visible = false
