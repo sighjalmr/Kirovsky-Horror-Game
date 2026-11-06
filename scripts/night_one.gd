@@ -472,7 +472,8 @@ func _watch_lurk() -> void:
 	var cam: Camera3D = main.player.camera
 	var head := k.global_position + Vector3(0, 1.5, 0)
 	var d := cam.global_position.distance_to(head)
-	var shown: bool = main.player.flashlight_on or main.store.is_lit(k.global_position)
+	# Night four: the lamp of his own torch gives him away in the dark.
+	var shown: bool = main.player.flashlight_on or main.store.is_lit(k.global_position) or k.torch_on()
 	if d > 8.0 or cam.is_position_behind(head) or not (shown or d < 4.0):
 		return
 	var at := cam.unproject_position(head)

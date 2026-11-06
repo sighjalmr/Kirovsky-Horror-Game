@@ -84,6 +84,10 @@ const CROWBAR_POS := Vector3(-9.27, 0, 27.4)
 ## Under the director's desk, knees to the chin.
 const HIDE_DESK := [Vector3(2.4, 0, 30.75), Vector3(0, 0, -1), Vector3(2.4, 0, 29.7), "Спрятаться под столом директора"]
 const LURKS_3 := [[0, 14], [2, 58], [4, 40]]
+## Behind the broken crates in the cellar, out of the line from the stairs
+## (the same spot as on night four).
+const HIDE_CELLAR := [Vector3(0.45, BackRooms.FLOOR, 33.65), Vector3(-1, 0, -0.2), Vector3(-0.2, BackRooms.FLOOR, 33.9),
+	"Спрятаться за ящиками"]
 
 var rooms: BackRooms
 ## The office call: "" (not yet), ringing, open (the line left open, follow
@@ -121,6 +125,7 @@ func _ready() -> void:
 	store.add_interactable("crowbar", CROWBAR_POS, "Снять лом с пожарного щита", 1.2, true, false)
 	store.add_interactable("call02", Vector3(10.9, 0, 1.75), N3_CALL_PROMPT, 1.0, false, false)
 	store.add_interactable("hide_desk", HIDE_DESK[2], HIDE_DESK[3], 1.0, false, false)
+	store.add_interactable("hide_cellar", HIDE_CELLAR[2], HIDE_CELLAR[3], 1.0, false, false)
 	store.add_interactable("hang_up", BackRooms.HANDSET + Vector3(0.28, -0.77, -0.5), "Положить трубку на рычаг", 1.1, true, false)
 	# Once he takes the crowbar, its red painted outline on the board shows.
 	_crowbar_node = Node3D.new()
@@ -391,8 +396,9 @@ func interact(id: String) -> bool:
 				_scare()
 		"call02":
 			_call_police()
-		"hide_desk":
-			main.hide_in({"id": id, "pos": HIDE_DESK[0], "face": HIDE_DESK[1], "out": HIDE_DESK[2]})
+		"hide_desk", "hide_cellar":
+			var h: Array = HIDE_DESK if id == "hide_desk" else HIDE_CELLAR
+			main.hide_in({"id": id, "pos": h[0], "face": h[1], "out": h[2]})
 			if main.player.hidden and not _talked.has("hid"):
 				_talked["hid"] = true
 				hud.say(G_HIDE)
@@ -501,6 +507,7 @@ func _rooms_prompts() -> void:
 	store.set_interactable("hang_up", office and clues.handset and not _talked.has("hung_up"))
 	store.set_interactable("letter", office and not clues.letter)
 	store.set_interactable("hide_desk", office)
+	store.set_interactable("hide_cellar", open)
 	store.set_interactable("call02", clues.body and not called)
 
 
@@ -534,6 +541,12 @@ func objectives() -> Array:
 				out.append(task("Осмотреть тело", clues.cord, true))
 	if clues.body and not called:
 		out.append(task("Позвонить в милицию с поста (02)"))
+		if line in ["open", "found"] and not _talked.has("hung_up"):
+			out.append(task("Сначала положить трубку в кабинете директора, иначе линия занята", false, true))
+	var kp: Vector3 = main.killer.global_position
+	if main.killer.is_active() and not main.player.hidden and BackRooms.in_cellar(main.player.global_position) \
+			and kp.z > 26.0 and absf(kp.x - Store.CELLAR_X) < 4.0:
+		out.append(task("Он у подвала: спрятаться за ящиками (E), погасить фонарь", false, false, true))
 	_round_tasks(out)
 	_killer_task(out)
 	return out
@@ -566,7 +579,10 @@ func clue_marks() -> Array:
 		if not clues.boots:
 			out.append(Vector3(Store.CELLAR_X - 0.1, BackRooms.FLOOR + 0.03, 33.6))
 	if clues.body and not called:
-		out.append([main.store.phone_pos + Vector3(0, 0.15, 0), 9.0])
+		if line in ["open", "found"] and not _talked.has("hung_up"):
+			out.append([BackRooms.HANDSET + Vector3(0, 0.03, 0), 9.0])
+		else:
+			out.append([main.store.phone_pos + Vector3(0, 0.15, 0), 9.0])
 	_round_marks(out)
 	return out
 

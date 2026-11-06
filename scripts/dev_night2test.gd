@@ -17,6 +17,13 @@ func _ready() -> void:
 	main.hud.chosen.emit(0)
 	await _until_true(func(): return main.night.koles_state == "gone", 300.0)
 	_check(main.night.clues.seizure, "bag taken by Колесников")
+	await _until_true(func(): return not Main.checkpoint.is_empty(), 300.0)
+	_check(not Main.checkpoint.rounds[0].signed, "saved at the lock-in (%s), before the first round" % main._fmt(Main.checkpoint.minutes))
+	var n: NightTwo = main.night
+	n.restore_state(Main.checkpoint.duplicate(true))
+	_check(n.koles_car == "sitting" and n.koles_seat.visible and n.koles_bag, "restored: he sits in the «бобик» with the bag")
+	await _until_true(func(): return n.koles_car == "empty", 300.0)
+	_check(n.street.get("out_at", "") != "", "he got out of the car at " + n.street.get("out_at", "?"))
 	await _until(23, 31)
 	for id in ["locker31", "register2", "cellar", "chest_A3", "storage_door", "panel", "journal"]:
 		_use(id)

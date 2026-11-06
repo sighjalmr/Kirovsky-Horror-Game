@@ -381,6 +381,9 @@ func _task_shots(p: Player, store: Store, night: NightOne) -> void:
 ## still at the end of a dark aisle.
 func _polish_shots(p: Player, store: Store, night: NightOne) -> void:
 	Killer.blind = true
+	if night is NightTwo or night is NightThree or night is NightFour:
+		await _polish_late(p, store, night)
+		return
 	main._timeline.clear()
 	night.kovpak.visible = false
 	night.tamara.visible = false
@@ -433,3 +436,72 @@ func _shot(id: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(out_dir.path_join(id + ".png"))
 	print("shot ", id)
+
+
+## Nights two to four (--night2/3/4 --autoshot=DIR --polishshot): the man
+## waiting at the end of an aisle, the hiding place in the cellar with the
+## task hint, his torch held low while he waits.
+func _polish_late(p: Player, store: Store, night: NightOne) -> void:
+	main._timeline.clear()
+	night.kovpak.visible = false
+	night._talked["kovpak_walk"] = true
+	night.kovpak_state = "done"
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	main.minutes = Main.clock(3, 6)
+	var k: Killer = main.killer
+	# The torch's whirr would call him straight over: keep him at his post.
+	p.noise.disconnect(main.on_noise)
+	if night is NightTwo:
+		var n2: NightTwo = night
+		n2.koles_state = "gone"
+		n2.koles_car = "gone"
+		night.killer_phase = "in"
+		k.activate(Vector3(-3.0, 0, 16.8))
+		_place(p, Vector3(-3.0, 0, 11.4), Vector3(0, 0, 1))
+		p.head.rotation.x = 0.03
+		p.force_flashlight = true
+		k.lurk_at(Vector3(-3.0, 0, 16.4), 120.0)
+		night._lurk_seen = false
+		await _until(func(): return k.is_lurking(), 60.0)
+		await _wait(2.5)
+		# The prologue's talk is still running underneath: put it out of view.
+		main.hud.choices.visible = false
+		n2.kolesnikov.visible = false
+		n2.kovpak.visible = false
+		await _wait(0.5)
+		await _shot("p2_lurk")
+		return
+	if night is NightThree:
+		var n3: NightThree = night
+		n3.rooms.show_broken_lock()
+		store.open_cellar(true)
+		n3.rooms.open_fridge(true)
+		n3.clues.body = true
+		n3._rooms_prompts()
+		night.killer_phase = "in"
+		k.activate(Vector3(Store.CELLAR_X - 0.4, 0, 27.2))
+		k.lurk_at(Vector3(Store.CELLAR_X, 0, 27.4), 120.0)
+		_place(p, Vector3(-0.2, BackRooms.FLOOR, 33.9), Vector3(1, 0, 0.1))
+		p.force_flashlight = true
+		await _wait(1.5)
+		_place(p, n3.HIDE_CELLAR[2] + Vector3(0, 0, -0.5), Vector3(0.6, 0, 1))
+		p.head.rotation.x = -0.25
+		await _wait(2.0)
+		await _shot("p3_hide_cellar_hint")
+		return
+	var n4: NightFour = night
+	store.power_cut()
+	n4.rooms.cut_wire()
+	n4.power_cut = true
+	main._lit = 0.0
+	night.killer_phase = "in"
+	k.activate(Vector3(-3.0, 0, 17.6))
+	k.set_torch(true)
+	_place(p, Vector3(-3.0, 0, 11.6), Vector3(0, 0, 1))
+	p.head.rotation.x = 0.02
+	k.lurk_at(Vector3(-3.0, 0, 17.2), 120.0)
+	night._lurk_seen = false
+	await _until(func(): return k.is_lurking(), 60.0)
+	await _wait(3.0)
+	await _shot("p4_lurk_torch_low")
