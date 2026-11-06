@@ -20,7 +20,7 @@ extends CanvasLayer
 signal finished
 
 ## Which cutscenes play before each chapter, in order.
-const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": ["night2"], "night3": ["night3"]}
+const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": ["night2"], "night3": ["night3"], "night4": ["night4"]}
 
 const NINA_1 := "Нина: — Вот. Пробила, как вы сказали. Сорок килограммов говядины, без реализации."
 const NINA_2 := "Нина: — Теперь вы им всё покажете? Правда?"
@@ -42,6 +42,9 @@ const N2_KOLES := "На крыльце курит милиционер. Учас
 const N3_FROST := "Четверг. К ночи дождь перешёл в снежную крупу. Через неделю у нас всегда зима."
 const N3_CALL := "Ковпак позвонил мне в обед. Попросил прийти пораньше. Голос как у человека, который не спал."
 const N3_VOLGA := "«Волга» стоит с работающим мотором. Он уже в пальто. Домой торопится, или подальше отсюда."
+const N4_SUNDAY := "Воскресенье. Нину увезли в морг в пятницу утром. Рината держат в СИЗО. Для милиции дело закрыто."
+const N4_BOBIK := "За киоском опять «бобик» участкового. Фары погашены, мотор холодный. В кабине никого."
+const N4_KNOWS := "Он знает, что я был в подвале. И знает, кем я был до пенсии. Сегодня он придёт не за сумкой."
 const N2_BAG := "Сумка Нины всё ещё лежит в тридцать первой ячейке. Если он пришёл за ней, надо успеть её убрать, пока он курит."
 
 ## Till 2 in the store, where Nina punched the receipt.
@@ -164,6 +167,8 @@ func _play() -> void:
 			await _night_two()
 		"night3":
 			await _night_three()
+		"night4":
+			await _night_four()
 	_finish()
 
 
@@ -797,6 +802,48 @@ func _night_three() -> void:
 	await shot(6.5, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.2, 1.5, -16.4), Vector3(3.0, 1.8, -6.5), 40.0)
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
 	await shot(6.0, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),
+		Vector3(0.5, Exterior.PORCH + 1.5, 1.2), 50.0, 1.0)
+	fade(1.0, 1.0)
+	await wait(1.2)
+
+
+# --- Sunday 23 October: the empty «бобик» behind the kiosk ---------------------------
+
+func _night_four() -> void:
+	_street("night")
+	sound("rain", -12.0)
+	var bobik := Vehicles.bobik()
+	ext.add_child(bobik)
+	var bp := Vector3(-18.0, 0, -19.6)
+	bobik.position = bp
+	bobik.rotation.y = PI * 0.5
+	# The lamp on the corner of the next block catches it, and nothing else.
+	var lamp := OmniLight3D.new()
+	lamp.position = bp + Vector3(1.2, 4.5, -2.5)
+	lamp.omni_range = 9.0
+	lamp.light_energy = 1.6
+	lamp.light_color = Color(1.0, 0.75, 0.45)
+	ext.add_child(lamp)
+	_black.color.a = 1.0
+	fade(0.0, 2.0)
+	caption("Воскресенье, 23 октября 1988 года, 22:20", 4.5)
+	_drive(0.15, 20.0)
+	say(N4_SUNDAY)
+	await shot(7.5, Vector3(-30, 22, -64), Vector3(0, 3, -8), Vector3(-14, 10, -38), Vector3(1, 2.5, -4), 42.0, 0.2)
+	_wiping = true
+	var inside := sound("rain_car", -8.0)
+	await ride(6.0, ext.zhiguli)
+	_wiping = false
+	inside.queue_free()
+	Vehicles.set_lights(ext.zhiguli, false)
+	sound("click", -8.0, ext.zhiguli)
+	if is_instance_valid(_engine):
+		_tween().tween_property(_engine, "volume_db", -60.0, 1.5)
+	say(N4_BOBIK)
+	await shot(7.0, bp + Vector3(1.0, 1.5, -7.2), bp + Vector3(0, 1.0, 0), bp + Vector3(0.4, 1.4, -5.6), bp + Vector3(0, 1.1, 0), 40.0, 0.4)
+	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	say(N4_KNOWS)
+	await shot(7.5, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),
 		Vector3(0.5, Exterior.PORCH + 1.5, 1.2), 50.0, 1.0)
 	fade(1.0, 1.0)
 	await wait(1.2)

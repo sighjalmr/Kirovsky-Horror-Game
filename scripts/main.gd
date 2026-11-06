@@ -116,6 +116,8 @@ func _ready() -> void:
 		chapter = "night2"
 	if "--night3" in OS.get_cmdline_user_args():
 		chapter = "night3"
+	if "--night4" in OS.get_cmdline_user_args():
+		chapter = "night4"
 	if Cutscene.vertical():  # dev: a phone video of a cutscene
 		get_tree().root.content_scale_size = Vector2i(1080, 1920)
 		hud.subtitle.position = Vector2(60, 1260)
@@ -129,7 +131,9 @@ func _ready() -> void:
 	if chapter == "day1":
 		_ready_day()
 		return
-	if chapter == "night3":
+	if chapter == "night4":
+		night = NightFour.new(self)
+	elif chapter == "night3":
 		night = NightThree.new(self)
 	elif chapter == "night2":
 		night = NightTwo.new(self)
@@ -159,7 +163,8 @@ func _ready() -> void:
 			add_child(st)
 			return
 	if "--nighttest" in OS.get_cmdline_user_args():
-		var test: String = {"night2": "res://scripts/dev_night2test.gd", "night3": "res://scripts/dev_night3test.gd"}.get(
+		var test: String = {"night2": "res://scripts/dev_night2test.gd", "night3": "res://scripts/dev_night3test.gd",
+			"night4": "res://scripts/dev_night4test.gd"}.get(
 			chapter, "res://scripts/dev_nighttest.gd")
 		add_child(load(test).new().with(self))
 		return
@@ -176,7 +181,7 @@ func _ready() -> void:
 		"Shift — бег (шумно и недолго: одышка)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
 		"E — осмотреть, поговорить, спрятаться      Tab — блокнот      J — задания\n\n" +
-		_continue_line() + "Нажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая      4 — ночь третья")
+		_continue_line() + "Нажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая      4 — ночь третья      5 — ночь четвёртая")
 
 
 ## "C — continue from the signature at 02:20" when the save has one.
@@ -187,6 +192,8 @@ func _continue_line() -> String:
 
 
 func _night_name() -> String:
+	if chapter == "night4":
+		return "Ночь четвёртая. Воскресенье, 23 октября"
 	if chapter == "night3":
 		return "Ночь третья. Четверг, 20 октября"
 	return "Ночь вторая. Понедельник, 17 октября" if chapter == "night2" else "Ночь первая. Пятница, 14 октября"
@@ -527,8 +534,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif phase == Phase.TITLE and event.is_action_pressed("interact"):
 		_start()
 	elif phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
-			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4]:
-		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2", KEY_4: "night3"}[
+			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5]:
+		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2", KEY_4: "night3", KEY_5: "night4"}[
 			(event as InputEventKey).physical_keycode]
 		if to != chapter:
 			_go_to(to, {}, [])
@@ -536,6 +543,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_go_to("day1", night.clues.duplicate(), [])
 	elif phase == Phase.END and night and chapter == "night2" and event.is_action_pressed("interact"):
 		_go_to("night3", night.clues.duplicate(), day_answers)
+	elif phase == Phase.END and night and chapter == "night3" and event.is_action_pressed("interact"):
+		_go_to("night4", night.clues.duplicate(), day_answers)
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
 		_go_to("night2", night_clues.duplicate(), day.asked.duplicate())
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible and not _struggling:
@@ -548,7 +557,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
 		get_tree().reload_current_scene()
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
-		if chapter in ["night2", "night3"] and phase == Phase.DEAD:
+		if chapter in ["night2", "night3", "night4"] and phase == Phase.DEAD:
 			_go_to(chapter, night_clues, day_answers)
 		else:
 			_go_to("night1", {}, [])
@@ -821,8 +830,11 @@ func _show_death() -> void:
 	var again := "R: начать смену заново"
 	if not checkpoint.is_empty():
 		again = "R: продолжить с последнего сохранения (%s)\nN: начать ночь сначала" % _fmt(checkpoint.minutes)
+	var after := "Участковый Колесников в тот же день задержал мясника Рината. Дело закрыли за неделю."
+	if chapter == "night4":
+		after = "Участковый Колесников записал: «Сторож оставил пост, находился в нетрезвом виде». Дело закрыли за неделю."
 	hud.show_title("ГОРДЕЕВ НЕ ДОЖИЛ ДО УТРА",
-		"В 6:10 его нашли грузчики, у %s. Рядом лежал топорик из мясного отдела.\nУчастковый Колесников в тот же день задержал мясника Рината. Дело закрыли за неделю.\n\n%s" % [_where(player.global_position), again],
+		"В 6:10 его нашли грузчики, у %s. Рядом лежал топорик из мясного отдела.\n%s\n\n%s" % [_where(player.global_position), after, again],
 		Hud.RED)
 
 
@@ -860,10 +872,15 @@ func end_shift() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
+	if chapter == "night4":
+		write_save("night4", night_clues, day_answers, {})
+		hud.show_title("06:00. КОНЕЦ ЧЕТВЁРТОЙ НОЧИ",
+			"%s\n\nДальше: день четвёртый, Эдик у пивного ларька, и пятая ночь (в работе).\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+		return
 	if chapter == "night3":
-		write_save("night3", night_clues, day_answers, {})
+		write_save("night4", night.clues, day_answers, {})
 		hud.show_title("06:00. КОНЕЦ ТРЕТЬЕЙ НОЧИ",
-			"%s\n\nДальше: день третий, разговор с Ковпаком (в работе).\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+			"%s\n\nE: дальше, ночь четвёртая (день третий с Ковпаком в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	if chapter == "night2":
 		write_save("night3", night.clues, day_answers, {})
@@ -912,7 +929,7 @@ static func _load_save() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "night3"]:
+	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "night3", "night4"]:
 		return
 	chapter = data.chapter
 	night_clues = data.get("night_clues", {})

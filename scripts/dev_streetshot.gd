@@ -27,7 +27,10 @@ func _ready() -> void:
 		main.store.switch_off(i, true)
 	n.interact("spare_key")
 	main.store.set_front_door(true)
-	if n is NightThree:
+	if n is NightFour:
+		main.store.set_front_door(false)
+		await _night_four(n as NightFour)
+	elif n is NightThree:
 		main.store.set_front_door(false)
 		await _night_three(n as NightThree)
 	elif n is NightTwo:
@@ -92,6 +95,60 @@ func _night_two(n: NightTwo) -> void:
 
 ## Night three: the wire, the office, the cellar, Nina, the morning.
 ##   ... -- --night3 --streetshot=/tmp/n3
+func _night_four(n: NightFour) -> void:
+	n.kovpak.visible = false
+	var only := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--only="):
+			only = a.get_slice("=", 1)
+	await _shot4(only, "v01_seal", Vector3(Store.CELLAR_X + 0.4, 0, 26.6), Vector3(0, 0, 1), -0.12, true)
+	main.store.power_cut()
+	n.rooms.cut_wire()
+	main._lit = 0.0
+	var k: Killer = main.killer
+	var bx := -3.0
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--beamx="):
+			bx = float(a.get_slice("=", 1))
+	k.activate(Vector3(bx + 0.3, 0, 17.6))
+	k.look_at(Vector3(bx, 0, 12.5), Vector3.UP)
+	k.deactivate()
+	k.visible = true
+	k.set_torch(true)
+	await _frames(4)
+	k.torch.rotation.x = deg_to_rad(-10.0)
+	await _shot4(only, "v02_beam", Vector3(bx, 0, 12.5), Vector3(0.03, 0, 1), 0.02, true)
+	k.visible = false
+	k.set_torch(false)
+	await _shot4(only, "v03_panel", Vector3(-0.5, 0, 26.7), Vector3(0, 0, 1), 0.05, true)
+	await _shot4(only, "v04_wire", Vector3(6.2, 0, 26.2), Vector3(0.05, 0, 1), 0.45, true)
+	main.store.open_cellar(true)
+	await _shot4(only, "v05_cellar", Vector3(Store.CELLAR_X + 0.2, BackRooms.FLOOR, 32.2), Vector3(-0.55, 0, 1), -0.25, true)
+	await _shot4(only, "v06_vent", Vector3(-4.2, BackRooms.FLOOR, 35.55), Vector3(0, 0, 1), 0.0, true)
+	n.rooms.open_vent(true)
+	await _shot4(only, "v07_duct", Vector3(-4.3, BackRooms.FLOOR, 35.75), Vector3(0, 0, 1), -0.05, true)
+	n.rooms.open_tin()
+	main.player.crouching = true
+	await _shot4(only, "v08_tin", Vector3(-4.31, BackRooms.FLOOR, 35.9), Vector3(0, 0, 1), -0.8, true)
+	main.player.crouching = false
+	n.clues = {"panel": true, "wire": true, "prints": true, "box": true, "earring": true}
+	n.power_cut = true
+	n.seal_seen = true
+	n.has_box = true
+	n.update_notebook()
+	main.hud.notebook.visible = only == "" or only == "v09_notebook"
+	await _shot4(only, "v09_notebook", Vector3(0, 0, 5), Vector3(0, 0, 1), 0.0, false)
+
+
+func _shot4(only: String, id: String, pos: Vector3, dir: Vector3, pitch: float, torch: bool) -> void:
+	if only != "" and only != id:
+		return
+	main.hud.clear_subtitles()
+	main.player.force_flashlight = torch
+	await _shot(id, pos, dir, pitch)
+	main.player.force_flashlight = false
+
+
 func _night_three(n: NightThree) -> void:
 	n.kovpak.visible = false
 	n.line = "open"
