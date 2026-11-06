@@ -20,7 +20,7 @@ extends CanvasLayer
 signal finished
 
 ## Which cutscenes play before each chapter, in order.
-const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": ["night2"], "night3": ["night3"], "night4": ["night4"]}
+const BEFORE := {"night1": ["flashback", "night1"], "day1": ["day1"], "night2": ["night2"], "night3": ["night3"], "night4": ["night4"], "night5": ["night5"]}
 
 const NINA_1 := "Нина: — Вот. Пробила, как вы сказали. Сорок килограммов говядины, без реализации."
 const NINA_2 := "Нина: — Теперь вы им всё покажете? Правда?"
@@ -169,6 +169,8 @@ func _play() -> void:
 			await _night_three()
 		"night4":
 			await _night_four()
+		"night5":
+			await _night_five()
 	_finish()
 
 
@@ -716,6 +718,54 @@ func _day_one() -> void:
 	fade(1.0, 0.8)
 	await wait(1.0)
 	crowd.queue_free()
+
+
+# --- Wednesday 26 October: he waits on the porch with Ковпак's keys -------------------
+
+const N5_LAST := "Среда. Пятая смена, последняя. Ковпак позвонил в обед: ключи у участкового, все до одного."
+const N5_KEYS := "Он стоит на крыльце и крутит на пальце связку Ковпака. Не прячется. Больше незачем."
+const N5_GO := "Коробка в двенадцатой ячейке. Эдик обещал прийти к закрытию. Ну что, Гордеев. Последняя смена."
+
+
+func _night_five() -> void:
+	_street("night")
+	sound("rain", -12.0)
+	var bobik := Vehicles.bobik()
+	ext.add_child(bobik)
+	bobik.position = Vector3(5.5, 0, -9.0)
+	bobik.rotation.y = PI * 0.5
+	var koles := Npc.new().setup("kolesnikov")
+	ext.add_child(koles)
+	var kp := Vector3(0.9, Exterior.PORCH, -3.6)
+	koles.global_position = kp
+	koles.rotation.y = 0.0
+	koles.pose = "idle"
+	_black.color.a = 1.0
+	fade(0.0, 2.0)
+	caption("Среда, 26 октября 1988 года, 22:20", 4.5)
+	_drive(0.2, 18.0)
+	say(N5_LAST)
+	await shot(7.0, Vector3(-24, 16, -52), Vector3(0, 3, -6), Vector3(-10, 8, -32), Vector3(0.5, 2.2, -4), 42.0, 0.2)
+	_wiping = true
+	var inside := sound("rain_car", -7.0)
+	await ride(7.0, ext.zhiguli)
+	_wiping = false
+	inside.queue_free()
+	Vehicles.set_lights(ext.zhiguli, false)
+	sound("click", -8.0, ext.zhiguli)
+	if is_instance_valid(_engine):
+		_tween().tween_property(_engine, "volume_db", -60.0, 1.5)
+	koles.look_at_point(Exterior.ZHIGULI_SPOT)
+	say(N5_KEYS)
+	sound("keys", -6.0, kp + Vector3(0, 1.1, 0))
+	await shot(7.5, kp + Vector3(1.3, 0.55, -3.0), kp + Vector3(0, 1.6, 0), kp + Vector3(0.9, 0.5, -2.4),
+		kp + Vector3(0, 1.62, 0), 34.0, 0.3)
+	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	say(N5_GO)
+	await shot(7.5, Vector3(3.8, 1.65, -10.0), kp + Vector3(0, 1.5, 0), Vector3(1.6, Exterior.PORCH + 1.62, -5.8),
+		kp + Vector3(0, 1.6, 0), 45.0, 1.0)
+	fade(1.0, 1.0)
+	await wait(1.2)
 
 
 # --- Monday 17 October: the участковый on the porch ---------------------------------

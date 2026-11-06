@@ -118,6 +118,8 @@ func _ready() -> void:
 		chapter = "night3"
 	if "--night4" in OS.get_cmdline_user_args():
 		chapter = "night4"
+	if "--night5" in OS.get_cmdline_user_args():
+		chapter = "night5"
 	if Cutscene.vertical():  # dev: a phone video of a cutscene
 		get_tree().root.content_scale_size = Vector2i(1080, 1920)
 		hud.subtitle.position = Vector2(60, 1260)
@@ -131,7 +133,9 @@ func _ready() -> void:
 	if chapter == "day1":
 		_ready_day()
 		return
-	if chapter == "night4":
+	if chapter == "night5":
+		night = NightFive.new(self)
+	elif chapter == "night4":
 		night = NightFour.new(self)
 	elif chapter == "night3":
 		night = NightThree.new(self)
@@ -164,7 +168,7 @@ func _ready() -> void:
 			return
 	if "--nighttest" in OS.get_cmdline_user_args():
 		var test: String = {"night2": "res://scripts/dev_night2test.gd", "night3": "res://scripts/dev_night3test.gd",
-			"night4": "res://scripts/dev_night4test.gd"}.get(
+			"night4": "res://scripts/dev_night4test.gd", "night5": "res://scripts/dev_night5test.gd"}.get(
 			chapter, "res://scripts/dev_nighttest.gd")
 		add_child(load(test).new().with(self))
 		return
@@ -181,7 +185,7 @@ func _ready() -> void:
 		"Shift — бег (шумно и недолго: одышка)      C — пригнуться (тихо)\n" +
 		"F (держать) — фонарик-«жучок» (шумно)\n" +
 		"E — осмотреть, поговорить, спрятаться      Tab — блокнот      J — задания\n\n" +
-		_continue_line() + "Нажмите E, чтобы начать смену\n1 — ночь первая      2 — день первый      3 — ночь вторая      4 — ночь третья      5 — ночь четвёртая")
+		_continue_line() + "Нажмите E, чтобы начать смену\n1 — ночь первая   2 — день первый   3 — ночь вторая   4 — ночь третья   5 — ночь четвёртая   6 — ночь пятая")
 
 
 ## "C — continue from the signature at 02:20" when the save has one.
@@ -192,6 +196,8 @@ func _continue_line() -> String:
 
 
 func _night_name() -> String:
+	if chapter == "night5":
+		return "Ночь пятая, последняя. Среда, 26 октября"
 	if chapter == "night4":
 		return "Ночь четвёртая. Воскресенье, 23 октября"
 	if chapter == "night3":
@@ -534,8 +540,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif phase == Phase.TITLE and event.is_action_pressed("interact"):
 		_start()
 	elif phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
-			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5]:
-		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2", KEY_4: "night3", KEY_5: "night4"}[
+			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6]:
+		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2", KEY_4: "night3", KEY_5: "night4",
+			KEY_6: "night5"}[
 			(event as InputEventKey).physical_keycode]
 		if to != chapter:
 			_go_to(to, {}, [])
@@ -545,6 +552,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_go_to("night3", night.clues.duplicate(), day_answers)
 	elif phase == Phase.END and night and chapter == "night3" and event.is_action_pressed("interact"):
 		_go_to("night4", night.clues.duplicate(), day_answers)
+	elif phase == Phase.END and night and chapter == "night4" and event.is_action_pressed("interact"):
+		var carried := night.clues.duplicate()
+		carried["has_box"] = (night as NightFour).has_box
+		_go_to("night5", carried, day_answers)
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
 		_go_to("night2", night_clues.duplicate(), day.asked.duplicate())
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible and not _struggling:
@@ -557,7 +568,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
 		get_tree().reload_current_scene()
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
-		if chapter in ["night2", "night3", "night4"] and phase == Phase.DEAD:
+		if chapter in ["night2", "night3", "night4", "night5"] and phase == Phase.DEAD:
 			_go_to(chapter, night_clues, day_answers)
 		else:
 			_go_to("night1", {}, [])
@@ -766,6 +777,9 @@ func _struggle() -> void:
 		return
 	Sfx.play_3d(view, "clank", killer.global_position + Vector3(0, 1.6, 0), 0.0, 0.8)
 	_flash = 0.3
+	# Night five: he is down, and Gordeev may finish it (an ending).
+	if await night.on_tore_free():
+		return
 	player.controllable = true
 	player.busy = false
 	player.breath = maxf(player.breath, 0.7)
@@ -833,6 +847,8 @@ func _show_death() -> void:
 	var after := "Участковый Колесников в тот же день задержал мясника Рината. Дело закрыли за неделю."
 	if chapter == "night4":
 		after = "Участковый Колесников записал: «Сторож оставил пост, находился в нетрезвом виде». Дело закрыли за неделю."
+	if chapter == "night5":
+		after = "В журнале обходов последняя запись почерком участкового: «Сторож оставил пост». Коробку из-под монпансье никто не искал.\nКонцовка «Смерть». Всего концовок пять."
 	hud.show_title("ГОРДЕЕВ НЕ ДОЖИЛ ДО УТРА",
 		"В 6:10 его нашли грузчики, у %s. Рядом лежал топорик из мясного отдела.\n%s\n\n%s" % [_where(player.global_position), after, again],
 		Hud.RED)
@@ -873,9 +889,11 @@ func end_shift() -> void:
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
 	if chapter == "night4":
-		write_save("night4", night_clues, day_answers, {})
+		var carried := night.clues.duplicate()
+		carried["has_box"] = (night as NightFour).has_box
+		write_save("night5", carried, day_answers, {})
 		hud.show_title("06:00. КОНЕЦ ЧЕТВЁРТОЙ НОЧИ",
-			"%s\n\nДальше: день четвёртый, Эдик у пивного ларька, и пятая ночь (в работе).\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+			"%s\n\nE: дальше, ночь пятая, последняя (день четвёртый в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	if chapter == "night3":
 		write_save("night4", night.clues, day_answers, {})
@@ -890,6 +908,28 @@ func end_shift() -> void:
 	write_save("day1", night.clues, [], {})
 	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
 		"%s\n\nE: дальше, день первый\nR: сыграть ночь ещё раз" % night.summary())
+
+
+const ENDINGS := {
+	"prosecutor": ["КОНЕЦ. ПРОКУРОР", "Гордеев дожил до утра и довёл дело до прокурора: коробка, страница Пахомова и показания Эдика. Колесников осуждён, дело засекречено.\nЛучшая концовка."],
+	"word": ["КОНЕЦ. СЛОВО ПРОТИВ СЛОВА", "Гордеев дожил до утра, но для суда этого мало. Нужны и коробка, и свидетель: Эдик забирает сумку из камеры хранения в самом начале смены."],
+	"wrong": ["КОНЕЦ. ДЕЛО ЗАКРЫТО", "Неверное обвинение или улика в чужих руках. Колесников закрыл дело, и через год всё повторилось."],
+	"defence": ["КОНЕЦ. САМООБОРОНА", "Гордеев убил Колесникова в зале. Правду он знает, но судили его самого."],
+}
+
+
+## Night five is the last: its ending, over black.
+func end_game(kind: String, summary: String) -> void:
+	phase = Phase.END
+	checkpoint = {}
+	player.controllable = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	hud.set_prompt("")
+	hud.clear_subtitles()
+	hud.fade_to(0.95, 1.0)
+	write_save("night5", night_clues, day_answers, {})
+	var e: Array = ENDINGS[kind]
+	hud.show_title(e[0], "%s\n\n%s\nВсего концовок пять: прокурор, слово против слова, дело закрыто, самооборона и смерть.\n\nR: сыграть пятую ночь ещё раз      N: начать с первой ночи" % [e[1], summary])
 
 
 ## Gordeev walks out into the afternoon; the day's statements on the card.
@@ -929,7 +969,7 @@ static func _load_save() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "night3", "night4"]:
+	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "night3", "night4", "night5"]:
 		return
 	chapter = data.chapter
 	night_clues = data.get("night_clues", {})

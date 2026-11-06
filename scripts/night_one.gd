@@ -1098,6 +1098,12 @@ func street_notes() -> PackedStringArray:
 	return out
 
 
+## Main calls this when Gordeev has just torn free of him; true when the
+## chapter took over (night five: he may finish it).
+func on_tore_free() -> bool:
+	return false
+
+
 func stop_sounds() -> void:
 	set_radio(false)
 	_phone.stop()
