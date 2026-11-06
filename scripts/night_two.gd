@@ -104,6 +104,9 @@ const N2_K_NOT_NOW := "Ковпак: — Не при нём, Гордеев. И�
 const N2_CELLAR_AGAIN := "Замок висит. Новый. Ключа у меня нет."
 const N2_K_END_OK := "Ковпак: — Подписи на месте. Слыхал? Пахомов-то утонул. Пил много."
 const N2_G_END := "Ковпак говорит про Пахомова, а смотрит в пол. Днём схожу к Ринату: седьмого он задерживался, мясо рубил."
+## He stops at the end of an aisle and waits, as on Friday; not while he is
+## still in the «бобик» or at the panel at 03:20.
+const LURKS_2 := [[0, 18], [3, 6], [4, 44]]
 
 var kolesnikov: Npc
 ## Колесников in the driver's seat of the «бобик» (a second body, seated).
@@ -123,6 +126,8 @@ var _answer := -1
 ## What Gordeev brought from night one (clue keys) and day one (question ids).
 var known: Dictionary = {}
 var heard: Array = []
+## Колесников walked off with Nina's bag (kept across a save: the bag mesh is not).
+var koles_bag := false
 
 
 func _init(m: Node) -> void:
@@ -208,6 +213,8 @@ func build_timeline() -> void:
 			_killer_return())
 	m.at(23, 5, _killer_enters)
 	m.at(0, 10, func(): hud.say(N2_G_0010))
+	for t: Array in LURKS_2:
+		m.at(t[0], t[1], _lurk)
 	for i in rounds.size():
 		var idx := i
 		var r: Dictionary = rounds[i]
@@ -295,6 +302,7 @@ func _prologue() -> void:
 		hud.say(N2_G_NOT_BELIEVE)
 	else:
 		store.empty_locker31()
+		koles_bag = true
 		kolesnikov.body.bag = kolesnikov.body.attach("Bip01 L Hand", Characters.handbag(Color(0.45, 0.2, 0.18)))
 		_find_clue("seizure", N2_CLUE_SEIZURE)
 		hud.say(N2_G_TAKES)
@@ -324,6 +332,9 @@ func _prologue() -> void:
 	await get_tree().create_timer(2.5, false).timeout
 	store.car_leave()
 	hud.say(G_LOCKED)
+	# Locked in: a death before the first round no longer replays the prologue.
+	if main.phase == Main.Phase.PLAY:
+		main.save_checkpoint()
 
 
 # --- the «бобик» behind the kiosk -------------------------------------------------
@@ -599,7 +610,7 @@ func interact(id: String) -> bool:
 				hud.say(N2_G_CAR_AGAIN, -1.0, true)
 			else:
 				street["car"] = true
-				street["car_bag"] = kolesnikov.body.bag != null
+				street["car_bag"] = koles_bag
 				Sfx.play_3d(main.view, "cloth", main.player.global_position + Vector3(0, 1, 0), -10.0)
 				hud.say(N2_G_CAR if street.car_bag else N2_G_CAR_NO_BAG, -1.0, true)
 				update_notebook()
@@ -858,6 +869,8 @@ func save_state() -> Dictionary:
 	d["bag_hidden"] = bag_hidden
 	d["duty_on"] = main.store.duty_on
 	d["calls_missed"] = _calls_missed
+	d["koles_car"] = koles_car
+	d["koles_bag"] = koles_bag
 	return d
 
 
@@ -867,6 +880,7 @@ func restore_state(d: Dictionary) -> void:
 	var was_gone := koles_car == "gone"
 	koles_car = "empty"
 	bag_hidden = d.get("bag_hidden", false)
+	koles_bag = d.get("koles_bag", false)
 	_calls_missed = int(d.get("calls_missed", 0))
 	super(d)
 	kovpak_state = "done"
@@ -876,6 +890,15 @@ func restore_state(d: Dictionary) -> void:
 			outdoors.bobik.queue_free()
 			outdoors.bobik = null
 		koles_car = "gone"
+	elif d.get("koles_car", "empty") in ["walking", "sitting"]:
+		# Saved at the lock-in: he is back behind the wheel, smoking, and
+		# gets out at 23:03 as before (or after a few minutes, if that is past).
+		koles_car = "sitting"
+		_sat_at = main.minutes - 9.0
+		koles_seat.visible = true
+		store.set_interactable("bobik_watch", not street.get("bobik", false))
+		if main.minutes >= Main.clock(23, 3):
+			main.after(1.0, _koles_leaves_car)
 	else:
 		store.set_interactable("bobik_car", true)
 	if not d.get("duty_on", true):

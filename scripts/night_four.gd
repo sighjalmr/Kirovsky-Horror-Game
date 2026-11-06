@@ -83,6 +83,8 @@ const N4_G_LOCKER := "Коробка в двенадцатой ячейке, п�
 const N4_G_SUROVA := "Серьга Суровой. Два года назад мне велели не копать. Теперь я знаю, кого покрывали."
 const N4_G_LOST := "Коробки у меня нет. Есть следы к решётке и пустая труба. С этим к прокурору не пойдёшь."
 const N4_G_NOTHING := "Он пришёл посмотреть на меня. Живой ли. Знаю ли я. Я пока ничего не знаю."
+## When he tore the seal himself at 03:20 and asks Gordeev about it.
+const N4_G_SEAL_HIS := "Пломбу он сорвал сам, в три двадцать. А спрашивает с меня."
 
 const N4_FINAL := "Свет вырубили и телефон перерезали, чтобы забрать из подвала своё. В вентиляции жестянка из-под монпансье: четыре пряди, одна Нинина, и янтарная серьга Галины Суровой, вторая из пары. Четыре женщины. Один человек в форме."
 
@@ -108,6 +110,8 @@ var box_hidden := false
 var box_lost := false
 var tin_open := false
 var he_knows := false
+## Who tore the militia seal: "" (nobody), "gordeev", "him".
+var seal_by := ""
 var _seal: Node3D
 var _hunt_t := 20.0
 var _seen_stairs := false
@@ -263,8 +267,6 @@ func _cut_power() -> void:
 	power_cut = true
 	main.store.power_cut()
 	rooms.cut_wire()
-	if radio_on:
-		pass  # the «Альпинист» runs on batteries
 	main.hud.say(N4_G_CUT, -1.0, true)
 	main.store.set_interactable("phone", true, "Снять трубку: позвонить 02")
 	await get_tree().create_timer(3.0, false).timeout
@@ -386,6 +388,7 @@ func set_radio(on: bool, by_him := false) -> void:
 func _tear_seal(by_gordeev := true) -> void:
 	var store: Store = main.store
 	_seal.visible = false
+	seal_by = "gordeev" if by_gordeev else "him"
 	Sfx.play_3d(store, "cloth", SEAL_POS, -6.0, 1.5)
 	store.open_cellar()
 	store.set_interactable("cellar", false)
@@ -585,6 +588,10 @@ func objectives() -> Array:
 				out.append(task("Телефон перерезан: позвонить некуда", true))
 		else:
 			out.append(task("Телефон на посту: позвонить 02", false))
+	var kp: Vector3 = main.killer.global_position
+	if main.killer.is_active() and not main.player.hidden and BackRooms.in_cellar(main.player.global_position) \
+			and kp.z > 26.0 and absf(kp.x - Store.CELLAR_X) < 4.0:
+		out.append(task("Он у подвала: спрятаться за ящиками (E), погасить фонарь", false, false, true))
 	_round_tasks(out)
 	if killer_phase == "in":
 		var hint := task("Он с фонарём: не попадать в луч, пригнуться (C), прятаться (E)" if power_cut
@@ -748,8 +755,10 @@ func _morning() -> void:
 	hud.say(N4_KL_COME)
 	if power_cut:
 		hud.say(N4_G_SAID)
-	if main.store.cellar_open and not box_lost or seal_seen and main.store.cellar_open:
+	if main.store.cellar_open:
 		hud.say(N4_KL_SEAL)
+		if seal_by == "him":
+			hud.say(N4_G_SEAL_HIS)
 	hud.say(N4_KL_WARN)
 	if has_box and not box_hidden:
 		hud.say(N4_KL_POCKET)
@@ -791,6 +800,7 @@ func save_state() -> Dictionary:
 	d["box_lost"] = box_lost
 	d["he_knows"] = he_knows
 	d["seen_stairs"] = _seen_stairs
+	d["seal_by"] = seal_by
 	return d
 
 
@@ -807,6 +817,7 @@ func restore_state(d: Dictionary) -> void:
 	box_lost = d.get("box_lost", false)
 	he_knows = d.get("he_knows", false)
 	_seen_stairs = d.get("seen_stairs", false)
+	seal_by = d.get("seal_by", "gordeev" if d.get("cellar_open", false) else "")
 	if power_cut:
 		store.power_cut()
 		rooms.cut_wire()

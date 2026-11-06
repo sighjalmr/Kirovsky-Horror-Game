@@ -60,6 +60,10 @@ var _alerted := false
 ## sees the beam coming down the aisle; anybody caught in it is seen too.
 var torch: SpotLight3D
 var _torch_t := 0.0
+## Standing in wait he holds the torch low, at the floor in front of him:
+## the beam is a pool on the tiles, the lamp a bright point in the dark.
+var _torch_pitch := -6.0
+const TORCH_LURK_PITCH := -40.0
 const TORCH_RANGE := 12.0
 const TORCH_COS := 0.93
 
@@ -260,7 +264,8 @@ func _physics_process(delta: float) -> void:
 	if torch_on():
 		# The beam swings a little with his step and sweeps when he looks round.
 		_torch_t += delta
-		torch.rotation = Vector3(deg_to_rad(-6.0) + sin(_torch_t * 1.3) * 0.05, sin(_torch_t * 0.7) * 0.12, 0)
+		_torch_pitch = move_toward(_torch_pitch, TORCH_LURK_PITCH if is_lurking() else -6.0, delta * 40.0)
+		torch.rotation = Vector3(deg_to_rad(_torch_pitch) + sin(_torch_t * 1.3) * 0.05, sin(_torch_t * 0.7) * 0.12, 0)
 	var speed := 0.0
 	match state:
 		State.LEAVE:
