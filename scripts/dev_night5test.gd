@@ -1,7 +1,7 @@
 extends "res://scripts/dev_night3test.gd"
 
 ## Developer check of night five. Run
-##   godot --headless --path . -- --night5 --nighttest [--ending=word|wrong|defence|lost]
+##   godot --headless --path . -- --night5 --nighttest [--ending=word|wrong|defence|lost|alarm]
 ## A fast clock and a blind killer. Talks to Эдик, takes the tin from locker
 ## 12, finds the spare-key box, the alarm plate and the cut wire, opens his
 ## map case while he is out, saves and restores, writes the journal at six
@@ -24,6 +24,10 @@ func _ready() -> void:
 	await _until_true(func(): return n.edik.visible, 60.0)
 	await _wait(2.0)
 	if ending != "word":
+		# Ковпак does not send him out while Gordeev is right there.
+		main.player.global_position = n.edik.global_position + Vector3(2.0, 0, 1.0)
+		await _until(22, 34)
+		_check(n.edik.visible and n._edik_state == "prologue", "Эдик waits while Gordeev is near (22:34)")
 		_use("talk_edik")
 		_check(n.clues.edik, "Эдик told")
 	await _until_true(func(): return n.kovpak_state == "done", 400.0)
@@ -35,6 +39,17 @@ func _ready() -> void:
 	_check(n.clues.spare, "spare-key clue")
 	_use("alarm")
 	_check(n.clues.button, "alarm plate clue")
+	if ending == "alarm":
+		# Pressed before 23:10, the button brings him in early (6 real seconds: a slower clock).
+		slow = true
+		_use("alarm")
+		await _until_true(func(): return n.killer_phase == "in", 120.0)
+		_check(n.killer_phase == "in" and main.minutes < Main.clock(23, 10), "the button called him in before 23:10")
+		slow = false
+		await _until(23, 12)
+		_check(main.killer.is_active(), "still in after the 23:10 beat")
+		get_tree().quit()
+		return
 	await _until(23, 31)
 	for id in ["storage_door", "panel", "journal"]:
 		_use(id)
