@@ -135,6 +135,9 @@ static func clock(h: int, m: int) -> float:
 	return t
 
 
+static var _splashed := false
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	randomize()
@@ -252,6 +255,13 @@ func _title_menu() -> void:
 		_autostart = false
 		_start()
 		return
+	if not _splashed and (OS.get_cmdline_user_args().is_empty() or "--splash" in OS.get_cmdline_user_args()):
+		_splashed = true  # once per launch, not after a reload
+		var splash := StudioSplash.new()
+		add_child(splash)
+		await splash.finished
+	elif not _splashed:
+		_splashed = true
 	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ", "Свердловск, октябрь 1988")
 	menu.has_progress = chapter != "night1" or not checkpoint.is_empty() or not night_clues.is_empty()
 	menu.continue_label = "Продолжить: " + _night_name()
