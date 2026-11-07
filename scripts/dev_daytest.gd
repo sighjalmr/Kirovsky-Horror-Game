@@ -26,10 +26,16 @@ func _ready() -> void:
 	main.day.start()
 	await _wait(1.0)
 	await _shot("20_%s_entrance" % main.chapter)
-	_use("door_front")
+	var door := "car_home" if main.chapter == "day4" else "door_front"
+	_use(door)
 	_check(not main.day.done, "door refuses before the talk")
 	var talk := "talk_tamara_day"
 	match main.chapter:
+		"day4":
+			talk = "talk_edik4"
+			_use("talk_vasya4")
+			_use("talk_seller4")
+			_place(DayFour.EDIK_AT + Vector3(0.6, 0, 1.4), DayFour.EDIK_AT + Vector3(0, 1.4, 0))
 		"day2":
 			talk = "talk_rinat"
 			_use("rinat_photo")
@@ -65,8 +71,11 @@ func _ready() -> void:
 	_check(main.day.asked.size() == DayOne.ASK_LIMIT, "three questions asked")
 	if main.chapter == "day3":
 		_check((main.day as DayThree).confessed, "Ковпак told about the third key")
+	if main.chapter == "day4":
+		_check((main.day as DayFour).promised, "Эдик will come tomorrow")
+		_check(main._day_carry().get("edik_ready", false), "night five is told he comes")
 	_check(not main.player.busy, "player free after the talk")
-	_use("door_front")
+	_use(door)
 	await _until_true(func(): return main.phase == Main.Phase.END, 20.0)
 	_check(main.phase == Main.Phase.END, "day ended")
 	print("END: ", main.hud.title_sub.text.replace("\n", " | "))

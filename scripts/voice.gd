@@ -21,3 +21,21 @@ static func find(text: String) -> Dictionary:
 			if data is Dictionary:
 				_index = data
 	return _index.get(text, {})
+
+
+## Dev: subtitle lines that were shown with no take (--voice-missing=PATH).
+static var missing: Dictionary = {}
+
+
+static func note_missing(text: String) -> void:
+	if text.strip_edges() != "" and find(text).is_empty():
+		missing[text] = true
+
+
+static func dump_missing() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--voice-missing=") and not missing.is_empty():
+			var f := FileAccess.open(a.get_slice("=", 1), FileAccess.WRITE)
+			if f:
+				for k: String in missing:
+					f.store_line(JSON.stringify(k))
