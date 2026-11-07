@@ -229,6 +229,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	Voice.dump_missing()
 	Loc.shutdown()
 
 

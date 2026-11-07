@@ -53,6 +53,9 @@ func _ready() -> void:
 	main.menu.open_pause()
 	await _wait(0.3)
 	await _shot("04_pause")
+	main.menu._keys()
+	await _wait(0.3)
+	await _shot("04a_keys")
 	main.menu.close()
 	get_tree().paused = false
 	Main.deductions = {"night1": 1}

@@ -347,6 +347,8 @@ func _process(delta: float) -> void:
 ## A voiced line stays up at least as long as its take.
 func say(text: String, duration := -1.0, now := false) -> void:
 	var take := Voice.find(text)
+	if take.is_empty():
+		Voice.note_missing(text)
 	if duration < 0.0:
 		duration = 2.5 + text.length() * 0.05
 	if not take.is_empty():

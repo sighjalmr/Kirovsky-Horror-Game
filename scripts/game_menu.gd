@@ -29,6 +29,7 @@ const KEYS := "Мышь — смотреть      W / A / S / D — идти\n" 
 	"F или правая кнопка мыши (держать) — фонарик-«жучок» (жужжит, его слышно)\n" + \
 	"E — осмотреть, поговорить, спрятаться\nQ — бросить банку или бутылку (если в руке)\n" + \
 	"V — валидол (одышка и дрожь проходят)\n" + \
+	"M — план эвакуации (когда осмотрен на посту)\n" + \
 	"Tab — блокнот      J — что делать      Esc — пауза"
 
 ## "title" or "pause": where Back from a sub-page returns.
@@ -386,8 +387,13 @@ func _brightness_swatch() -> Control:
 	row.add_theme_constant_override("separation", 18)
 	var hint := Label.new()
 	hint.text = "Средний квадрат должен быть едва виден:"
+	hint.custom_minimum_size = Vector2(560, 0)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hint.add_theme_font_size_override("font_size", 20)
 	hint.add_theme_color_override("font_color", DIM)
+	hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	hint.add_theme_constant_override("outline_size", 4)
 	row.add_child(hint)
 	for v: float in [0.0, 0.035, 0.09]:
 		var r := ColorRect.new()
@@ -449,9 +455,15 @@ func _row(text: String) -> HBoxContainer:
 	row.add_theme_constant_override("separation", 24)
 	var l := Label.new()
 	l.text = text
+	# A long label (the detective mode, or any line in Hungarian) wraps in its
+	# column instead of pushing the switch out of line with the others.
 	l.custom_minimum_size = Vector2(560, 0)
+	l.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.add_theme_font_size_override("font_size", 26)
 	l.add_theme_color_override("font_color", PAPER)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	l.add_theme_constant_override("outline_size", 5)
 	row.add_child(l)
 	_panel.add_child(row)
 	return row
