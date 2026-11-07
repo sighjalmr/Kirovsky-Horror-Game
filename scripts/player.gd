@@ -124,8 +124,9 @@ func _ready() -> void:
 func look(rel: Vector2) -> void:
 	if not controllable or dead:
 		return
-	rotation.y -= rel.x * MOUSE_SENS
-	head.rotation.x = clampf(head.rotation.x - rel.y * MOUSE_SENS, -PITCH_LIMIT, PITCH_LIMIT)
+	var k := MOUSE_SENS * Settings.mouse
+	rotation.y -= rel.x * k
+	head.rotation.x = clampf(head.rotation.x - rel.y * k * (-1.0 if Settings.invert_y else 1.0), -PITCH_LIMIT, PITCH_LIMIT)
 
 
 func _physics_process(delta: float) -> void:

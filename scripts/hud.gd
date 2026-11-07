@@ -40,6 +40,11 @@ var _choice_box: VBoxContainer
 var _choice_title: Label
 var _choice_count := 0
 
+## A key hint above the prompt the first time something is needed (Main.hint).
+var hint: Label
+var _hints: Array = []
+var _hint_busy := false
+
 var _queue: Array = []
 var _sub_t := 0.0
 var _voice: AudioStreamPlayer
@@ -74,7 +79,12 @@ func _ready() -> void:
 	_build_tasks()
 	_voice = AudioStreamPlayer.new()
 	_voice.process_mode = Node.PROCESS_MODE_PAUSABLE   # holds while the notebook is open
+	_voice.bus = Settings.VOICE_BUS
 	add_child(_voice)
+	hint = _label(Vector2(260, 740), Vector2(1400, 80), 27, HORIZONTAL_ALIGNMENT_CENTER, Color(1.0, 0.86, 0.58))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.modulate.a = 0.0
+	apply_settings()
 
 	notebook = ColorRect.new()
 	notebook.color = Color(0.89, 0.87, 0.8, 0.97)
@@ -277,7 +287,7 @@ func _label(pos: Vector2, size: Vector2, font_size: int, align: HorizontalAlignm
 func _process(delta: float) -> void:
 	var hall := AudioServer.get_bus_index(Sfx.BUS)
 	if hall != -1:
-		var duck := DUCK_DB if _voice.playing else 0.0
+		var duck := (DUCK_DB if _voice.playing else 0.0) + Settings.db(Settings.sounds)
 		AudioServer.set_bus_volume_db(hall, move_toward(AudioServer.get_bus_volume_db(hall), duck, delta * 20.0))
 	tasks.visible = tasks_wanted and tasks_allowed and _tasks_key != "" \
 		and not notebook.visible and not memo.visible and not choices.visible
@@ -334,6 +344,30 @@ func flash_note(text: String) -> void:
 	tw.tween_property(note, "modulate:a", 1.0, 0.5)
 	tw.tween_interval(3.5)
 	tw.tween_property(note, "modulate:a", 0.0, 1.5)
+
+
+## Subtitles on or off and their size, from the settings.
+func apply_settings() -> void:
+	subtitle.visible = Settings.subtitles
+	subtitle.add_theme_font_size_override("font_size", Settings.sub_font())
+	subtitle.position.y = 890 - (Settings.sub_font() - 32) * 3
+	subtitle.size.y = 170 + (Settings.sub_font() - 32) * 3
+
+
+## Shows a key hint for a few seconds; several wait their turn.
+func show_hint(text: String) -> void:
+	_hints.append(text)
+	if _hint_busy:
+		return
+	_hint_busy = true
+	while not _hints.is_empty():
+		hint.text = _hints.pop_front()
+		var tw := create_tween()
+		tw.tween_property(hint, "modulate:a", 1.0, 0.4)
+		tw.tween_interval(5.5)
+		tw.tween_property(hint, "modulate:a", 0.0, 0.8)
+		await tw.finished
+	_hint_busy = false
 
 
 func set_prompt(text: String) -> void:
