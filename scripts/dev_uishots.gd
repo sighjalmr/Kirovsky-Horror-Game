@@ -28,6 +28,9 @@ func _ready() -> void:
 	main.menu._chapters()
 	await _wait(0.3)
 	await _shot("03_chapters")
+	main.menu._difficulty()
+	await _wait(0.3)
+	await _shot("03d_difficulty")
 	# Some made-up progress for the achievements and statistics pages.
 	Stats.earned = ["first_shift", "witness", "all_rounds", "tore_free", "first_death", "third_key",
 		"night_five", "end_word", "end_death"]

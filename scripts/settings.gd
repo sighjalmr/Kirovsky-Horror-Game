@@ -32,6 +32,9 @@ static var sub_size := 0
 static var hints := true
 ## "Следователь": no rings round clues, no clue counter, tasks in Gordeev's words.
 static var detective := false
+## «Ветеран»: he hears further and notices sooner, one валидол a shift,
+## tearing free takes more presses. Chosen with a new game, or in Settings.
+static var veteran := false
 ## Index in Loc.LANGS: the language of subtitles and on-screen text (the
 ## voices stay Russian). -1 until the first start picks the computer's own.
 static var language := -1
@@ -67,6 +70,7 @@ static func load_all() -> void:
 	sub_size = cf.get_value("video", "sub_size", sub_size)
 	hints = cf.get_value("game", "hints", hints)
 	detective = cf.get_value("game", "detective", detective)
+	veteran = cf.get_value("game", "veteran", veteran)
 	hints_seen = cf.get_value("game", "hints_seen", hints_seen)
 	reached = cf.get_value("game", "reached", reached)
 	endings = cf.get_value("game", "endings", endings)
@@ -90,6 +94,7 @@ static func save() -> void:
 	cf.set_value("video", "sub_size", sub_size)
 	cf.set_value("game", "hints", hints)
 	cf.set_value("game", "detective", detective)
+	cf.set_value("game", "veteran", veteran)
 	cf.set_value("game", "hints_seen", hints_seen)
 	cf.set_value("game", "reached", reached)
 	cf.set_value("game", "endings", endings)

@@ -73,7 +73,7 @@ static func count_right(d: Dictionary) -> int:
 
 ## The right-hand page: people (struck through once cleared) and conclusions.
 static func people_page(ch: String, d: Dictionary) -> String:
-	var order := ["night1", "day1", "night2", "day2", "night3", "day3", "night4", "night5"]
+	var order := ["night1", "day1", "night2", "day2", "night3", "day3", "night4", "day4", "night5"]
 	var at := maxi(0, order.find(ch))
 	var out := PackedStringArray(["[b]ЛЮДИ[/b]"])
 	for p: Array in PEOPLE:

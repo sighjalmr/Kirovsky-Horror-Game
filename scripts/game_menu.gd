@@ -21,6 +21,7 @@ const CHAPTERS := [
 	["night3", "Ночь третья. Четверг, 20 октября"],
 	["day3", "День третий. Пятница, 21 октября"],
 	["night4", "Ночь четвёртая. Воскресенье, 23 октября"],
+	["day4", "День четвёртый. Вторник, 25 октября"],
 	["night5", "Ночь пятая, последняя. Среда, 26 октября"],
 ]
 
@@ -86,7 +87,7 @@ func show_title_menu() -> void:
 	if has_progress:
 		_button("Новая игра", _ask_new)
 	else:
-		_button("Новая игра", "new")
+		_button("Новая игра", _difficulty)
 	if Settings.reached.size() > 1:
 		_button("Главы", _chapters)
 	_button(Stats.tr_text(Stats.UI.menu), _achievements)
@@ -118,7 +119,7 @@ func _pause_page() -> void:
 
 
 func _ask_new() -> void:
-	_sure("Начать с первой ночи? Сохранение смены пропадёт, открытые главы останутся.", "new")
+	_sure("Начать с первой ночи? Сохранение смены пропадёт, открытые главы останутся.", _difficulty)
 
 
 func _ask_title() -> void:
@@ -180,7 +181,7 @@ func _achievements() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 60)
-	grid.add_theme_constant_override("v_separation", 10)
+	grid.add_theme_constant_override("v_separation", 6)  # 24 entries fit 1080
 	_panel.add_child(grid)
 	for a: Array in Stats.ACHIEVEMENTS:
 		var got: bool = a[0] in Stats.earned
@@ -195,7 +196,7 @@ func _achievements() -> void:
 func _achievement_cell(name_text: String, desc: String, got: bool) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
-	row.custom_minimum_size = Vector2(780, 0)
+	row.custom_minimum_size = Vector2(800, 0)
 	var mark := Panel.new()
 	mark.custom_minimum_size = Vector2(22, 22)
 	mark.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -205,7 +206,7 @@ func _achievement_cell(name_text: String, desc: String, got: bool) -> Control:
 	sb.set_border_width_all(2)
 	mark.add_theme_stylebox_override("panel", sb)
 	var wrap := MarginContainer.new()
-	wrap.add_theme_constant_override("margin_top", 6)
+	wrap.add_theme_constant_override("margin_top", 5)
 	wrap.add_child(mark)
 	row.add_child(wrap)
 	var col := VBoxContainer.new()
@@ -214,13 +215,13 @@ func _achievement_cell(name_text: String, desc: String, got: bool) -> Control:
 	row.add_child(col)
 	var n := Label.new()
 	n.text = name_text
-	n.add_theme_font_size_override("font_size", 26)
+	n.add_theme_font_size_override("font_size", 23)
 	n.add_theme_color_override("font_color", PAPER if got else Color(0.6, 0.6, 0.55))
 	col.add_child(n)
 	var d := Label.new()
 	d.text = desc
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	d.add_theme_font_size_override("font_size", 19)
+	d.add_theme_font_size_override("font_size", 17)
 	d.add_theme_color_override("font_color", Color(0.72, 0.72, 0.66) if got else Color(0.5, 0.5, 0.47))
 	col.add_child(d)
 	return row
@@ -283,7 +284,28 @@ func _keys() -> void:
 	_focus_first()
 
 
-func _sure(question: String, id: String) -> void:
+## A new game: how hard the nights are.
+func _difficulty() -> void:
+	_page("СЛОЖНОСТЬ", Vector2(460, 420))
+	_button("Сторож: как задумано", func() -> void: _pick_difficulty(false))
+	_button("Ветеран: он слышит дальше и замечает быстрее, валидола одна таблетка", func() -> void: _pick_difficulty(true))
+	var l := Label.new()
+	l.text = "Сложность можно поменять в настройках."
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 22)
+	l.add_theme_color_override("font_color", DIM)
+	_panel.add_child(l)
+	_button("Назад", _back, true)
+	_focus_first(1 if Settings.veteran else 0)
+
+
+func _pick_difficulty(hard: bool) -> void:
+	Settings.veteran = hard
+	Settings.save()
+	picked.emit("new")
+
+
+func _sure(question: String, id: Variant) -> void:
 	_page(question, Vector2(560, 470))
 	_heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_button("Да", id)
@@ -307,6 +329,7 @@ func _settings() -> void:
 	_option("Размер субтитров", ["обычный", "крупный", "очень крупный"], Settings.sub_size, _set_sub_size)
 	_toggle("Подсказки по управлению", Settings.hints, _set_hints)
 	_toggle("Режим «Следователь»: без колец у улик и без счётчика", Settings.detective, _set_detective)
+	_toggle("Сложность «Ветеран»: он слышит дальше, валидола одна таблетка", Settings.veteran, _set_veteran)
 	_button("Готово", _settings_done, true)
 	_focus_first()
 
@@ -368,6 +391,11 @@ func _set_sub_size(i: int) -> void:
 
 func _set_hints(on: bool) -> void:
 	Settings.hints = on
+
+
+func _set_veteran(on: bool) -> void:
+	Settings.veteran = on
+	Settings.save()
 
 
 func _set_detective(on: bool) -> void:

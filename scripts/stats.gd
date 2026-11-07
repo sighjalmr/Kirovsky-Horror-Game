@@ -39,6 +39,8 @@ const ACHIEVEMENTS := [
 	["end_death", "Сторож оставил пост", "Погибнуть в последнюю ночь.", true],
 	["all_endings", "Все пять концовок", "Увидеть все пять концовок.", false],
 	["clean_run", "Ни царапины", "Пройти всю игру с первой ночи, ни разу не погибнув.", false],
+	["veteran", "Ветеран", "Дойти до любой концовки, кроме смерти, на сложности «Ветеран».", false],
+	["witness_comes", "Он придёт", "Уговорить Эдика прийти в последнюю ночь.", false],
 ]
 
 ## Ending ids in order, with their names on the statistics page.
@@ -275,6 +277,8 @@ static func day_done(ch: String, confessed: bool) -> void:
 static func ending(kind: String) -> void:
 	ending_counts[kind] = int(ending_counts.get(kind, 0)) + 1
 	earn("end_" + kind)
+	if kind != "death" and Settings.veteran:
+		earn("veteran")
 	var all := true
 	for e: Array in ENDINGS:
 		if not ending_counts.has(e[0]):

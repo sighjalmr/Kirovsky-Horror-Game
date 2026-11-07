@@ -64,7 +64,7 @@ const TRACE_LINES := {
 var main: Node
 var night_no := 1
 var held := ""
-var pills := PILLS_A_NIGHT
+var pills := 1 if Settings.veteran else PILLS_A_NIGHT
 ## 0..1: how hard the heart is working; grows each time he runs out of breath.
 var strain := 0.0
 var _calm := 0.0
@@ -97,7 +97,7 @@ func _ready() -> void:
 			Equip.decal(store, p, 0.8, "juice", randf() * TAU, Color(0.75, 0.8, 0.8))
 	var k: Killer = main.killer
 	k.quiet = night_no >= 3
-	k.hear_mult = 1.4 if night_no >= 4 else 1.0
+	k.hear_mult = (1.4 if night_no >= 4 else 1.0) * (1.3 if Settings.veteran else 1.0)
 	k.lost.connect(func() -> void: _rest = 25.0)
 	main.player.out_of_breath.connect(_on_winded)
 	_plan = PlanView.new()
@@ -205,7 +205,8 @@ func _on_winded() -> void:
 	if strain >= 0.75:
 		main.hud.say(G_STRAIN, -1.0, true)
 	if pills > 0:
-		main.hint("pill", "V — валидол под язык: одышка и дрожь пройдут. На смену две таблетки")
+		main.hint("pill", "V — валидол под язык: одышка и дрожь пройдут. На смену одна таблетка" if Settings.veteran
+			else "V — валидол под язык: одышка и дрожь пройдут. На смену две таблетки")
 
 
 func open_plan() -> void:

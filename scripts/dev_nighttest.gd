@@ -36,6 +36,9 @@ func _ready() -> void:
 		Killer.blind = false
 		await _until_true(func(): return main.phase == Main.Phase.DEAD, 30.0)
 		_check(main.phase == Main.Phase.DEAD, "killed")
+		main._note_death(main.player.global_position)  # as if he died here twice
+		_check(not Main._tip.is_empty() and String(Main._tip.get("prompt", "")).begins_with("Спрятаться"),
+			"a second death here offers a hiding place: %s, %.0f m" % [Main._tip.get("prompt", ""), Main._tip.get("dist", 0.0)])
 		await _wait(3.0)
 		reparent(get_tree().root)  # outlive the reload
 		set_process(false)
@@ -48,6 +51,7 @@ func _ready() -> void:
 		print("after restart: ", m._fmt(m.minutes), " phase ", m.phase, " clues ", m.night.clue_count(),
 			" killer ", Killer.State.keys()[m.killer.state], " round1 ", m.night.rounds[0].signed,
 			" rows lit ", m.store.lit_fraction())
+		_check(m._tip_t > 0.0, "the hiding place has its ring after R")
 		get_tree().quit()
 		return
 	_use("chair")
