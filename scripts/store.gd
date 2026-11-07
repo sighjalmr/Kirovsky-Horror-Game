@@ -396,7 +396,7 @@ func _build_hall() -> void:
 	rng.seed = 1988
 	# Three gondolas, each broken in the middle by a column of the building's
 	# 6 m grid (segments of 3.125 m), and two wall runs in segments of 3.25 m.
-	var sides := {-6.0: ["zamorozka", "bakaleya"], 0.0: ["bakaleya", "konservy"], 6.0: ["konservy", "moloko"]}
+	var sides := {-6.0: ["hleb", "bakaleya"], 0.0: ["bakaleya", "konservy"], 6.0: ["konservy", "moloko"]}
 	var seg_z := [12.0, 15.125, 18.75, 21.875]
 	for x: float in sides:
 		for k in 4:

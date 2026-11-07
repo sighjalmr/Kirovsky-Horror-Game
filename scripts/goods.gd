@@ -72,6 +72,36 @@ const ITEMS := {
 	"fish": ["block", Vector3(0.38, 0.09, 0.26), "fish", 0],
 	"chicken": ["chicken", Vector3(0.26, 0.1, 0.16), "chicken", 0],
 	"plombir": ["cup", Vector3(0.07, 0.07, 0.07), "plombir", 0],
+	# Blender-only range (models/kit/goods.glb, atlas goods2.png); the cell
+	# is only what the procedural fallback would draw.
+	"baton": ["loaf", Vector3(0.32, 0.075, 0.1), "flour", 0],
+	"borodinsky": ["loaf", Vector3(0.2, 0.085, 0.1), "grechka", 0],
+	"kirpich": ["loaf", Vector3(0.22, 0.1, 0.1), "flour", 0],
+	"bulka": ["loaf", Vector3(0.12, 0.06, 0.12), "flour", 0],
+	"pryaniki": ["bag", Vector3(0.14, 0.18, 0.06), "sugar", 0],
+	"yubileynoe": ["box", Vector3(0.16, 0.055, 0.06), "tea", 0],
+	"coffee": ["tin", Vector3(0.08, 0.11, 0.08), "tushonka", Lid.GOLD],
+	"kakao": ["box", Vector3(0.07, 0.11, 0.05), "chicory", 0],
+	"gerkules": ["box", Vector3(0.12, 0.2, 0.06), "barley", 0],
+	"vermishel": ["bag", Vector3(0.12, 0.2, 0.06), "macaroni", 0],
+	"kisel": ["box", Vector3(0.08, 0.035, 0.03), "soda", 0],
+	"lavr": ["box", Vector3(0.06, 0.09, 0.012), "tea", 0],
+	"buratino": ["bottle", Vector3(0.068, 0.3, 0.068), "oil", Lid.GOLD],
+	"tarhun": ["bottle", Vector3(0.068, 0.3, 0.068), "oil", Lid.GOLD],
+	"mineral": ["bottle", Vector3(0.068, 0.3, 0.068), "oil", Lid.GOLD],
+	"eggs": ["box", Vector3(0.27, 0.075, 0.11), "salt", 0],
+	"syrki": ["box", Vector3(0.045, 0.025, 0.09), "butter", 0],
+	"tomato_paste": ["jar", Vector3(0.075, 0.1, 0.075), "jar_tomato", Lid.GOLD],
+	"gorchitsa": ["jar", Vector3(0.06, 0.09, 0.06), "ikra", Lid.TIN],
+	"saira": ["tin", Vector3(0.084, 0.06, 0.084), "kapusta", Lid.TIN],
+	"turist": ["tin", Vector3(0.1, 0.09, 0.1), "tushonka", Lid.TIN],
+	"bychki": ["flat", Vector3(0.105, 0.035, 0.105), "kilka", Lid.KILKA],
+	"baklazhan": ["jar", Vector3(0.084, 0.13, 0.084), "ikra", Lid.GOLD],
+	"soap": ["box", Vector3(0.095, 0.035, 0.06), "barley", 0],
+	"zubnoy": ["box", Vector3(0.06, 0.09, 0.03), "soda", 0],
+	"palochki": ["bag", Vector3(0.16, 0.26, 0.07), "sugar", 0],
+	"karamel": ["bag", Vector3(0.14, 0.18, 0.05), "sugar", 0],
+	"yogurt": ["milk", Vector3(0.065, 0.16, 0.065), "glass_milk", Lid.FOIL_MILK],
 }
 
 
@@ -97,7 +127,13 @@ static func size_of(id: String) -> Vector3:
 
 
 ## One item standing at the origin of `xf` (bottom centre), its front to -z.
+## The Blender model (models/kit/goods.glb, a variant picked by position)
+## goes into the builder's kit; the procedural shapes below are the fallback.
 static func build(mb: MeshBuilder, xf: Transform3D, id: String, tint := Color.WHITE) -> void:
+	if mb.kit != null and tint == Color.WHITE:
+		var v := Models.pick("goods", id, Models.seed_of(xf))
+		if v != "" and Models.add(mb.kit, "goods", v, xf):
+			return
 	var it: Array = ITEMS[id]
 	var s: Vector3 = it[1]
 	var c := cell(it[2])

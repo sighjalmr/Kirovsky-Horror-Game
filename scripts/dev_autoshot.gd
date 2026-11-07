@@ -39,6 +39,10 @@ func _ready() -> void:
 		await _night2_shots(p, store, night)
 		get_tree().quit()
 		return
+	if "--kitshot" in OS.get_cmdline_user_args():
+		await _kit_shots(p, store, night)
+		get_tree().quit()
+		return
 	if "--gfxshot" in OS.get_cmdline_user_args():
 		await _gfx_shots(p, store, night)
 		get_tree().quit()
@@ -298,6 +302,48 @@ func _hall_shots(p: Player, store: Store, night: NightOne) -> void:
 		_place(p, v[1], v[2])
 		p.head.rotation.x = v[3]
 		await _wait(0.8)
+		await _shot(v[0] + "_day")
+
+
+## Model comparison (--autoshot=DIR --kitshot): close views of the goods,
+## shelves, cases, chests, tills and the back passage by day (no fog, so the
+## shapes read), then three of them at night in the torch beam.
+const KIT_VIEWS := [
+	["k01_konservy", Vector3(1.25, 0, 14.0), Vector3(-1, 0, 0.6), -0.3],
+	["k02_bakaleya", Vector3(-1.25, 0, 14.0), Vector3(1, 0, 0.6), -0.3],
+	["k03_moloko", Vector3(9.9, 0, 14.5), Vector3(1, 0, 0.55), -0.25],
+	["k04_frozen", Vector3(-9.9, 0, 14.5), Vector3(-1, 0, 0.5), -0.45],
+	["k05_pyramid", Vector3(-3.4, 0, 14.0), Vector3(0.55, 0, 1), -0.4],
+	["k06_tills", Vector3(-0.2, 0, 10.8), Vector3(-0.45, 0, -1), -0.3],
+	["k07_chests", Vector3(-7.4, 0, 12.8), Vector3(-0.45, 0, 1), -0.5],
+	["k08_back", Vector3(9.4, 0, 24.2), Vector3(0.6, 0, 1), -0.2],
+	["k09_shelf_close", Vector3(0.75, 0, 16.0), Vector3(-1, 0, 0.25), -0.45],
+	["k10_hall", Vector3(-3.0, 0, 11.0), Vector3(0.1, 0, 1), -0.1],
+]
+
+
+func _kit_shots(p: Player, store: Store, night: NightOne) -> void:
+	main.hud.visible = false
+	night.tamara.visible = false
+	night.kovpak.visible = false
+	if night.get("vasya") != null:
+		night.vasya.visible = false
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in [KIT_VIEWS[0], KIT_VIEWS[2], KIT_VIEWS[8]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0] + "_dark")
+	p.force_flashlight = false
+	for i in store.rows.size():
+		store.switch_on(i)
+	main._day_look()
+	for v: Array in KIT_VIEWS:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
 		await _shot(v[0] + "_day")
 
 

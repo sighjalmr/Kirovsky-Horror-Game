@@ -15,15 +15,21 @@ const SIDES := MeshFactory.PX | MeshFactory.NX | MeshFactory.PZ | MeshFactory.NZ
 ## Goods are in Goods.ITEMS (scripts/goods.gd).
 const RANGE := {
 	"bakaleya": ["salt", "tea", "macaroni", "matches", "flour", "sugar", "chicory", "barley", "grechka", "psheno",
-		"soda", "oil", "salt", "sugar", "macaroni"],
+		"soda", "oil", "salt", "sugar", "macaroni", "gerkules", "vermishel", "kisel", "lavr", "coffee", "kakao",
+		"pryaniki", "yubileynoe", "karamel", "palochki", "soap", "zubnoy"],
 	"konservy": ["peas", "condensed", "tushonka", "kapusta", "kilka", "sprats", "ikra", "jar_tomato", "jar_birch",
-		"jar_apple", "kilka", "kapusta", "jar_birch"],
-	"moloko": ["milk", "milk", "kefir", "kefir", "ryazhenka", "smetana", "tetra", "tetra", "butter"],
+		"jar_apple", "kilka", "kapusta", "jar_birch", "saira", "turist", "bychki", "baklazhan", "tomato_paste",
+		"gorchitsa", "turist"],
+	"moloko": ["milk", "milk", "kefir", "kefir", "ryazhenka", "smetana", "tetra", "tetra", "butter", "yogurt",
+		"eggs", "eggs"],
 	"zamorozka": ["kilka", "sprats", "kapusta", "jar_tomato", "peas", "ikra"],
+	# Bread and drinks on the side of the left gondola that faces the freezers.
+	"hleb": ["baton", "baton", "borodinsky", "kirpich", "kirpich", "bulka", "borodinsky", "buratino", "tarhun",
+		"mineral", "mineral", "pryaniki"],
 }
 
 ## Shapes that can stand on top of one another.
-const STACKS := ["tin", "flat", "box"]
+const STACKS := ["tin", "flat", "box", "loaf"]
 
 
 static func at(x: float, y: float, z: float) -> Transform3D:
@@ -114,19 +120,23 @@ static func gondola(parent: Node3D, rng: RandomNumberGenerator, pos: Vector3, le
 	var root := node(parent, pos)
 	var kit := MeshBuilder.Kit.new()
 	var paint := kit.b("paint")
-	paint.box(at(0, 0, 0), Vector3(0.96, 0.12, length), Color(0.55, 0.6, 0.58), NO_RECT, Vector2(0.6, 0.6),
-		ALL & ~MeshFactory.NY, 1.0)
-	kit.b("pegboard").box(at(0, 0.12, 0), Vector3(0.05, 1.68, length), Color.WHITE, NO_RECT, Vector2(1.0, 1.0),
-		SIDES, 0.6)
-	for z: float in [-length * 0.5 + 0.025, length * 0.5 - 0.025]:
-		paint.box(at(0, 0, z), Vector3(0.08, 1.85, 0.05))
-	paint.box(at(0, 1.8, 0), Vector3(0.12, 0.05, length))
+	var model := "gondola_%d" % roundi(length * 1000.0)
+	var blender := Models.add(kit, "shelves", model, Transform3D.IDENTITY)
+	if not blender:
+		paint.box(at(0, 0, 0), Vector3(0.96, 0.12, length), Color(0.55, 0.6, 0.58), NO_RECT, Vector2(0.6, 0.6),
+			ALL & ~MeshFactory.NY, 1.0)
+		kit.b("pegboard").box(at(0, 0.12, 0), Vector3(0.05, 1.68, length), Color.WHITE, NO_RECT, Vector2(1.0, 1.0),
+			SIDES, 0.6)
+		for z: float in [-length * 0.5 + 0.025, length * 0.5 - 0.025]:
+			paint.box(at(0, 0, z), Vector3(0.08, 1.85, 0.05))
+		paint.box(at(0, 1.8, 0), Vector3(0.12, 0.05, length))
 	var levels := [0.12, 0.52, 0.92, 1.32]
 	for si in 2:
 		var side := -1.0 if si == 0 else 1.0
 		for li in levels.size():
 			var y: float = levels[li]
-			_shelf_board(paint, Vector3(side * 0.235, y, 0), side, 0.42, length - 0.06)
+			if not blender:
+				_shelf_board(paint, Vector3(side * 0.235, y, 0), side, 0.42, length - 0.06)
 			var top: float = levels[li + 1] if li + 1 < levels.size() else 1.82
 			var xf := Transform3D(Basis(Vector3(0, 0, side), Vector3.UP, Vector3(-side, 0, 0)),
 				Vector3(side * 0.445, y + 0.02, -side * (length * 0.5 - 0.04)))
@@ -134,8 +144,9 @@ static func gondola(parent: Node3D, rng: RandomNumberGenerator, pos: Vector3, le
 	for e in 2:
 		if (e == 0 and end_front) or (e == 1 and end_back):
 			var z := (-length * 0.5 - 0.02) if e == 0 else (length * 0.5 + 0.02)
-			paint.box(at(0, 0, z), Vector3(1.0, 1.86, 0.04), Color(0.62, 0.66, 0.63), NO_RECT, Vector2(0.6, 0.6),
-				ALL, 0.6)
+			if not Models.add(kit, "shelves", "gondola_end", Transform3D(Basis(Vector3.UP, PI * e), Vector3(0, 0, z))):
+				paint.box(at(0, 0, z), Vector3(1.0, 1.86, 0.04), Color(0.62, 0.66, 0.63), NO_RECT, Vector2(0.6, 0.6),
+					ALL, 0.6)
 	kit.build(root)
 	collider(root, Vector3.ZERO, Vector3(1.0, 1.9, length))
 
@@ -155,17 +166,21 @@ static func wall_shelf(parent: Node3D, rng: RandomNumberGenerator, pos: Vector3,
 	var root := node(parent, pos)
 	var kit := MeshBuilder.Kit.new()
 	var paint := kit.b("paint")
-	paint.box(at(side * 0.03, 0, 0), Vector3(0.74, 0.12, length), Color(0.5, 0.55, 0.53), NO_RECT, Vector2(0.6, 0.6),
-		ALL & ~MeshFactory.NY, 1.0)
-	kit.b("pegboard").box(at(-side * 0.37, 0.12, 0), Vector3(0.05, 2.0, length), Color(0.95, 0.95, 0.9), NO_RECT,
-		Vector2(1.0, 1.0), SIDES, 0.6)
-	for z: float in [-length * 0.5 + 0.02, length * 0.5 - 0.02]:
-		paint.box(at(0, 0, z), Vector3(0.8, 2.2, 0.04), Color(0.6, 0.64, 0.61), NO_RECT, Vector2(0.6, 0.6), ALL, 0.6)
-	paint.box(at(0, 2.15, 0), Vector3(0.8, 0.05, length))
+	var blender := Models.add(kit, "shelves", "wall_%d" % roundi(length * 1000.0),
+		Transform3D(Basis(Vector3.UP, 0.0 if side > 0.0 else PI), Vector3.ZERO))
+	if not blender:
+		paint.box(at(side * 0.03, 0, 0), Vector3(0.74, 0.12, length), Color(0.5, 0.55, 0.53), NO_RECT, Vector2(0.6, 0.6),
+			ALL & ~MeshFactory.NY, 1.0)
+		kit.b("pegboard").box(at(-side * 0.37, 0.12, 0), Vector3(0.05, 2.0, length), Color(0.95, 0.95, 0.9), NO_RECT,
+			Vector2(1.0, 1.0), SIDES, 0.6)
+		for z: float in [-length * 0.5 + 0.02, length * 0.5 - 0.02]:
+			paint.box(at(0, 0, z), Vector3(0.8, 2.2, 0.04), Color(0.6, 0.64, 0.61), NO_RECT, Vector2(0.6, 0.6), ALL, 0.6)
+		paint.box(at(0, 2.15, 0), Vector3(0.8, 0.05, length))
 	var levels := [0.12, 0.52, 0.92, 1.32, 1.72]
 	for li in levels.size():
 		var y: float = levels[li]
-		_shelf_board(paint, Vector3(side * 0.03, y, 0), side, 0.72, length - 0.08)
+		if not blender:
+			_shelf_board(paint, Vector3(side * 0.03, y, 0), side, 0.72, length - 0.08)
 		var top: float = levels[li + 1] if li + 1 < levels.size() else 2.15
 		var xf := Transform3D(Basis(Vector3(0, 0, side), Vector3.UP, Vector3(-side, 0, 0)),
 			Vector3(side * 0.39, y + 0.02, -side * (length * 0.5 - 0.05)))
