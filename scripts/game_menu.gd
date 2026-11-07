@@ -188,6 +188,8 @@ func _settings() -> void:
 	_slider("Голоса", 0.0, 1.0, Settings.voice, _set_voice)
 	_slider("Скорость мыши", 0.3, 2.5, Settings.mouse, _set_mouse)
 	_toggle("Перевернуть мышь по вертикали", Settings.invert_y, _set_invert)
+	_toggle("Во весь экран", Settings.fullscreen, _set_fullscreen)
+	_option("Разрешение", Settings.RESOLUTION_NAMES, Settings.resolution, _set_resolution)
 	_slider("Яркость", 0.7, 1.5, Settings.brightness, _set_brightness)
 	_panel.add_child(_brightness_swatch())
 	_toggle("Субтитры", Settings.subtitles, _set_subtitles)
@@ -218,6 +220,16 @@ func _set_mouse(v: float) -> void:
 
 func _set_invert(on: bool) -> void:
 	Settings.invert_y = on
+
+
+func _set_fullscreen(on: bool) -> void:
+	Settings.fullscreen = on
+	picked.emit("apply")
+
+
+func _set_resolution(i: int) -> void:
+	Settings.resolution = i
+	picked.emit("apply")
 
 
 func _set_brightness(v: float) -> void:

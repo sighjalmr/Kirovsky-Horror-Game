@@ -98,7 +98,7 @@ static func vertical() -> bool:
 func _ready() -> void:
 	var size := Vector2(1080, 1920) if vertical() else Vector2(1920, 1080)
 	view = SubViewport.new()
-	view.size = Vector2i(size)
+	view.size = Vector2i(size) if not OS.get_cmdline_user_args().is_empty() else Settings.render_size(Vector2i(size))
 	view.own_world_3d = true
 	view.msaa_3d = Viewport.MSAA_4X
 	view.audio_listener_enable_3d = true

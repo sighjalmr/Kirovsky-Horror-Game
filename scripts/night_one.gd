@@ -480,7 +480,7 @@ func _watch_lurk() -> void:
 	var shown: bool = main.player.flashlight_on or main.store.is_lit(k.global_position) or k.torch_on()
 	if d > 8.0 or cam.is_position_behind(head) or not (shown or d < 4.0):
 		return
-	var at := cam.unproject_position(head)
+	var at: Vector2 = main.to_screen(cam.unproject_position(head))
 	var r := Rect2(Vector2(Main.RENDER_W, Main.RENDER_H) * 0.2, Vector2(Main.RENDER_W, Main.RENDER_H) * 0.6)
 	if not r.has_point(at):
 		return
