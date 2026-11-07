@@ -116,7 +116,8 @@ func _shots(pb: Passersby) -> void:
 			[Vector3(2.0, g, -17.0), Vector3(-6.0, g + 1.0, -20.6)], [Vector3(-12.5, g, -20.5), Vector3(-15.1, g + 1.2, -18.4)]]
 	else:
 		views = [[Vector3(-1.2, 0, 2.6), Vector3(2.5, 1.2, 9.0)], [Vector3(-3.0, 0, 11.4), Vector3(-3.0, 1.2, 20.0)],
-			[Vector3(3.0, 0, 11.4), Vector3(3.0, 1.2, 20.0)], [Vector3(0.0, 0, 5.2), Vector3(-1.0, 1.0, -2.0)]]
+			[Vector3(3.0, 0, 11.4), Vector3(3.0, 1.2, 20.0)], [Vector3(0.0, 0, 5.2), Vector3(-1.0, 1.0, -2.0)],
+			[Vector3(7.6, 0, 11.6), Vector3(8.85, 0.3, 17.0)]]  # the open chests of aisle D
 	for k in 3:
 		for i in views.size():
 			main.player.global_position = views[i][0]

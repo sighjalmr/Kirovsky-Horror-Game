@@ -65,31 +65,50 @@ static func _library() -> AnimationLibrary:
 	return _lib
 
 
-## Photo textures on the shared store shader, so the people take the torch,
-## the fog and the grade like everything else.
+## Photo textures on the people's own shader (skin that lets light
+## through, cloth sheen, soft-edged hair), lit by the torch, the fog and the
+## grade like everything else. With «Текстуры 2K» the faces and clothes come
+## from hd/ at 2048 px with their gloss maps (tools/make_people_hd.py).
 func _dress(mi: MeshInstance3D) -> void:
 	for i in mi.mesh.get_surface_count():
 		var src := mi.mesh.surface_get_material(i)
 		var part := src.resource_name.get_slice("_", 1) if src else "body"
-		var kind := Mats.SOLID
-		var color := "%s%s/%s_color.jpg" % [DIR, who, part]
+		var cards := false
+		var color := _tex(part + "_color", "jpg")
 		if part == "opacity" or part == "glasses":
 			# Hair, lashes and spectacle glass are cut-out cards seen from both sides.
-			kind = Mats.DOUBLE
-			color = "%s%s/%s%s_color.png" % [DIR, who, part, "_opacity" if part == "glasses" else ""]
+			cards = true
+			color = _tex(part + "_color", "png") if part == "opacity" else "%s%s/glasses_opacity_color.png" % [DIR, who]
 		elif ResourceLoader.exists("%s%s/%s_cut.png" % [DIR, who, part]):
 			# Part of the mesh cut away (Колесников's own patrol cap, under the furazhka).
-			kind = Mats.DOUBLE
+			cards = true
 			color = "%s%s/%s_cut.png" % [DIR, who, part]
 		var m := ShaderMaterial.new()
-		m.shader = load("res://shaders/%s.gdshader" % kind)
+		m.shader = load("res://shaders/person_cards.gdshader" if cards else "res://shaders/person.gdshader")
 		m.set_shader_parameter("albedo_tex", load(color))
-		var normal := "%s%s/%s_normal.jpg" % [DIR, who, part]
+		var normal := _tex(part + "_normal", "jpg")
 		if ResourceLoader.exists(normal):
 			m.set_shader_parameter("normal_tex", load(normal))
+		var spec := "%s%s/hd/%s_spec.webp" % [DIR, who, part]
+		if Settings.hd_textures and ResourceLoader.exists(spec):
+			m.set_shader_parameter("spec_tex", load(spec))
+			m.set_shader_parameter("spec_map", 1.0 if part == "head" else 0.6)
 		m.set_shader_parameter("roughness", 0.55 if part == "head" else 0.8)
 		m.set_shader_parameter("specular", 0.35 if part == "head" else 0.2)
+		if part == "head":
+			m.set_shader_parameter("skin", 0.45 if Settings.graphics >= Graphics.MEDIUM else 0.0)
+		elif part == "body":
+			# The hands and neck are on the body sheet too, but it is mostly cloth.
+			m.set_shader_parameter("sheen", 0.25)
 		mi.set_surface_override_material(i, m)
+
+
+## A texture of this person: the 2K one if wanted and there, else the game's.
+func _tex(name_: String, ext: String) -> String:
+	var hd := "%s%s/hd/%s.webp" % [DIR, who, name_]
+	if Settings.hd_textures and ResourceLoader.exists(hd):
+		return hd
+	return "%s%s/%s.%s" % [DIR, who, name_, ext]
 
 
 ## Plays "walk", "idle", "talk", "sit", "bag", "run", "prowl" or "breathe",

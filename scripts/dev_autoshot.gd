@@ -19,6 +19,10 @@ func _ready() -> void:
 	var p: Player = main.player
 	var store: Store = main.store
 	var night: NightOne = main.night
+	if "--propshot" in OS.get_cmdline_user_args():
+		await _prop_shots(p, store)
+		get_tree().quit()
+		return
 	if "--handshot" in OS.get_cmdline_user_args():
 		await _hand_shots(p, store, night)
 		get_tree().quit()
@@ -33,6 +37,14 @@ func _ready() -> void:
 		return
 	if night is NightTwo:
 		await _night2_shots(p, store, night)
+		get_tree().quit()
+		return
+	if "--kitshot" in OS.get_cmdline_user_args():
+		await _kit_shots(p, store, night)
+		get_tree().quit()
+		return
+	if "--gfxshot" in OS.get_cmdline_user_args():
+		await _gfx_shots(p, store, night)
 		get_tree().quit()
 		return
 	if "--hallshot" in OS.get_cmdline_user_args():
@@ -293,6 +305,110 @@ func _hall_shots(p: Player, store: Store, night: NightOne) -> void:
 		await _shot(v[0] + "_day")
 
 
+## Model comparison (--autoshot=DIR --kitshot): close views of the goods,
+## shelves, cases, chests, tills and the back passage by day (no fog, so the
+## shapes read), then three of them at night in the torch beam.
+const KIT_VIEWS := [
+	["k01_konservy", Vector3(1.25, 0, 14.0), Vector3(-1, 0, 0.6), -0.3],
+	["k02_bakaleya", Vector3(-1.25, 0, 14.0), Vector3(1, 0, 0.6), -0.3],
+	["k03_moloko", Vector3(9.9, 0, 14.5), Vector3(1, 0, 0.55), -0.25],
+	["k04_frozen", Vector3(-9.9, 0, 14.5), Vector3(-1, 0, 0.5), -0.45],
+	["k05_pyramid", Vector3(-3.4, 0, 14.0), Vector3(0.55, 0, 1), -0.4],
+	["k06_tills", Vector3(-0.2, 0, 10.8), Vector3(-0.45, 0, -1), -0.3],
+	["k07_chests", Vector3(-7.4, 0, 12.8), Vector3(-0.45, 0, 1), -0.5],
+	["k08_back", Vector3(9.4, 0, 24.2), Vector3(0.6, 0, 1), -0.2],
+	["k09_shelf_close", Vector3(0.75, 0, 16.0), Vector3(-1, 0, 0.25), -0.45],
+	["k10_hall", Vector3(-3.0, 0, 11.0), Vector3(0.1, 0, 1), -0.1],
+	["k11_booth", Vector3(9.5, 0, 2.3), Vector3(1, 0, -0.15), -0.5],
+	["k12_lockers", Vector3(-7.3, 0, 2.9), Vector3(-0.25, 0, -1), -0.05],
+	["k13_radiator", Vector3(-10.4, 0, 4.6), Vector3(-1, 0, 0.45), -0.45],
+	["k14_passage", Vector3(-4.6, 0, 24.6), Vector3(-0.55, 0, 1), -0.3],
+]
+
+
+func _kit_shots(p: Player, store: Store, night: NightOne) -> void:
+	main.hud.visible = false
+	night.tamara.visible = false
+	night.kovpak.visible = false
+	if night.get("vasya") != null:
+		night.vasya.visible = false
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in [KIT_VIEWS[0], KIT_VIEWS[2], KIT_VIEWS[8]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0] + "_dark")
+	p.force_flashlight = false
+	for i in store.rows.size():
+		store.switch_on(i)
+	main._day_look()
+	for v: Array in KIT_VIEWS:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0] + "_day")
+
+
+## Graphics comparison (--autoshot=DIR --gfxshot): the same views before and
+## after a change to the look: Kovpak's face, the lit hall, the dark hall in
+## the torch beam, the wet floor by the storeroom, the hall by day.
+func _gfx_shots(p: Player, store: Store, night: NightOne) -> void:
+	main.hud.visible = false
+	night.tamara.visible = false
+	night.kovpak.global_position = Vector3(7.9, 0, 2.6)
+	night.kovpak.rotation.y = PI * 0.5
+	_place(p, Vector3(9.3, 0, 2.7), Vector3(-1, 0, 0.0))
+	p.head.rotation.x = 0.04
+	await _wait(2.0)
+	await _shot("g01_face")
+	var kp: Vector3 = night.kovpak.global_position
+	_place(p, kp + Vector3(0.95, 0, 0.05), Vector3(-1, 0, -0.05))
+	p.head.rotation.x = 0.05
+	p.camera.fov = 45.0
+	await _wait(0.8)
+	await _shot("g07_face_close")
+	p.camera.fov = 70.0
+	_place(p, Vector3(-0.5, 0, 9.6), Vector3(0.05, 0, 1))
+	p.head.rotation.x = -0.75
+	await _wait(0.8)
+	await _shot("g08_floor")
+	if "--gfxquick" in OS.get_cmdline_user_args():
+		return
+	night.kovpak.visible = false
+	var views := [
+		["g02_hall", Vector3(-0.5, 0, 9.6), Vector3(0.05, 0, 1), 0.3],
+		["g03_gallery", Vector3(-3.0, 0, 15.0), Vector3(-0.8, 0, 1), 0.2],
+		["g04_aisle", Vector3(7.4, 0, 13.0), Vector3(0.1, 0, 1), 0.0],
+		["g05_back", Vector3(-1.5, 0, 23.0), Vector3(0.15, 0, -1), 0.1],
+		["g06_store", Vector3(7.6, 0, 22.6), Vector3(0.35, 0, 1), -0.25],
+	]
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0])
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0] + "_dark")
+	p.force_flashlight = false
+	for i in store.rows.size():
+		store.switch_on(i)
+	main._day_look()
+	await _wait(1.0)
+	for v: Array in [views[0], views[1]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0] + "_day")
+
+
 ## Night two (--night2 --autoshot=DIR): the участковый at the post, his
 ## question, the bag out of locker 31, the cellar door, the token on the
 ## floor, the post gone dark.
@@ -505,3 +621,40 @@ func _polish_late(p: Player, store: Store, night: NightOne) -> void:
 	await _until(func(): return k.is_lurking(), 60.0)
 	await _wait(3.0)
 	await _shot("p4_lurk_torch_low")
+
+
+## --propshot: the round journal on the booth desk, and every freezer chest
+## with its cloth off (what lies in it should match the line about it).
+func _prop_shots(p: Player, store: Store) -> void:
+	main._timeline.clear()
+	await _wait(1.0)
+	_place(p, Vector3(10.2, 0, 2.6), Vector3(0.6, 0, 0))
+	p.head.rotation.x = -0.75
+	await _wait(0.6)
+	await _shot("journal")
+	# Under the booth desk and under till 3, the man's boots going past.
+	for id: String in ["hide_booth", "hide_till3"]:
+		var h: Array = NightOne.HIDES[id]
+		_place(p, h[2], (h[0] as Vector3) - (h[2] as Vector3))
+		await _wait(0.3)
+		main.hide_in({"id": id, "pos": h[0], "face": h[1], "out": h[2]})
+		await _shot(id + "_0_going_in")
+		await _wait(0.6)
+		await _shot(id + "_1_crawling")
+		await _wait(1.6)
+		var k: Node3D = main.killer
+		k.visible = true
+		k.global_position = (h[0] as Vector3) + (h[1] as Vector3) * 1.3 + Vector3(0, 0, 0.6)
+		await _wait(0.4)
+		await _shot(id + "_2_hidden")
+		print("hidden ", p.hidden, " clock ", main.minutes)
+		main.leave_hiding()
+		k.global_position = Vector3(9.0, 0, 33.0)
+	for id: String in store.chests:
+		store.lift_cloth(id)
+		var c: Vector3 = store.chests[id].pos
+		var side := 1.0 if c.x < 0.0 else -1.0
+		_place(p, c + Vector3(side * 1.3, 0, 0), Vector3(-side, 0, 0))
+		p.head.rotation.x = -0.8
+		await _wait(0.5)
+		await _shot("chest_" + id)

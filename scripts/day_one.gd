@@ -79,6 +79,7 @@ func _ready() -> void:
 	var store: Store = main.store
 	for it in store.interactables:
 		it.active = false
+	store.dress_for_day()
 	# Tamara on her stool at till 2, the queue on the customer side, Эдик
 	# leaning by the doors with a bag of jeans.
 	tamara = _person("tamara_day", TILL, PI * 0.5)

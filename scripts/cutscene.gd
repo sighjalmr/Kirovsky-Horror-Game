@@ -50,6 +50,8 @@ const N2_BAG := "Сумка Нины всё ещё лежит в тридцат�
 ## Till 2 in the store, where Nina punched the receipt.
 const TILL := Vector3(-2.35, 0.89, 7.95)
 const NINA_AT_TILL := Vector3(-1.75, 0, 7.95)
+## The flashback killer's own render layer (no light reaches his face).
+const KILLER_LAYER := 1 << 9
 
 var main: Main
 var kind: String
@@ -113,6 +115,7 @@ func _ready() -> void:
 	post = main.post.duplicate()
 	screen.material = post
 	add_child(screen)
+	add_child(Graphics.Blur.new(view, post))
 	for y: float in ([] if vertical() else [0.0, 1080.0 - 118.0]):
 		var bar := ColorRect.new()
 		bar.color = Color.BLACK
@@ -461,6 +464,7 @@ func _park_zhiguli() -> void:
 	car.visible = true
 	car.global_position = Exterior.ZHIGULI_SPOT
 	car.rotation.y = PI
+	CarCabin.set_driver(car, false)
 
 
 # --- 7 October -------------------------------------------------------------------
@@ -518,7 +522,7 @@ func _flashback() -> void:
 	var him := Person.new().setup("killer", false)
 	root.add_child(him)
 	him.position = Vector3(9.05, 0, 29.9)
-	him.rotation.y = PI  # faces into the hall
+	him.rotation.y = 0.0  # his back to the hall: a shape in the doorway, no face
 	him.play("idle")
 	var receipt := MeshInstance3D.new()
 	var q := QuadMesh.new()
@@ -534,7 +538,10 @@ func _flashback() -> void:
 	caption("7 октября 1988 года, 22:40\nУниверсам «Кировский», после закрытия", 4.5)
 	fade(0.0, 3.0)
 	store.open_storage_door(true)
-	nina.walk(PackedVector3Array([Vector3(9.0, 0, 26.6), Vector3(8.85, 0, 21.0), Vector3(8.0, 0, 12.0)]))
+	# Round the freezer chests of aisle D, not through them.
+	var out := PackedVector3Array([Vector3(9.0, 0, 26.6)])
+	out.append_array(store.route(Vector3(9.0, 0, 26.6), Vector3(8.0, 0, 12.0)))
+	nina.walk(out)
 	await shot(8.0, Vector3(6.6, 1.45, 20.5), Vector3(9.0, 1.3, 28.0), Vector3(6.8, 1.4, 19.4), Vector3(8.6, 1.3, 23.0), 40.0)
 	# At the till: she goes round to the cashier's side and punches it.
 	nina.global_position = Vector3(-0.6, 0, 8.6)
@@ -566,13 +573,26 @@ func _flashback() -> void:
 	# Over her shoulder: he comes out of the dark between the shelves.
 	say(NINA_2)
 	him.play("prowl", 0.6)
-	# Just enough light off the tills to make out a man, not a face.
+	# Light from behind him only: the outline of a man, never a face.
 	var rim := OmniLight3D.new()
 	rim.light_color = Color(0.7, 0.8, 0.75)
-	rim.light_energy = 0.5
-	rim.omni_range = 2.5
+	rim.light_energy = 2.0
+	rim.omni_range = 2.2
 	him.add_child(rim)
-	rim.position = Vector3(0, 2.2, 1.0)
+	rim.position = Vector3(0, 2.0, -1.2)
+	# And no other lamp in the hall touches him: on a layer of his own, lit
+	# by the rim alone, he stays a dark shape against the shelves.
+	# His skin and clothes read even in the dark with this exposure, so in
+	# this shot he is a figure in black: only the rim off his shoulders.
+	var shade := StandardMaterial3D.new()
+	shade.albedo_color = Color(0.05, 0.05, 0.055)
+	shade.roughness = 0.9
+	for mi: MeshInstance3D in him.find_children("*", "MeshInstance3D", true, false):
+		mi.layers = KILLER_LAYER
+		mi.material_override = shade
+	for l: Light3D in root.find_children("*", "Light3D", true, false):
+		l.light_cull_mask &= ~KILLER_LAYER
+	rim.light_cull_mask = KILLER_LAYER
 	var walk := _tween()
 	walk.tween_property(him, "global_position", NINA_AT_TILL + Vector3(1.0, 0, 1.6), 4.5)
 	await shot(4.5, NINA_AT_TILL + Vector3(-0.35, 1.78, -1.05), Vector3(3.0, 1.2, 13.5), NINA_AT_TILL + Vector3(-0.25, 1.76, -0.9),
@@ -670,6 +690,7 @@ func _night_one() -> void:
 	await shot(7.2, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.4, 1.5, -16.8), Vector3(3.0, 2.0, -6.0), 40.0)
 	# The letters over the canopy, the arrow, the rain in the lamplight.
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	CarCabin.set_driver(ext.zhiguli, false)  # he is out of the car
 	say(N1_VOLGA)
 	await shot(7.6, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
 	# Up the steps to the doors; Ковпак waits behind the glass.
@@ -761,6 +782,7 @@ func _night_five() -> void:
 	await shot(7.5, kp + Vector3(1.3, 0.55, -3.0), kp + Vector3(0, 1.6, 0), kp + Vector3(0.9, 0.5, -2.4),
 		kp + Vector3(0, 1.62, 0), 34.0, 0.3)
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	CarCabin.set_driver(ext.zhiguli, false)  # he is out of the car
 	say(N5_GO)
 	await shot(7.5, Vector3(3.8, 1.65, -10.0), kp + Vector3(0, 1.5, 0), Vector3(1.6, Exterior.PORCH + 1.62, -5.8),
 		kp + Vector3(0, 1.6, 0), 45.0, 1.0)
@@ -816,6 +838,7 @@ func _night_two() -> void:
 	await shot(7.0, kp + Vector3(1.4, 0.55, -3.2), kp + Vector3(0, 1.62, 0), kp + Vector3(1.0, 0.5, -2.6),
 		kp + Vector3(0, 1.64, 0), 34.0, 0.3)
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	CarCabin.set_driver(ext.zhiguli, false)  # he is out of the car
 	await shot(5.0, Vector3(3.8, 1.65, -10.0), kp + Vector3(0, 1.5, 0), Vector3(1.5, Exterior.PORCH + 1.62, -5.6),
 		kp + Vector3(0, 1.6, 0), 45.0, 1.0)
 	fade(1.0, 1.0)
@@ -851,6 +874,7 @@ func _night_three() -> void:
 	say(N3_VOLGA)
 	await shot(6.5, Vector3(-4.8, 1.5, -17.5), Vector3(3.0, 1.6, -8.0), Vector3(-4.2, 1.5, -16.4), Vector3(3.0, 1.8, -6.5), 40.0)
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	CarCabin.set_driver(ext.zhiguli, false)  # he is out of the car
 	await shot(6.0, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),
 		Vector3(0.5, Exterior.PORCH + 1.5, 1.2), 50.0, 1.0)
 	fade(1.0, 1.0)
@@ -892,6 +916,7 @@ func _night_four() -> void:
 	say(N4_BOBIK)
 	await shot(7.0, bp + Vector3(1.0, 1.5, -7.2), bp + Vector3(0, 1.0, 0), bp + Vector3(0.4, 1.4, -5.6), bp + Vector3(0, 1.1, 0), 40.0, 0.4)
 	sound("car_door", -4.0, Exterior.ZHIGULI_SPOT + Vector3(-0.9, 1, 0))
+	CarCabin.set_driver(ext.zhiguli, false)  # he is out of the car
 	say(N4_KNOWS)
 	await shot(7.5, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),
 		Vector3(0.5, Exterior.PORCH + 1.5, 1.2), 50.0, 1.0)

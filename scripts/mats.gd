@@ -18,9 +18,13 @@ const SURFACE := {
 	"metal": [0.5, 0.4, 0.4], "paint": [0.45, 0.4, 0.0], "locker": [0.5, 0.4, 0.2], "door": [0.5, 0.4, 0.2],
 	"wall": [0.6, 0.35, 0.0], "rubber": [0.45, 0.4, 0.0], "leather": [0.5, 0.35, 0.0], "torch": [0.35, 0.45, 0.0],
 	"blood": [0.15, 0.55, 0.0], "skin": [0.6, 0.3, 0.0], "face": [0.6, 0.3, 0.0], "register": [0.45, 0.4, 0.1],
-	"labels": [0.4, 0.4, 0.0], "goods": [0.32, 0.5, 0.05], "equip": [0.4, 0.45, 0.05], "decals": [0.12, 0.6, 0.0], "street": [0.55, 0.35, 0.05], "ext_decals": [0.1, 0.6, 0.0], "basket": [0.4, 0.4, 0.3], "display": [0.1, 0.6, 0.0], "grille": [0.5, 0.4, 0.5],
+	"labels": [0.4, 0.4, 0.0], "goods": [0.32, 0.5, 0.05], "goods2": [0.32, 0.5, 0.05], "equip": [0.4, 0.45, 0.05], "decals": [0.12, 0.6, 0.0], "street": [0.55, 0.35, 0.05], "ext_decals": [0.1, 0.6, 0.0], "basket": [0.4, 0.4, 0.3], "display": [0.1, 0.6, 0.0], "grille": [0.5, 0.4, 0.5],
 	"wood": [0.65, 0.3, 0.0], "kraft": [0.75, 0.25, 0.0], "kafel": [0.15, 0.55, 0.0], "concrete": [0.6, 0.35, 0.0], "galv": [0.4, 0.5, 0.6],
 }
+
+## Ground that holds water: [wetness, cover 0..1, darkening]. The hall's
+## floor has a few patches the mop left; the street has puddles after rain.
+const WET := {"floor": [0.8, 0.12, 0.25], "ext_asphalt": [1.0, 0.42, 0.9], "ext_slabs": [0.9, 0.3, 0.8]}
 
 static var _shaders: Dictionary = {}
 static var _cache: Dictionary = {}
@@ -43,16 +47,25 @@ static func unique(tex: String, tint := Color.WHITE, emission := Color.BLACK, ki
 	m.set_shader_parameter("tint", tint)
 	m.set_shader_parameter("emission", emission)
 	var base := TexFactory.file_name(tex)
-	var normal := TexFactory.DIR + base + "_n.png"
+	var normal := TexFactory.hd_path(base, "_n")
+	if normal == "":
+		normal = TexFactory.DIR + base + "_n.png"
 	if ResourceLoader.exists(normal):
 		m.set_shader_parameter("normal_tex", load(normal))
 	var surf: Array = SURFACE.get(base, [0.85, 0.25, 0.0])
 	m.set_shader_parameter("roughness", surf[0])
-	var rough := TexFactory.DIR + base + "_r.png"
+	var rough := TexFactory.hd_path(base, "_r")
+	if rough == "":
+		rough = TexFactory.DIR + base + "_r.png"
 	if ResourceLoader.exists(rough):  # the map is absolute; SURFACE then only scales it (0.5 = as drawn)
 		m.set_shader_parameter("rough_tex", load(rough))
 		m.set_shader_parameter("rough_map", 1.0)
 		m.set_shader_parameter("roughness", 0.5)
+	if WET.has(base) and Settings.graphics >= Graphics.MEDIUM:
+		m.set_shader_parameter("wet_tex", load(TexFactory.DIR + "wet_mask.png"))
+		m.set_shader_parameter("wet", WET[base][0])
+		m.set_shader_parameter("wet_cover", WET[base][1])
+		m.set_shader_parameter("wet_darken", WET[base][2])
 	m.set_shader_parameter("specular", surf[1])
 	m.set_shader_parameter("metallic", surf[2])
 	return m

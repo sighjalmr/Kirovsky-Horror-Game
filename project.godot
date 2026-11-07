@@ -1,5 +1,5 @@
 ; Engine configuration file.
-; Godot 4.5, Compatibility renderer (OpenGL 3), PS1 look.
+; Godot 4.5, Forward+ renderer (Vulkan / D3D12) with fallback to OpenGL 3.
 
 config_version=5
 
@@ -8,7 +8,8 @@ config_version=5
 config/name="Кировский: Закрытие"
 config/description="Нуар-хоррор. Свердловск, октябрь 1988. Ночь первая и день первый."
 run/main_scene="res://scenes/main.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
+config/features=PackedStringArray("4.5", "Forward Plus")
+config/project_settings_override="user://renderer.cfg"
 config/icon="res://icon.svg"
 
 [display]
@@ -24,10 +25,17 @@ locale/fallback="ru"
 
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
+renderer/rendering_method="forward_plus"
+rendering_device/fallback_to_opengl3=true
+rendering_device/fallback_to_d3d12=true
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=3
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+environment/volumetric_fog/volume_size=96
+environment/volumetric_fog/volume_depth=96
+textures/vram_compression/import_s3tc_bptc=true
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
-textures/default_filters/anisotropic_filtering_level=0
+textures/default_filters/anisotropic_filtering_level=3
 anti_aliasing/quality/msaa_3d=0
 shading/overrides/force_vertex_shading=false
 limits/opengl/max_renderable_lights=64

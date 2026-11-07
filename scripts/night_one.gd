@@ -186,8 +186,9 @@ var _butt: Node3D
 ## Places to hide from him: the spot he crouches in, the way he faces, where
 ## he steps back out, the prompt.
 const HIDES := {
-	"hide_till3": [Vector3(3.25, 0, 7.75), Vector3(-1, 0, 0.2), Vector3(3.3, 0, 7.0), "Спрятаться под кассой № 3"],
-	"hide_booth": [Vector3(10.35, 0, 3.15), Vector3(1, 0, 0), Vector3(9.9, 0, 3.6), "Спрятаться под столом на посту"],
+	"hide_till3": [Vector3(3.25, 0, 7.75), Vector3(1, 0, 0.25), Vector3(3.3, 0, 7.0), "Спрятаться под кассой № 3"],
+	# Right in under the desk top, between its legs, looking out at the booth.
+	"hide_booth": [Vector3(11.2, 0, 2.55), Vector3(-1, 0, 0.15), Vector3(9.9, 0, 3.6), "Спрятаться под столом на посту"],
 	"hide_cartons": [Vector3(-5.6, 0, 26.75), Vector3(0, 0, 1), Vector3(-5.6, 0, 26.1), "Спрятаться за коробками"],
 }
 ## The «Альпинист» on the booth desk.

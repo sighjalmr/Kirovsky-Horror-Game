@@ -166,8 +166,13 @@ static func build(car: Node3D, s: Dictionary) -> void:
 		steel.box(arm, Vector3(0.014, 0.008, top.distance_to(pad)))
 		black.box(Props.rot(Vector3.RIGHT, -0.45, pad), Vector3(p[1], 0.012, 0.07 if px > -0.3 else 0.055))
 	kit.build(car, false)
+	# Gordeev himself (legs, coat, hands): only while he drives. Parked,
+	# the car stands empty (set_driver).
+	var driver := Node3D.new()
+	driver.name = "Driver"
+	car.add_child(driver)
 	var legs := DriverLegs.make(Vector3(-0.36, 0.53, 0.24))
-	car.add_child(legs)
+	driver.add_child(legs)
 	for mi: MeshInstance3D in legs.find_children("*", "MeshInstance3D", true, false):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# The skirts of his coat over his lap.
@@ -177,7 +182,7 @@ static func build(car: Node3D, s: Dictionary) -> void:
 	wool.ellipsoid(Props.at(-0.36, 0.6, 0.16), Vector3(0.23, 0.075, 0.2), 20, 10)
 	for sx: float in [-0.12, 0.12]:
 		wool.ellipsoid(Props.rot(Vector3.RIGHT, 0.12, Vector3(-0.36 + sx, 0.6, 0.0)), Vector3(0.1, 0.06, 0.16), 16, 8)
-	lap.build(car, false)
+	lap.build(driver, false)
 
 	# A little of the dash's light falls into the footwell.
 	var well := OmniLight3D.new()
@@ -197,6 +202,7 @@ static func build(car: Node3D, s: Dictionary) -> void:
 	pivot.add_child(steer)
 	var hands: Node3D = (load(HANDS) as PackedScene).instantiate()
 	steer.add_child(hands)
+	car.set_meta("driver", [driver, hands])
 	var skin := _skin()
 	for mi: MeshInstance3D in hands.find_children("*", "MeshInstance3D", true, false):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -229,6 +235,19 @@ static func build(car: Node3D, s: Dictionary) -> void:
 
 
 ## Dash lights on with the ignition, off when he parks.
+## Gordeev at the wheel, or the car left empty where he parked it. The
+## wheel itself is in the same model as the hands, so the wheel stays and
+## only the hands and sleeves go.
+static func set_driver(car: Node3D, on: bool) -> void:
+	if not car.has_meta("driver"):
+		return
+	var nodes: Array = car.get_meta("driver")
+	(nodes[0] as Node3D).visible = on
+	for mi: MeshInstance3D in (nodes[1] as Node3D).find_children("*", "MeshInstance3D", true, false):
+		if mi.name.begins_with("hand") or mi.name.begins_with("sleeve"):
+			mi.visible = on
+
+
 static func set_dash(car: Node3D, on: bool) -> void:
 	if not car.has_meta("dash"):
 		return

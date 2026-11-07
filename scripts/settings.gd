@@ -23,6 +23,22 @@ static var fullscreen := true
 static var resolution := 2
 const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 const RESOLUTION_NAMES := ["1280 × 720", "1600 × 900", "1920 × 1080 (Full HD)", "2560 × 1440 (2K)"]
+## Graphics quality, Graphics.LOW..ULTRA (see scripts/graphics.gd), and the
+## effects that can be switched off on their own.
+static var graphics := 2
+static var volumetric := true
+static var reflections := true
+static var gi := true
+static var motion_blur := true
+## 0..1: how strongly the picture is graded like 1980s colour film (grain,
+## halation, dust, the frame weaving a little).
+static var film := 1.0
+## Scanned 2K surfaces (textures/hd/) instead of the 512 px ones.
+static var hd_textures := true
+## Start the next time in OpenGL (Compatibility), for weak or old graphics
+## cards: none of the modern effects, but it runs anywhere.
+static var opengl := false
+const OVERRIDE := "user://renderer.cfg"
 ## Picture gamma 0.7..1.5 (1 = as the artists left it).
 static var brightness := 1.0
 static var subtitles := true
@@ -67,6 +83,14 @@ static func load_all() -> void:
 	fullscreen = cf.get_value("video", "fullscreen", fullscreen)
 	resolution = clampi(cf.get_value("video", "resolution", resolution), 0, RESOLUTIONS.size() - 1)
 	subtitles = cf.get_value("video", "subtitles", subtitles)
+	graphics = clampi(cf.get_value("video", "graphics", graphics), 0, 3)
+	volumetric = cf.get_value("video", "volumetric", volumetric)
+	reflections = cf.get_value("video", "reflections", reflections)
+	gi = cf.get_value("video", "gi", gi)
+	motion_blur = cf.get_value("video", "motion_blur", motion_blur)
+	film = cf.get_value("video", "film", film)
+	hd_textures = cf.get_value("video", "hd_textures", hd_textures)
+	opengl = FileAccess.file_exists(OVERRIDE)
 	sub_size = cf.get_value("video", "sub_size", sub_size)
 	hints = cf.get_value("game", "hints", hints)
 	detective = cf.get_value("game", "detective", detective)
@@ -91,6 +115,13 @@ static func save() -> void:
 	cf.set_value("video", "fullscreen", fullscreen)
 	cf.set_value("video", "resolution", resolution)
 	cf.set_value("video", "subtitles", subtitles)
+	cf.set_value("video", "graphics", graphics)
+	cf.set_value("video", "volumetric", volumetric)
+	cf.set_value("video", "reflections", reflections)
+	cf.set_value("video", "gi", gi)
+	cf.set_value("video", "motion_blur", motion_blur)
+	cf.set_value("video", "film", film)
+	cf.set_value("video", "hd_textures", hd_textures)
 	cf.set_value("video", "sub_size", sub_size)
 	cf.set_value("game", "hints", hints)
 	cf.set_value("game", "detective", detective)
@@ -101,6 +132,18 @@ static func save() -> void:
 	cf.set_value("game", "plan_copied", plan_copied)
 	cf.set_value("game", "language", language)
 	cf.save(PATH)
+
+
+## The renderer for the next start: the override file is read by Godot itself
+## before anything else (application/config/project_settings_override).
+static func set_opengl(on: bool) -> void:
+	opengl = on
+	if on:
+		var f := FileAccess.open(OVERRIDE, FileAccess.WRITE)
+		f.store_string('[rendering]\nrenderer/rendering_method="gl_compatibility"\n')
+		f.close()
+	elif FileAccess.file_exists(OVERRIDE):
+		DirAccess.remove_absolute(OVERRIDE)
 
 
 ## A slider value 0..1 as decibels (0 is silence).
