@@ -113,6 +113,7 @@ func _ready() -> void:
 	post = main.post.duplicate()
 	screen.material = post
 	add_child(screen)
+	add_child(Graphics.Blur.new(view, post))
 	for y: float in ([] if vertical() else [0.0, 1080.0 - 118.0]):
 		var bar := ColorRect.new()
 		bar.color = Color.BLACK

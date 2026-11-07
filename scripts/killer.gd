@@ -149,6 +149,7 @@ func set_torch(on: bool) -> void:
 		torch.light_color = Color(1.0, 0.9, 0.72)
 		torch.light_specular = 0.3
 		torch.shadow_enabled = true
+		torch.set_meta("role", "beam")
 		add_child(torch)
 		var lens := MeshInstance3D.new()
 		var m := CylinderMesh.new()

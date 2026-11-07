@@ -35,6 +35,10 @@ func _ready() -> void:
 		await _night2_shots(p, store, night)
 		get_tree().quit()
 		return
+	if "--gfxshot" in OS.get_cmdline_user_args():
+		await _gfx_shots(p, store, night)
+		get_tree().quit()
+		return
 	if "--hallshot" in OS.get_cmdline_user_args():
 		await _hall_shots(p, store, night)
 		get_tree().quit()
@@ -290,6 +294,64 @@ func _hall_shots(p: Player, store: Store, night: NightOne) -> void:
 		_place(p, v[1], v[2])
 		p.head.rotation.x = v[3]
 		await _wait(0.8)
+		await _shot(v[0] + "_day")
+
+
+## Graphics comparison (--autoshot=DIR --gfxshot): the same views before and
+## after a change to the look: Kovpak's face, the lit hall, the dark hall in
+## the torch beam, the wet floor by the storeroom, the hall by day.
+func _gfx_shots(p: Player, store: Store, night: NightOne) -> void:
+	main.hud.visible = false
+	night.tamara.visible = false
+	night.kovpak.global_position = Vector3(7.9, 0, 2.6)
+	night.kovpak.rotation.y = PI * 0.5
+	_place(p, Vector3(9.3, 0, 2.7), Vector3(-1, 0, 0.0))
+	p.head.rotation.x = 0.04
+	await _wait(2.0)
+	await _shot("g01_face")
+	var kp: Vector3 = night.kovpak.global_position
+	_place(p, kp + Vector3(0.95, 0, 0.05), Vector3(-1, 0, -0.05))
+	p.head.rotation.x = 0.05
+	p.camera.fov = 45.0
+	await _wait(0.8)
+	await _shot("g07_face_close")
+	p.camera.fov = 70.0
+	_place(p, Vector3(-0.5, 0, 9.6), Vector3(0.05, 0, 1))
+	p.head.rotation.x = -0.75
+	await _wait(0.8)
+	await _shot("g08_floor")
+	if "--gfxquick" in OS.get_cmdline_user_args():
+		return
+	night.kovpak.visible = false
+	var views := [
+		["g02_hall", Vector3(-0.5, 0, 9.6), Vector3(0.05, 0, 1), 0.3],
+		["g03_gallery", Vector3(-3.0, 0, 15.0), Vector3(-0.8, 0, 1), 0.2],
+		["g04_aisle", Vector3(7.4, 0, 13.0), Vector3(0.1, 0, 1), 0.0],
+		["g05_back", Vector3(-1.5, 0, 23.0), Vector3(0.15, 0, -1), 0.1],
+		["g06_store", Vector3(7.6, 0, 22.6), Vector3(0.35, 0, 1), -0.25],
+	]
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0])
+	for i in store.rows.size():
+		store.switch_off(i, true)
+	p.force_flashlight = true
+	for v: Array in views:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
+		await _shot(v[0] + "_dark")
+	p.force_flashlight = false
+	for i in store.rows.size():
+		store.switch_on(i)
+	main._day_look()
+	await _wait(1.0)
+	for v: Array in [views[0], views[1]]:
+		_place(p, v[1], v[2])
+		p.head.rotation.x = v[3]
+		await _wait(1.0)
 		await _shot(v[0] + "_day")
 
 

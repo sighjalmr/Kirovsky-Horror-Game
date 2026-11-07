@@ -100,6 +100,7 @@ func _ready() -> void:
 	flashlight.light_color = Color(1.0, 0.92, 0.75)
 	flashlight.light_specular = 0.9
 	flashlight.shadow_enabled = true
+	flashlight.set_meta("role", "beam")
 	flashlight.visible = false
 	hand.add_child(flashlight)
 

@@ -32,6 +32,7 @@ var volga: Node3D
 var env: Environment
 var sun: DirectionalLight3D
 var rain: CPUParticles3D
+var leaves: CPUParticles3D
 var sign_mats: Array[ShaderMaterial] = []
 ## The phone booths' node; in the night store the right one's handset is
 ## left off its hook for the call of night one (see Outdoors).
@@ -73,6 +74,22 @@ func _ready() -> void:
 		zhiguli.rotation.y = PI
 	if look == "night":
 		_build_rain()
+	elif Settings.graphics >= Graphics.MEDIUM:
+		_build_leaves()
+
+
+## The rain and the leaves keep falling round whatever camera is looking.
+func _process(_delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		# Built round the night store: no rain falling through the hall.
+		var outside := not embedded or cam.global_position.z < -0.6
+		if rain:
+			rain.visible = outside
+		if leaves:
+			leaves.visible = outside
+		if outside:
+			follow(cam)
 
 
 # --- helpers ------------------------------------------------------------------
@@ -635,9 +652,20 @@ func _build_rain() -> void:
 	var q := QuadMesh.new()
 	q.size = Vector2(0.008, 0.45)
 	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# Lit drops: they flash in the lamplight and the headlights and all but
+	# vanish in the dark between the lamps, as rain does.
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL if Settings.graphics >= Graphics.MEDIUM \
+		else BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.albedo_color = Color(0.7, 0.75, 0.8, 0.22)
+	if m.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
+		m.albedo_color = Color(0.9, 0.93, 1.0, 0.35)
+		m.emission_enabled = true
+		m.emission = Color(0.05, 0.055, 0.065)
+		m.roughness = 0.1
+		m.metallic_specular = 1.0
+		m.backlight_enabled = true
+		m.backlight = Color(0.6, 0.6, 0.65)
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
 	m.billboard_keep_scale = true
 	# No drops right at the lens (nor inside the car in the shots from the seat).
@@ -650,10 +678,56 @@ func _build_rain() -> void:
 	add_child(rain)
 
 
+## Day: the last birch and poplar leaves coming down off the trees round the
+## square, tumbling, drifting with the wind.
+func _build_leaves() -> void:
+	leaves = CPUParticles3D.new()
+	leaves.amount = 260
+	leaves.lifetime = 9.0
+	leaves.preprocess = 9.0
+	leaves.local_coords = false
+	leaves.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	leaves.emission_box_extents = Vector3(22, 1.5, 22)
+	leaves.direction = Vector3(1, -0.3, 0.4)
+	leaves.spread = 40.0
+	leaves.gravity = Vector3(0.25, -0.55, 0.1)
+	leaves.initial_velocity_min = 0.2
+	leaves.initial_velocity_max = 0.9
+	leaves.angle_min = 0.0
+	leaves.angle_max = 360.0
+	leaves.angular_velocity_min = -160.0
+	leaves.angular_velocity_max = 160.0
+	leaves.scale_amount_min = 0.6
+	leaves.scale_amount_max = 1.2
+	leaves.damping_min = 0.2
+	leaves.damping_max = 0.5
+	var q := QuadMesh.new()
+	q.size = Vector2(0.07, 0.07)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = load("res://textures/leaves.png")
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.5
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.particles_anim_h_frames = 2
+	m.particles_anim_v_frames = 2
+	m.backlight_enabled = true
+	m.backlight = Color(0.5, 0.4, 0.1)
+	m.roughness = 0.7
+	q.material = m
+	leaves.mesh = q
+	leaves.anim_offset_min = 0.0
+	leaves.anim_offset_max = 1.0
+	leaves.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(leaves)
+
+
 ## Keeps the rain falling round the camera.
 func follow(cam: Camera3D) -> void:
 	if rain:
 		rain.global_position = cam.global_position + Vector3(0, 9, 0) - cam.global_basis.z * 6.0
+	if leaves:
+		leaves.global_position = cam.global_position + Vector3(0, 7, 0) - cam.global_basis.z * 8.0
 
 
 ## Signs lit (night) or dark (day).

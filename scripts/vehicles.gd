@@ -85,6 +85,7 @@ static func build(s: Dictionary) -> Node3D:
 		l.light_energy = 0.0
 		l.light_color = Color(1.0, 0.93, 0.78)
 		l.shadow_enabled = sx < 0.0
+		l.set_meta("role", "beam")
 		car.add_child(l)
 		beams.append(l)
 	if s.get("cabin", false):
@@ -230,6 +231,7 @@ static func bobik() -> Node3D:
 		l.light_energy = 0.0
 		l.light_color = Color(1.0, 0.92, 0.75)
 		l.shadow_enabled = sx < 0.0
+		l.set_meta("role", "beam")
 		car.add_child(l)
 		beams.append(l)
 	car.set_meta("beams", beams)

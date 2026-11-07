@@ -16,6 +16,20 @@ uniform float roughness = 0.8;
 uniform float specular = 0.3;
 uniform float metallic = 0.0;
 
+// Standing water (Mats.WET): the floor freshly mopped in patches, puddles
+// on the asphalt. The mask is laid in world space, one repeat every 14 m,
+// so it does not repeat with the tiles; `wet_cover` is how much of the
+// ground it covers (0 dry .. 1 flooded), `wet` how wet the wet part is.
+uniform sampler2D wet_tex : hint_default_black, filter_linear_mipmap, repeat_enable;
+uniform float wet = 0.0;
+uniform float wet_cover = 0.4;
+uniform float wet_darken = 0.5;
+varying vec3 psx_world;
+
+void vertex() {
+	psx_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+
 vec4 psx_texel(vec2 uv) {
 	return texture(albedo_tex, uv);
 }
@@ -27,4 +41,15 @@ vec4 psx_texel(vec2 uv) {
 	ROUGHNESS = clamp(mix(roughness + (0.5 - dot(tex.rgb, vec3(0.33))) * 0.2, \
 		texture(rough_tex, UV).r * roughness * 2.0, rough_map), 0.05, 1.0); \
 	SPECULAR = specular; \
-	METALLIC = metallic;
+	METALLIC = metallic; \
+	if (wet > 0.0) { \
+		float psx_m = texture(wet_tex, psx_world.xz / 14.0).r; \
+		float psx_up = smoothstep(0.75, 0.95, (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y); \
+		float psx_pool = smoothstep(1.0 - wet_cover, 1.0 - wet_cover + 0.06, psx_m) * psx_up * wet; \
+		float psx_damp = smoothstep(1.0 - wet_cover - 0.18, 1.0 - wet_cover, psx_m) * psx_up * wet; \
+		ROUGHNESS = mix(ROUGHNESS, ROUGHNESS * 0.45, psx_damp); \
+		ROUGHNESS = mix(ROUGHNESS, 0.02, psx_pool); \
+		SPECULAR = mix(SPECULAR, 0.6, psx_pool); \
+		NORMAL_MAP = mix(NORMAL_MAP, vec3(0.5, 0.5, 1.0), psx_pool * 0.9); \
+		ALBEDO *= mix(1.0, 0.6, max(psx_pool, psx_damp * 0.6) * wet_darken); \
+	}

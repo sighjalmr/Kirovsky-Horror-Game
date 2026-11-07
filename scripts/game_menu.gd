@@ -323,6 +323,7 @@ func _settings() -> void:
 	_toggle("Перевернуть мышь по вертикали", Settings.invert_y, _set_invert)
 	_toggle("Во весь экран", Settings.fullscreen, _set_fullscreen)
 	_option("Разрешение", Settings.RESOLUTION_NAMES, Settings.resolution, _set_resolution)
+	_button("Графика…", _graphics)
 	_slider("Яркость", 0.7, 1.5, Settings.brightness, _set_brightness)
 	_panel.add_child(_brightness_swatch())
 	_toggle("Субтитры", Settings.subtitles, _set_subtitles)
@@ -401,6 +402,69 @@ func _set_veteran(on: bool) -> void:
 func _set_detective(on: bool) -> void:
 	Settings.detective = on
 	picked.emit("apply")
+
+
+## Settings → «Графика»: the quality level and the effects one by one.
+func _graphics() -> void:
+	_page("ГРАФИКА", Vector2(460, 250))
+	_option("Качество графики", Graphics.NAMES, Settings.graphics, _set_graphics)
+	_toggle("Объёмный туман: виден луч фонарика (со «среднего»)", Settings.volumetric, _set_volumetric)
+	_toggle("Отражения на мокром полу и в лужах (с «высокого»)", Settings.reflections, _set_reflections)
+	_toggle("Отражённый свет SDFGI (только «ультра»)", Settings.gi, _set_gi)
+	_toggle("Размытие в движении", Settings.motion_blur, _set_motion_blur)
+	_slider("Плёнка 80-х: зерно, пылинки, ореолы", 0.0, 1.0, Settings.film, _set_film)
+	_toggle("Текстуры 2K (со следующей главы)", Settings.hd_textures, _set_hd)
+	_toggle("Режим для слабого компьютера: OpenGL, без эффектов (после перезапуска игры)", Settings.opengl, _set_opengl)
+	if not Graphics.modern():
+		var l := Label.new()
+		l.text = "Сейчас игра идёт в OpenGL: туман, отражения и SDFGI недоступны."
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_font_size_override("font_size", 20)
+		l.add_theme_color_override("font_color", DIM)
+		_panel.add_child(l)
+	_button("Готово", _graphics_done, true)
+	_focus_first()
+
+
+func _set_graphics(i: int) -> void:
+	Settings.graphics = i
+	picked.emit("apply")
+
+
+func _set_volumetric(on: bool) -> void:
+	Settings.volumetric = on
+	picked.emit("apply")
+
+
+func _set_reflections(on: bool) -> void:
+	Settings.reflections = on
+	picked.emit("apply")
+
+
+func _set_gi(on: bool) -> void:
+	Settings.gi = on
+	picked.emit("apply")
+
+
+func _set_motion_blur(on: bool) -> void:
+	Settings.motion_blur = on
+
+
+func _set_film(v: float) -> void:
+	Settings.film = v
+
+
+func _set_hd(on: bool) -> void:
+	Settings.hd_textures = on
+
+
+func _set_opengl(on: bool) -> void:
+	Settings.set_opengl(on)
+
+
+func _graphics_done() -> void:
+	Settings.save()
+	_settings()
 
 
 func _settings_done() -> void:

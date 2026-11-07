@@ -11,6 +11,12 @@ extends RefCounted
 
 const NO_RECT := Rect2()
 
+## Edge chamfer for closed boxes, in metres (Graphics sets it from the
+## quality level before the world is built; 0 = sharp boxes). Real
+## shelves, tills and lids never have knife edges: the rounded edge
+## catches a line of light and the parts stop looking like blocks.
+static var bevel := 0.0
+
 var ao_enabled := true
 
 var _st := SurfaceTool.new()
@@ -33,6 +39,10 @@ func box(xf: Transform3D, size: Vector3, color := Color.WHITE, rect := NO_RECT, 
 		faces := MeshFactory.ALL, step := 0.0, ao := true) -> void:
 	var hx := size.x * 0.5
 	var hz := size.z * 0.5
+	var smallest := minf(size.x, minf(size.y, size.z))
+	if bevel > 0.0 and faces == MeshFactory.ALL and step <= 0.0 and smallest > 0.025:
+		_bevel_box(xf, size, color, rect, tex_m, ao, minf(bevel, smallest * 0.14))
+		return
 	var defs := [
 		[MeshFactory.PX, Vector3(hx, 0, hz), Vector3(0, 0, -size.z), Vector3(0, size.y, 0)],
 		[MeshFactory.NX, Vector3(-hx, 0, -hz), Vector3(0, 0, size.z), Vector3(0, size.y, 0)],
@@ -62,6 +72,90 @@ func box(xf: Transform3D, size: Vector3, color := Color.WHITE, rect := NO_RECT, 
 					else:
 						uvs.append(Vector2(q.x * u.length() / tex_m.x, -q.y * v.length() / tex_m.y))
 				quad(xf, pts, uvs, color, ao)
+
+
+## The box with its twelve edges cut at 45° (width b) and its corners
+## cut off: each face shrunk by b, a strip along every edge whose normals
+## turn from one face to the next (so it shades round), a triangle at each
+## corner. UVs carry on from the faces as if the edge were still sharp.
+func _bevel_box(xf: Transform3D, size: Vector3, color: Color, rect: Rect2, tex_m: Vector2, ao: bool, b: float) -> void:
+	var h := size * 0.5
+	var c := Vector3(0, h.y, 0)
+	# Faces as [normal, origin, u, v] exactly like box().
+	var defs := {
+		Vector3.RIGHT: [Vector3(h.x, 0, h.z), Vector3(0, 0, -size.z), Vector3(0, size.y, 0)],
+		Vector3.LEFT: [Vector3(-h.x, 0, -h.z), Vector3(0, 0, size.z), Vector3(0, size.y, 0)],
+		Vector3.BACK: [Vector3(-h.x, 0, h.z), Vector3(size.x, 0, 0), Vector3(0, size.y, 0)],
+		Vector3.FORWARD: [Vector3(h.x, 0, -h.z), Vector3(-size.x, 0, 0), Vector3(0, size.y, 0)],
+		Vector3.UP: [Vector3(-h.x, size.y, h.z), Vector3(size.x, 0, 0), Vector3(0, 0, -size.z)],
+		Vector3.DOWN: [Vector3(-h.x, 0, -h.z), Vector3(size.x, 0, 0), Vector3(0, 0, size.z)],
+	}
+	var uv_of := func(n: Vector3, p: Vector3) -> Vector2:
+		var d: Array = defs[n]
+		var u: Vector3 = d[1]
+		var v: Vector3 = d[2]
+		var q := Vector2((p - d[0]).dot(u) / u.length_squared(), (p - d[0]).dot(v) / v.length_squared())
+		if rect.has_area():
+			return rect.position + Vector2(q.x, 1.0 - q.y) * rect.size
+		return Vector2(q.x * u.length() / tex_m.x, -q.y * v.length() / tex_m.y)
+	# Faces, shrunk.
+	for n: Vector3 in defs:
+		var d: Array = defs[n]
+		var o: Vector3 = d[0]
+		var u: Vector3 = d[1]
+		var v: Vector3 = d[2]
+		var bu := b / u.length()
+		var bv := b / v.length()
+		var pts := [o + u * bu + v * bv, o + u * (1 - bu) + v * bv, o + u * (1 - bu) + v * (1 - bv), o + u * bu + v * (1 - bv)]
+		var uvs := []
+		for pt: Vector3 in pts:
+			uvs.append(uv_of.call(n, pt))
+		quad(xf, pts, uvs, color, ao)
+	# Edges: every pair of faces at right angles.
+	var axes := [Vector3.RIGHT, Vector3.UP, Vector3.BACK]
+	var hs := {Vector3.RIGHT: h.x, Vector3.UP: h.y, Vector3.BACK: h.z}
+	for ai in 3:
+		var a: Vector3 = axes[ai]
+		var n1a: Vector3 = axes[(ai + 1) % 3]
+		var n2a: Vector3 = axes[(ai + 2) % 3]
+		for s1: float in [-1.0, 1.0]:
+			for s2: float in [-1.0, 1.0]:
+				var n1 := n1a * s1
+				var n2 := n2a * s2
+				var e := c + n1 * float(hs[n1a]) + n2 * float(hs[n2a])
+				var t0 := a * (-float(hs[a]) + b)
+				var t1 := a * (float(hs[a]) - b)
+				var A0 := e - n2 * b + t0
+				var A1 := e - n2 * b + t1
+				var B1 := e - n1 * b + t1
+				var B0 := e - n1 * b + t0
+				var pts := [A0, A1, B1, B0]
+				var ns := [n1, n1, n2, n2]
+				if (A1 - A0).cross(B0 - A0).dot(n1 + n2) < 0.0:
+					pts = [A0, B0, B1, A1]
+					ns = [n1, n2, n2, n1]
+				var uvs := []
+				for i in 4:
+					uvs.append(uv_of.call(ns[i], pts[i]))
+				quad(xf, pts, uvs, color, ao, ns)
+	# Corners.
+	for sx: float in [-1.0, 1.0]:
+		for sy: float in [-1.0, 1.0]:
+			for sz: float in [-1.0, 1.0]:
+				var k := c + Vector3(sx * h.x, sy * h.y, sz * h.z)
+				var nx := Vector3(sx, 0, 0)
+				var ny := Vector3(0, sy, 0)
+				var nz := Vector3(0, 0, sz)
+				var px := k - ny * b - nz * b
+				var py := k - nx * b - nz * b
+				var pz := k - nx * b - ny * b
+				var pts := [px, py, pz]
+				var ns := [nx, ny, nz]
+				if (py - px).cross(pz - px).dot(nx + ny + nz) < 0.0:
+					pts = [px, pz, py]
+					ns = [nx, nz, ny]
+				for idx: int in [0, 2, 1]:
+					_vertex(xf, pts[idx], uv_of.call(ns[idx], pts[idx]), ns[idx], color, ao)
 
 
 ## Upright cylinder or cone, bottom-centred. The side wraps `side_rect` once

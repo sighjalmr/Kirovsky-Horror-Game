@@ -16,7 +16,9 @@ static var _cache: Dictionary = {}
 static func get_tex(id: String) -> Texture2D:
 	if _cache.has(id):
 		return _cache[id]
-	var path := DIR + file_name(id) + ".png"
+	var path := hd_path(file_name(id), "")
+	if path == "":
+		path = DIR + file_name(id) + ".png"
 	var tex: Texture2D
 	if ResourceLoader.exists(path):
 		tex = load(path)
@@ -27,6 +29,16 @@ static func get_tex(id: String) -> Texture2D:
 		tex = ImageTexture.create_from_image(img)
 	_cache[id] = tex
 	return tex
+
+
+## The 2K version of a surface (tools/make_hd_textures.py: the drawn
+## texture with scanned photo detail laid into it) if there is one and the
+## player wants them; suffix "", "_n" (normal) or "_r" (roughness).
+static func hd_path(base: String, suffix: String) -> String:
+	if not Settings.hd_textures:
+		return ""
+	var p := DIR + "hd/" + base + suffix + ".webp"
+	return p if ResourceLoader.exists(p) else ""
 
 
 static func file_name(id: String) -> String:

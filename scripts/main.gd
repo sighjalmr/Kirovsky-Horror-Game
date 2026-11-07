@@ -146,6 +146,7 @@ func _ready() -> void:
 	_setup_input()
 	Sfx.setup_buses()
 	Settings.setup_bus()
+	Graphics.install(get_tree())
 	_build_view()
 	_build_world()
 	hud = Hud.new()
@@ -301,6 +302,7 @@ func apply_settings() -> void:
 	if not _dev():
 		view.size = Settings.render_size(Vector2i(RENDER_W, RENDER_H))
 	Settings.apply_display()
+	Graphics.reapply(get_tree())
 	if hud:
 		hud.apply_settings()
 
@@ -493,6 +495,7 @@ func _build_view() -> void:
 	post.shader = load("res://shaders/psx_post.gdshader")
 	screen.material = post
 	layer.add_child(screen)
+	add_child(Graphics.Blur.new(view, post))
 
 
 func _build_world() -> void:
