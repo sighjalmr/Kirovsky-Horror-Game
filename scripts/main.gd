@@ -187,6 +187,10 @@ func _ready() -> void:
 		_resume = false
 		_restore()
 		return
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--uishots="):
+			add_child(load("res://scripts/dev_uishots.gd").new().with(self, a.get_slice("=", 1)))
+			return
 	var shot_dir := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--autoshot="):
@@ -687,11 +691,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	# Developer jump to any chapter from the title: the number keys 1–6.
+	# Developer jump to any chapter from the title: the number keys 1–8
+	# (7 and 8 are days two and three, added later).
 	if phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
-			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6]:
+			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8]:
 		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2", KEY_4: "night3", KEY_5: "night4",
-			KEY_6: "night5"}[
+			KEY_6: "night5", KEY_7: "day2", KEY_8: "day3"}[
 			(event as InputEventKey).physical_keycode]
 		if to != chapter:
 			_go_to(to, {}, [])

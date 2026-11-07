@@ -65,6 +65,7 @@ func _ready() -> void:
 	label.pixel_size = 0.004
 	label.modulate = Color(0.8, 0.12, 0.08)
 	label.position = Vector3(5.0, 2.4, 27.9)
+	label.rotation.y = PI  # read from the hall side
 	store.add_child(label)
 	rinat = _person("shopper_man", RINAT, 0.0)
 	rinat.pose = "talk"

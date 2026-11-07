@@ -49,7 +49,7 @@ func _ready() -> void:
 	var store: Store = main.store
 	for it in store.interactables:
 		it.active = false
-	kovpak = _person("kovpak", KOVPAK, PI * 0.15)
+	kovpak = _person("kovpak", KOVPAK, atan2(-0.6, -1.0))  # turned to the till side
 	kovpak.pose = "talk"
 	shopper = _person("shopper2", Vector3(-3.4, 0, 9.0), PI)
 	store.add_interactable("talk_kovpak_day", KOVPAK + Vector3(0.6, 0, 1.0), "Поговорить с Ковпаком", 1.9, false)

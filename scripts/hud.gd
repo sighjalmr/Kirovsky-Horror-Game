@@ -456,7 +456,7 @@ func show_epilogue(heading: String, ep: Array, tail: String) -> void:
 	var ink := Color(0.12, 0.11, 0.1)
 	var rows := [
 		[Vector2(30, 14), Vector2(860, 60), 44, "ВЕЧЕРНИЙ СВЕРДЛОВСК", HORIZONTAL_ALIGNMENT_CENTER],
-		[Vector2(30, 76), Vector2(860, 30), 20, "Орган Свердловского горкома КПСС и горисполкома  ·  %s  ·  Цена 3 коп." % ep[0], HORIZONTAL_ALIGNMENT_CENTER],
+		[Vector2(30, 76), Vector2(860, 30), 20, "Газета горкома КПСС и горисполкома  ·  %s  ·  Цена 3 коп." % ep[0], HORIZONTAL_ALIGNMENT_CENTER],
 		[Vector2(30, 128), Vector2(860, 48), 36, ep[1], HORIZONTAL_ALIGNMENT_LEFT],
 		[Vector2(30, 186), Vector2(860, 270), 25, ep[2], HORIZONTAL_ALIGNMENT_LEFT],
 	]
