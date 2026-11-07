@@ -158,7 +158,7 @@ func _walls() -> void:
 	_wall(Vector2(22.0, -11.0), Vector2(0.3, 22.0))
 	_wall(Vector2(-1.0, -21.9), Vector2(46.0, 0.3))
 	# Street furniture (exterior coordinates moved by OFFSET).
-	_wall(Vector2(KIOSK.x, KIOSK.z), Vector2(2.8, 2.0))
+	_wall(Vector2(KIOSK.x, KIOSK.z - 0.1), Vector2(3.15, 2.35))          # the Blender kiosk: 3.1 x 2.3 m with its roof
 	_wall(Vector2(14.3, -2.3), Vector2(1.95, 0.95))                   # phone booths
 	_wall(Vector2(20.5, -3.3), Vector2(4.2, 1.6))                     # bins
 	_wall(Vector2(-20.1, -13.1), Vector2(6.4, 0.15))                  # lawn fence, gap for the path

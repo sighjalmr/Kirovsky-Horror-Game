@@ -48,6 +48,7 @@ const N4_KNOWS := "Он знает, что я был в подвале. И зн�
 const N2_BAG := "Сумка Нины всё ещё лежит в тридцать первой ячейке. Если он пришёл за ней, надо успеть её убрать, пока он курит."
 
 ## Till 2 in the store, where Nina punched the receipt.
+const INTRO_MUSIC := "res://sounds/music/intro_last_light.ogg"
 const TILL := Vector3(-2.35, 0.89, 7.95)
 const NINA_AT_TILL := Vector3(-1.75, 0, 7.95)
 ## The flashback killer's own render layer (no light reaches his face).
@@ -77,6 +78,9 @@ var _wipe_t := 0.0
 var _wiping := false
 var _car_prev: Array = []
 var _engine: Node
+var _music: AudioStreamPlayer
+var _music_db := 0.0     # its level between lines
+var _music_duck := 0.0   # how far it drops while someone speaks
 
 
 func _init(m: Main, kind_: String) -> void:
@@ -285,7 +289,14 @@ func inside(dur: float, car: Node3D, eye: Vector3, at: Vector3, fov := 55.0) -> 
 
 
 func _process(delta: float) -> void:
-	if _done or _shot.is_empty():
+	if _done:
+		return
+	if is_instance_valid(_music) and not _music_fading:
+		var want := _music_db + (_music_duck if main.hud.speaking() else 0.0)
+		# Down fast when a line starts, back up slowly after it.
+		var rate := 30.0 if want < _music.volume_db else 6.0
+		_music.volume_db = move_toward(_music.volume_db, want, delta * rate)
+	if _shot.is_empty():
 		return
 	_shot_t += delta
 	_place_camera()
@@ -412,6 +423,32 @@ func sound(id: String, volume_db := 0.0, at: Variant = null, bus := "Master") ->
 		p = a3
 	_players.append(p)
 	return p
+
+
+## Background music under a scene: `volume_db` between lines, `duck_db`
+## lower while a voice line plays, so it never covers the speech.
+func music(path: String, volume_db := -10.0, duck_db := -10.0) -> void:
+	_music = AudioStreamPlayer.new()
+	_music.stream = load(path)
+	_music_db = volume_db + Settings.db(Settings.sounds)
+	_music_duck = duck_db
+	_music.volume_db = -50.0
+	_music.bus = "Master"
+	add_child(_music)
+	_music.play()
+	_players.append(_music)
+	var tw := _tween()
+	tw.tween_property(_music, "volume_db", _music_db, 3.0)
+	tw.tween_callback(func(): _music_fading = false)
+
+
+var _music_fading := true
+
+
+func music_out(time: float) -> void:
+	if is_instance_valid(_music):
+		_music_fading = true
+		_tween().tween_property(_music, "volume_db", -60.0, time)
 
 
 func _street(look: String) -> void:
@@ -624,6 +661,7 @@ func _night_one() -> void:
 	kovpak.rotation.y = 0.0  # faces the glass and the street
 	kovpak.pose = "idle"
 	_black.color.a = 1.0
+	music(INTRO_MUSIC, -9.0, -11.0)
 	fade(0.0, 2.5)
 	caption("Свердловск, МЖК, Сиреневый бульвар\nПятница, 14 октября 1988 года, 22:20", 5.0)
 	say(N1_CITY)
@@ -695,6 +733,7 @@ func _night_one() -> void:
 	await shot(7.6, Vector3(2.5, 1.0, -12.5), Vector3(2.5, 5.2, -5.6), Vector3(2.4, 1.1, -11.2), Vector3(2.5, 5.6, -5.6), 50.0, 0.3)
 	# Up the steps to the doors; Ковпак waits behind the glass.
 	say(N1_GO)
+	music_out(7.0)
 	await shot(6.0, Vector3(3.6, 1.65, -10.0), Vector3(0.5, 1.7, 1.0), Vector3(0.6, Exterior.PORCH + 1.62, -1.6),
 		Vector3(0.5, Exterior.PORCH + 1.5, 1.2), 50.0, 1.0)
 	fade(1.0, 1.0)

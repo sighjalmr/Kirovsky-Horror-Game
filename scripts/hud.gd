@@ -446,6 +446,11 @@ func fade_to(alpha: float, time: float) -> void:
 	create_tween().tween_property(fade, "color:a", alpha, time)
 
 
+## True while a voice line is playing.
+func speaking() -> bool:
+	return _voice.playing
+
+
 func show_title(t: String, sub: String, color := PAPER) -> void:
 	title.text = t
 	title.add_theme_color_override("font_color", color)
