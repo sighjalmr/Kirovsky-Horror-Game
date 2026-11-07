@@ -182,9 +182,14 @@ func _questions_word(n: int) -> String:
 	return "вопрос" if n == 1 else "вопроса"
 
 
+## The questions of this day (later days have their own).
+func questions() -> Array:
+	return QUESTIONS
+
+
 func _available() -> Array:
 	var out := []
-	for q: Array in QUESTIONS:
+	for q: Array in questions():
 		if q[0] in asked:
 			continue
 		if q[1] != "" and not clues.get(q[1], false):

@@ -18,6 +18,8 @@ var subtitle: Label
 var prompt: Label
 var notebook: ColorRect
 var notebook_text: Label
+## The right-hand page: people and conclusions (Main fills it on opening).
+var notebook_right: RichTextLabel
 var fade: ColorRect
 var title: Label
 var title_sub: Label
@@ -39,6 +41,11 @@ var _memo_text: Label
 var _choice_box: VBoxContainer
 var _choice_title: Label
 var _choice_count := 0
+
+## A key hint above the prompt the first time something is needed (Main.hint).
+var hint: Label
+var _hints: Array = []
+var _hint_busy := false
 
 var _queue: Array = []
 var _sub_t := 0.0
@@ -74,21 +81,62 @@ func _ready() -> void:
 	_build_tasks()
 	_voice = AudioStreamPlayer.new()
 	_voice.process_mode = Node.PROCESS_MODE_PAUSABLE   # holds while the notebook is open
+	_voice.bus = Settings.VOICE_BUS
 	add_child(_voice)
+	hint = _label(Vector2(260, 740), Vector2(1400, 80), 27, HORIZONTAL_ALIGNMENT_CENTER, Color(1.0, 0.86, 0.58))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.modulate.a = 0.0
+	apply_settings()
 
+	# A school notebook open on two pages of squared paper, written in blue
+	# ballpoint: the findings on the left, the people and conclusions right.
 	notebook = ColorRect.new()
-	notebook.color = Color(0.89, 0.87, 0.8, 0.97)
-	notebook.position = Vector2(510, 90)
-	notebook.size = Vector2(900, 900)
+	notebook.color = Color(0.9, 0.89, 0.83, 0.98)
+	notebook.position = Vector2(170, 80)
+	notebook.size = Vector2(1580, 920)
 	notebook.visible = false
 	add_child(notebook)
+	for i in 41:
+		var h := ColorRect.new()
+		h.color = Color(0.42, 0.55, 0.72, 0.16)
+		h.position = Vector2(0, 14 + i * 22.5)
+		h.size = Vector2(1580, 1)
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		notebook.add_child(h)
+	for i in 71:
+		var v := ColorRect.new()
+		v.color = Color(0.42, 0.55, 0.72, 0.12)
+		v.position = Vector2(10 + i * 22.5, 0)
+		v.size = Vector2(1, 920)
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		notebook.add_child(v)
+	var spine := ColorRect.new()
+	spine.color = Color(0.2, 0.18, 0.15, 0.35)
+	spine.position = Vector2(788, 0)
+	spine.size = Vector2(4, 920)
+	notebook.add_child(spine)
+	var margin := ColorRect.new()
+	margin.color = Color(0.8, 0.25, 0.25, 0.35)
+	margin.position = Vector2(1520, 0)
+	margin.size = Vector2(2, 920)
+	notebook.add_child(margin)
 	notebook_text = Label.new()
-	notebook_text.position = Vector2(44, 36)
-	notebook_text.size = Vector2(812, 830)
+	notebook_text.position = Vector2(40, 30)
+	notebook_text.size = Vector2(716, 860)
 	notebook_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	notebook_text.add_theme_font_size_override("font_size", 27)
-	notebook_text.add_theme_color_override("font_color", Color(0.14, 0.13, 0.11))
+	notebook_text.add_theme_font_size_override("font_size", 25)
+	notebook_text.add_theme_color_override("font_color", Color(0.13, 0.17, 0.4))
 	notebook.add_child(notebook_text)
+	notebook_right = RichTextLabel.new()
+	notebook_right.bbcode_enabled = true
+	notebook_right.position = Vector2(830, 30)
+	notebook_right.size = Vector2(680, 860)
+	notebook_right.scroll_active = false
+	notebook_right.add_theme_font_size_override("normal_font_size", 24)
+	notebook_right.add_theme_font_size_override("bold_font_size", 25)
+	notebook_right.add_theme_color_override("default_color", Color(0.13, 0.17, 0.4))
+	notebook_right.add_theme_constant_override("line_separation", 6)
+	notebook.add_child(notebook_right)
 
 	choices = ColorRect.new()
 	choices.color = Color(0.03, 0.03, 0.03, 0.78)
@@ -277,7 +325,7 @@ func _label(pos: Vector2, size: Vector2, font_size: int, align: HorizontalAlignm
 func _process(delta: float) -> void:
 	var hall := AudioServer.get_bus_index(Sfx.BUS)
 	if hall != -1:
-		var duck := DUCK_DB if _voice.playing else 0.0
+		var duck := (DUCK_DB if _voice.playing else 0.0) + Settings.db(Settings.sounds)
 		AudioServer.set_bus_volume_db(hall, move_toward(AudioServer.get_bus_volume_db(hall), duck, delta * 20.0))
 	tasks.visible = tasks_wanted and tasks_allowed and _tasks_key != "" \
 		and not notebook.visible and not memo.visible and not choices.visible
@@ -336,6 +384,30 @@ func flash_note(text: String) -> void:
 	tw.tween_property(note, "modulate:a", 0.0, 1.5)
 
 
+## Subtitles on or off and their size, from the settings.
+func apply_settings() -> void:
+	subtitle.visible = Settings.subtitles
+	subtitle.add_theme_font_size_override("font_size", Settings.sub_font())
+	subtitle.position.y = 890 - (Settings.sub_font() - 32) * 3
+	subtitle.size.y = 170 + (Settings.sub_font() - 32) * 3
+
+
+## Shows a key hint for a few seconds; several wait their turn.
+func show_hint(text: String) -> void:
+	_hints.append(text)
+	if _hint_busy:
+		return
+	_hint_busy = true
+	while not _hints.is_empty():
+		hint.text = _hints.pop_front()
+		var tw := create_tween()
+		tw.tween_property(hint, "modulate:a", 1.0, 0.4)
+		tw.tween_interval(5.5)
+		tw.tween_property(hint, "modulate:a", 0.0, 0.8)
+		await tw.finished
+	_hint_busy = false
+
+
 func set_prompt(text: String) -> void:
 	prompt.text = text
 
@@ -344,8 +416,8 @@ func set_prompt(text: String) -> void:
 ## hand so the page never runs off the bottom of the sheet.
 func set_notebook(text: String) -> void:
 	notebook_text.text = text
-	var size := 27
-	while size > 18:
+	var size := 25
+	while size > 16:
 		var per_line := int(notebook_text.size.x / (size * 0.5))
 		var lines := 0
 		for l in text.split("\n"):
@@ -369,6 +441,49 @@ func show_title(t: String, sub: String, color := PAPER) -> void:
 	var tw := create_tween().set_parallel()
 	tw.tween_property(title, "modulate:a", 1.0, 1.2)
 	tw.tween_property(title_sub, "modulate:a", 1.0, 1.8)
+
+
+## The ending a year on: a newspaper cutting at the top, the fates and the
+## keys under it.
+func show_epilogue(heading: String, ep: Array, tail: String) -> void:
+	var paper := ColorRect.new()
+	paper.color = Color(0.86, 0.84, 0.76)
+	paper.position = Vector2(500, 40)
+	paper.size = Vector2(920, 470)
+	paper.rotation = deg_to_rad(-0.8)
+	paper.modulate.a = 0.0
+	add_child(paper)
+	var ink := Color(0.12, 0.11, 0.1)
+	var rows := [
+		[Vector2(30, 14), Vector2(860, 60), 44, "ВЕЧЕРНИЙ СВЕРДЛОВСК", HORIZONTAL_ALIGNMENT_CENTER],
+		[Vector2(30, 76), Vector2(860, 30), 20, "Газета горкома КПСС и горисполкома  ·  %s  ·  Цена 3 коп." % ep[0], HORIZONTAL_ALIGNMENT_CENTER],
+		[Vector2(30, 128), Vector2(860, 48), 36, ep[1], HORIZONTAL_ALIGNMENT_LEFT],
+		[Vector2(30, 186), Vector2(860, 270), 25, ep[2], HORIZONTAL_ALIGNMENT_LEFT],
+	]
+	for r: Array in rows:
+		var l := Label.new()
+		l.position = r[0]
+		l.size = r[1]
+		l.text = r[3]
+		l.horizontal_alignment = r[4]
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_font_size_override("font_size", r[2])
+		l.add_theme_color_override("font_color", ink)
+		paper.add_child(l)
+	var rule := ColorRect.new()
+	rule.color = ink
+	rule.position = Vector2(30, 112)
+	rule.size = Vector2(860, 3)
+	paper.add_child(rule)
+	title.text = ""
+	title_sub.position = Vector2(300, 540)
+	title_sub.size = Vector2(1320, 530)
+	title_sub.add_theme_font_size_override("font_size", 24)
+	title_sub.text = "%s\n\n%s\n\n%s" % [heading, ep[3], tail]
+	title_sub.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(paper, "modulate:a", 1.0, 1.5)
+	tw.tween_property(title_sub, "modulate:a", 1.0, 1.5)
 
 
 func hide_title() -> void:

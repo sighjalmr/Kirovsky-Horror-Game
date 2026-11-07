@@ -29,6 +29,10 @@ const G_WINDED := "Сердце колотится в горле. Мне не т
 ## Hiding and tearing free.
 const G_HIDE_LATE := "Он смотрит прямо на меня. Прятаться поздно."
 const G_ESCAPE := "Ударил его фонарём в лицо и вырвался. Второй раз так не повезёт."
+const G_ESCAPE_CORD := "Шнурок. Сзади, как Нину. Локтем ему под рёбра, и вывернулся. Шея горит."
+## The cord takes more: E presses in seconds.
+const CORD_PRESSES := 10
+const CORD_TIME := 3.0
 ## E presses needed in STRUGGLE_TIME seconds to tear free, once a night.
 const STRUGGLE_PRESSES := 7
 const STRUGGLE_TIME := 2.2
@@ -46,7 +50,7 @@ enum Phase { TITLE, CUT, PLAY, DEAD, END }
 ## The last signed round, kept across a scene reload after death.
 static var checkpoint: Dictionary = {}
 static var _resume := false
-## "night1", "day1", "night2" or "night3"; survives the reload between chapters.
+## "night1", "day1" … "night5"; survives the reload between chapters.
 static var chapter := "night1"
 ## What night one turned up, handed on to the day. Starting the day from the
 ## title screen counts every clue as found.
@@ -55,8 +59,14 @@ static var night_clues: Dictionary = {}
 ## handed on to night two together with night_clues. Night two started from
 ## the title screen (night_clues empty) counts everything as known.
 static var day_answers: Array = []
+## Gordeev's morning conclusions: chapter -> index of the answer picked
+## (Deductions.QUESTIONS). Kept in the save file.
+static var deductions: Dictionary = {}
 ## The save file is read once, on the first start of the game.
 static var _booted := false
+## Set before a reload that should go straight into the chapter (menu: new
+## game, a chapter), past the title.
+static var _autostart := false
 
 var phase := Phase.TITLE
 var minutes := START_MIN
@@ -66,8 +76,17 @@ var store: Store
 var player: Player
 var killer: Killer
 var hud: Hud
+var menu: GameMenu
 var night: NightOne
 var day: DayOne
+## Each day -> [the night after it, end title, "next" hint].
+const DAYS := {
+	"day1": ["night2", "КОНЕЦ ДНЯ ПЕРВОГО", "ночь вторая"],
+	"day2": ["night3", "КОНЕЦ ДНЯ ВТОРОГО", "ночь третья"],
+	"day3": ["night4", "КОНЕЦ ДНЯ ТРЕТЬЕГО", "ночь четвёртая"],
+}
+## Cans, broken glass, валидол, the plan and the man's habits (nights only).
+var tactics: Tactics
 var env: Environment
 var post: ShaderMaterial
 var chasing := false
@@ -85,7 +104,13 @@ var _morning := false
 var _escaped := false
 var _struggling := false
 var _mash := 0
+var _need := STRUGGLE_PRESSES
+var _cord := false
+## The morning question is on screen: the end-of-shift keys wait.
+var _deducing := false
 var _hide_spot: Dictionary = {}
+## Seconds of play in this chapter, for the first key hints.
+var _played := 0.0
 
 
 ## Minutes since midnight of the 14th for a clock time; after-midnight hours
@@ -102,16 +127,25 @@ func _ready() -> void:
 	randomize()
 	if not _booted:
 		_booted = true
+		Settings.load_all()
 		if not _dev():
 			_load_save()
 	_setup_input()
 	Sfx.setup_buses()
+	Settings.setup_bus()
 	_build_view()
 	_build_world()
 	hud = Hud.new()
 	add_child(hud)
+	menu = GameMenu.new()
+	add_child(menu)
+	menu.picked.connect(_on_menu)
+	apply_settings()
 	if "--daytest" in OS.get_cmdline_user_args():
 		chapter = "day1"
+	for d in ["--day2", "--day3"]:
+		if d in OS.get_cmdline_user_args():
+			chapter = d.substr(2)
 	if "--night2" in OS.get_cmdline_user_args():
 		chapter = "night2"
 	if "--night3" in OS.get_cmdline_user_args():
@@ -130,7 +164,7 @@ func _ready() -> void:
 		if a.begins_with("--cut="):
 			chapter = a.get_slice("=", 1)
 			get_tree().create_timer(2.0).timeout.connect(_start)
-	if chapter == "day1":
+	if chapter in DAYS:
 		_ready_day()
 		return
 	if chapter == "night5":
@@ -144,6 +178,8 @@ func _ready() -> void:
 	else:
 		night = NightOne.new(self)
 	add_child(night)
+	tactics = Tactics.new(self, int(chapter.right(1)))
+	add_child(tactics)
 	night.build_timeline()
 	night.update_notebook()
 	hud.clock.text = _fmt(minutes)
@@ -151,6 +187,10 @@ func _ready() -> void:
 		_resume = false
 		_restore()
 		return
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--uishots="):
+			add_child(load("res://scripts/dev_uishots.gd").new().with(self, a.get_slice("=", 1)))
+			return
 	var shot_dir := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--autoshot="):
@@ -179,23 +219,98 @@ func _ready() -> void:
 		add_child(dev)
 		return
 	hud.fade.color.a = 1.0
-	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ",
-		"Свердловск, октябрь 1988\n\n%s\n\n\n" % _night_name() +
-		"Мышь — смотреть      W / A / S / D — идти\n" +
-		"Shift — бег (шумно и недолго: одышка)      C — пригнуться (тихо)\n" +
-		"F (держать) — фонарик-«жучок» (шумно)\n" +
-		"E — осмотреть, поговорить, спрятаться      Tab — блокнот      J — задания\n\n" +
-		_continue_line() + "Нажмите E, чтобы начать смену\n1 — ночь первая   2 — день первый   3 — ночь вторая   4 — ночь третья   5 — ночь четвёртая   6 — ночь пятая")
+	_title_menu()
 
 
-## "C — continue from the signature at 02:20" when the save has one.
-func _continue_line() -> String:
-	if checkpoint.is_empty():
-		return ""
-	return "C — продолжить с последнего сохранения (%s)\n" % _fmt(checkpoint.minutes)
+## The title: the name over black and the menu under it. A reload that came
+## from "new game" or the chapter list goes straight in.
+func _title_menu() -> void:
+	if _autostart:
+		_autostart = false
+		_start()
+		return
+	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ", "Свердловск, октябрь 1988")
+	menu.has_progress = chapter != "night1" or not checkpoint.is_empty() or not night_clues.is_empty()
+	menu.continue_label = "Продолжить: " + _night_name()
+	if not checkpoint.is_empty():
+		menu.continue_label += ", с подписи в %s" % _fmt(checkpoint.minutes)
+	menu.show_title_menu()
+
+
+func _on_menu(id: String) -> void:
+	match id:
+		"apply":
+			apply_settings()
+		"resume":
+			menu.close()
+		"quit":
+			Settings.save()
+			get_tree().quit()
+		"to_title":
+			menu.close()
+			get_tree().paused = false
+			Settings.save()
+			get_tree().reload_current_scene()
+		"continue":
+			menu.close()
+			if not checkpoint.is_empty() and night:
+				_resume = true
+				get_tree().reload_current_scene()
+			else:
+				_start()
+		"new":
+			menu.close()
+			if chapter == "night1" and checkpoint.is_empty() and night_clues.is_empty():
+				_start()
+			else:
+				_autostart = true
+				_go_to("night1", {}, [])
+		_:
+			if id.begins_with("chapter:"):
+				menu.close()
+				_autostart = true
+				_go_to(id.get_slice(":", 1), {}, [])
+
+
+## Brightness, subtitles and the detective mode, from Settings.
+func apply_settings() -> void:
+	post.set_shader_parameter("brightness", Settings.brightness)
+	if hud:
+		hud.apply_settings()
+
+
+## A key hint shown once ever (Settings.hints_seen), if hints are on.
+func hint(id: String, text: String) -> void:
+	if not Settings.hints or id in Settings.hints_seen or _dev():
+		return
+	Settings.hints_seen.append(id)
+	Settings.save()
+	hud.show_hint(text)
+
+
+## The first time something is needed, the key for it.
+func _update_hints(delta: float) -> void:
+	_played += delta
+	if _played > 2.0:
+		hint("move", "Мышь — смотреть, W / A / S / D — идти. Esc — пауза и настройки")
+	if _played > 25.0:
+		hint("tasks", "J — что делать сейчас. Tab — блокнот с уликами")
+	if day:
+		hint("day", "E — поговорить. Вопрос выбирайте цифрами или мышью")
+		return
+	if not store.is_lit(player.global_position) and not player.flashlight_on and not player.hidden:
+		hint("dark", "Темно. Держите F или правую кнопку мыши — фонарик. Он жужжит: его слышно")
+	if killer.is_active() and killer.visible \
+			and player.global_position.distance_to(killer.global_position) < 16.0:
+		hint("crouch", "Он близко. C — пригнуться: шаги тише, вас хуже видно")
+	if chasing:
+		hint("run", "Shift — бежать, но недолго. Оторвитесь и спрячьтесь: E у прилавков и коробок")
 
 
 func _night_name() -> String:
+	for c: Array in GameMenu.CHAPTERS:
+		if c[0] == chapter:
+			return c[1]
 	if chapter == "night5":
 		return "Ночь пятая, последняя. Среда, 26 октября"
 	if chapter == "night4":
@@ -208,9 +323,19 @@ func _night_name() -> String:
 ## Day one: the lights on, people in the hall, no killer and no rounds.
 func _ready_day() -> void:
 	minutes = DAY_START_MIN
-	if night_clues.is_empty():
-		night_clues = {"bag": true, "clip": true, "tape": true, "page": true, "invoice": true}
-	day = DayOne.new(self, night_clues)
+	match chapter:
+		"day2":
+			if night_clues.is_empty():
+				night_clues = {"seizure": true, "pahomov": true, "token": true, "lock": true, "butt": true}
+			day = DayTwo.new(self, night_clues)
+		"day3":
+			if night_clues.is_empty():
+				night_clues = {"handset": true, "letter": true, "body": true, "cord": true, "boots": true}
+			day = DayThree.new(self, night_clues)
+		_:
+			if night_clues.is_empty():
+				night_clues = {"bag": true, "clip": true, "tape": true, "page": true, "invoice": true}
+			day = DayOne.new(self, night_clues)
 	add_child(day)
 	hud.clock.text = _fmt(minutes)
 	_day_look()
@@ -220,10 +345,7 @@ func _ready_day() -> void:
 		add_child(load("res://scripts/dev_daytest.gd").new().with(self))
 		return
 	hud.fade.color.a = 1.0
-	hud.show_title("ДЕНЬ ПЕРВЫЙ",
-		"Суббота, 15 октября 1988, 12:40\nУниверсам «Кировский», Сиреневый бульвар, 2\n\n\n" +
-		"Выходной. Гордеев пришёл как покупатель.\nТамара Ивановна сидит на второй кассе.\n\n" +
-		"E — поговорить      цифры или мышь — выбрать вопрос\nTab — блокнот\n\nНажмите E, чтобы войти")
+	_title_menu()
 
 
 ## Daytime: a busy shop at noon, plainly and evenly lit, no fog and no murk.
@@ -267,6 +389,18 @@ func _setup_input() -> void:
 	_bind("restart", [KEY_R], [JOY_BUTTON_START], [])
 	_bind("new_night", [KEY_N], [], [])
 	_bind("tasks", [KEY_J], [JOY_BUTTON_X], [])
+	_bind("throw", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
+	_bind("pill", [KEY_V], [], [])
+	_bind("plan", [KEY_M], [], [])
+	# E works in the menus as well as Enter and Space.
+	var has_e := false
+	for ev in InputMap.action_get_events("ui_accept"):
+		if ev is InputEventKey and (ev as InputEventKey).physical_keycode == KEY_E:
+			has_e = true
+	if not has_e:
+		var ek := InputEventKey.new()
+		ek.physical_keycode = KEY_E
+		InputMap.action_add_event("ui_accept", ek)
 	if InputMap.action_get_events("flashlight").size() < 4:
 		var m := InputEventMouseButton.new()
 		m.button_index = MOUSE_BUTTON_RIGHT
@@ -404,6 +538,8 @@ func _process(delta: float) -> void:
 	hud.tasks_allowed = phase == Phase.PLAY and not _morning and player.controllable
 	if phase != Phase.PLAY or get_tree().paused:
 		return
+	if not _morning and player.controllable:
+		_update_hints(delta)
 	var rate := EARLY_RATE if minutes < KILLER_MIN or day else LATE_RATE
 	if player.sitting:
 		rate *= WAIT_RATE
@@ -425,6 +561,7 @@ func _process(delta: float) -> void:
 		day.update(delta)
 		return
 	night.update(delta)
+	tactics.update(delta)
 	store.update_compressors(killer.global_position if killer.is_active() else Vector3(999, 0, 999), delta)
 	var music_target := -6.0 if chasing else -80.0
 	_chase_music.volume_db = move_toward(_chase_music.volume_db, music_target, delta * (60.0 if chasing else 12.0))
@@ -473,7 +610,7 @@ func _update_interaction() -> void:
 			leave_hiding()
 		return
 	if _struggling:
-		hud.set_prompt("ВЫРЫВАЙТЕСЬ! Жмите E: %d" % maxi(0, STRUGGLE_PRESSES - _mash))
+		hud.set_prompt(("ШНУРОК НА ШЕЕ! Жмите E: %d" if _cord else "ВЫРЫВАЙТЕСЬ! Жмите E: %d") % maxi(0, _need - _mash))
 		return
 	if player.sitting:
 		hud.set_prompt("Сидите и ждёте. W / A / S / D — встать")
@@ -496,8 +633,21 @@ func _update_interaction() -> void:
 ## The task list and the rings round clues near by.
 func _update_tasks() -> void:
 	var chap: Node = day if day else night
-	hud.set_tasks(chap.objectives())
+	var list: Array = chap.objectives()
+	if Settings.detective:
+		# No counters and no step-by-step directions: what to do, not where.
+		var kept: Array = []
+		for t: Dictionary in list:
+			var text: String = t.text
+			if text.begins_with("Улики") or (t.get("sub", false) and not t.get("urgent", false)):
+				continue
+			kept.append(t)
+		list = kept
+	hud.set_tasks(list)
 	var pts: Array = []
+	if Settings.detective:
+		hud.marks.points = pts
+		return
 	var cam := player.camera
 	var eye := cam.global_position
 	var space := player.get_world_3d().direct_space_state
@@ -527,45 +677,71 @@ func _unhandled_input(event: InputEvent) -> void:
 		player.look((event as InputEventMouseMotion).relative)
 	elif event is InputEventMouseButton and event.pressed and phase == Phase.PLAY and not hud.notebook.visible:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	elif event.is_action_pressed("ui_cancel"):
+	if tactics and tactics.plan_open():
+		if event.is_action_pressed("plan") or event.is_action_pressed("ui_cancel"):
+			tactics.close_plan()
+			get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("ui_cancel") and not menu.is_open():
+		if phase == Phase.PLAY and not _struggling and not hud.choices.visible:
+			if hud.notebook.visible:
+				hud.notebook.visible = false
+				get_tree().paused = false
+			menu.open_pause()
+			get_viewport().set_input_as_handled()
+			return
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	# Developer jump to any chapter from the title: the number keys 1–8
+	# (7 and 8 are days two and three, added later).
+	if phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
+			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8]:
+		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2", KEY_4: "night3", KEY_5: "night4",
+			KEY_6: "night5", KEY_7: "day2", KEY_8: "day3"}[
+			(event as InputEventKey).physical_keycode]
+		if to != chapter:
+			_go_to(to, {}, [])
+		return
+	if menu.is_open():
+		return
 	if _struggling and event.is_action_pressed("interact"):
 		_mash += 1
 		Sfx.play_2d(self, "hurt", -14.0, Sfx.BUS, randf_range(1.1, 1.3))
 		return
-	if phase == Phase.TITLE and event is InputEventKey and event.pressed \
-			and (event as InputEventKey).physical_keycode == KEY_C and not checkpoint.is_empty() and night:
-		_resume = true
-		get_tree().reload_current_scene()
-	elif phase == Phase.TITLE and event.is_action_pressed("interact"):
-		_start()
-	elif phase == Phase.TITLE and day == null and event is InputEventKey and event.pressed \
-			and (event as InputEventKey).physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6]:
-		var to: String = {KEY_1: "night1", KEY_2: "day1", KEY_3: "night2", KEY_4: "night3", KEY_5: "night4",
-			KEY_6: "night5"}[
-			(event as InputEventKey).physical_keycode]
-		if to != chapter:
-			_go_to(to, {}, [])
-	elif phase == Phase.END and night and chapter == "night1" and event.is_action_pressed("interact"):
+	if _deducing:
+		return
+	if phase == Phase.END and night and chapter == "night1" and event.is_action_pressed("interact"):
 		_go_to("day1", night.clues.duplicate(), [])
 	elif phase == Phase.END and night and chapter == "night2" and event.is_action_pressed("interact"):
-		_go_to("night3", night.clues.duplicate(), day_answers)
+		_go_to("day2", night.clues.duplicate(), day_answers)
 	elif phase == Phase.END and night and chapter == "night3" and event.is_action_pressed("interact"):
-		_go_to("night4", night.clues.duplicate(), day_answers)
+		_go_to("day3", night.clues.duplicate(), day_answers)
 	elif phase == Phase.END and night and chapter == "night4" and event.is_action_pressed("interact"):
 		var carried := night.clues.duplicate()
 		carried["has_box"] = (night as NightFour).has_box
 		_go_to("night5", carried, day_answers)
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
-		_go_to("night2", night_clues.duplicate(), day.asked.duplicate())
+		_go_to(DAYS[chapter][0], _day_carry(), _day_answers_after())
+	elif phase == Phase.PLAY and tactics and player.controllable and not _struggling and event.is_action_pressed("throw"):
+		tactics.throw()
+	elif phase == Phase.PLAY and tactics and player.controllable and not _struggling and event.is_action_pressed("pill"):
+		tactics.take_pill()
+	elif phase == Phase.PLAY and tactics and not hud.notebook.visible and not hud.memo.visible and not _struggling \
+			and event.is_action_pressed("plan"):
+		if Settings.plan_copied:
+			tactics.open_plan()
+		else:
+			hud.say("План бы пригодился. Он висит на стене поста.", -1.0, true)
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible and not _struggling:
 		var open := not hud.notebook.visible
+		if open:
+			_fill_notebook_right()
 		hud.notebook.visible = open
 		get_tree().paused = open
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if open else Input.MOUSE_MODE_CAPTURED
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("restart"):
 		get_tree().paused = false
 		_resume = phase == Phase.DEAD and not checkpoint.is_empty()
+		_autostart = not _resume
 		get_tree().reload_current_scene()
 	elif (phase == Phase.DEAD or phase == Phase.END) and event.is_action_pressed("new_night"):
 		if chapter in ["night2", "night3", "night4", "night5"] and phase == Phase.DEAD:
@@ -576,6 +752,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Reloads the scene into another chapter.
 func _go_to(ch: String, clues: Dictionary, answers: Array) -> void:
+	_autostart = true
+	if ch == "night1":
+		deductions = {}
 	get_tree().paused = false
 	checkpoint = {}
 	chapter = ch
@@ -592,6 +771,7 @@ func _start() -> void:
 	checkpoint = {}
 	write_save(chapter, night_clues, day_answers, {})
 	start_now()
+	_echo_deduction()
 	if day:
 		day.start()
 	hud.fade.color.a = 1.0
@@ -644,6 +824,8 @@ func start_now() -> void:
 # --- interactions -----------------------------------------------------------------
 
 func _interact(id: String) -> void:
+	if tactics and tactics.interact(id):
+		return
 	if day:
 		day.interact(id)
 	else:
@@ -743,6 +925,7 @@ func _on_lost() -> void:
 func _on_caught() -> void:
 	if phase != Phase.PLAY or _struggling:
 		return
+	_cord = killer.garrote
 	if not _escaped:
 		_struggle()
 		return
@@ -750,10 +933,13 @@ func _on_caught() -> void:
 
 
 ## His hands on Gordeev: one chance a night to tear free by hammering E.
+## From behind it is the cord: more presses, the picture closing in.
 func _struggle() -> void:
 	_escaped = true
 	_struggling = true
 	_mash = 0
+	_need = CORD_PRESSES if _cord else STRUGGLE_PRESSES
+	var limit := CORD_TIME if _cord else STRUGGLE_TIME
 	stand_up()
 	player.controllable = false
 	player.busy = true
@@ -765,14 +951,20 @@ func _struggle() -> void:
 	Sfx.play_3d(view, "killer_breath", killer.global_position + Vector3(0, 1.7, 0), -2.0, 1.0, 6.0)
 	_flash = 0.6
 	player.hit(0)
+	if _cord:
+		Sfx.play_2d(self, "cloth", -2.0, "Master", 0.7)
 	var t := 0.0
-	while t < STRUGGLE_TIME and phase == Phase.PLAY:
+	while t < limit and phase == Phase.PLAY:
 		await get_tree().process_frame
 		t += get_process_delta_time()
+		if _cord:
+			post.set_shader_parameter("vignette", lerpf(0.55, 1.6, t / limit))
 	_struggling = false
+	if _cord:
+		post.set_shader_parameter("vignette", 0.55)
 	if phase != Phase.PLAY:
 		return
-	if _mash < STRUGGLE_PRESSES:
+	if _mash < _need:
 		_kill()
 		return
 	Sfx.play_3d(view, "clank", killer.global_position + Vector3(0, 1.6, 0), 0.0, 0.8)
@@ -785,13 +977,15 @@ func _struggle() -> void:
 	player.breath = maxf(player.breath, 0.7)
 	player.winded = false
 	hud.set_prompt("")
-	hud.say(G_ESCAPE, -1.0, true)
+	hud.say(G_ESCAPE_CORD if _cord else G_ESCAPE, -1.0, true)
 	killer.stun(2.5)
 	on_noise(player.global_position, 10.0)
 
 
 func _kill() -> void:
 	phase = Phase.DEAD
+	if chapter == "night5":
+		Settings.saw_ending("death")
 	stand_up()
 	player.controllable = false
 	player.busy = true
@@ -807,7 +1001,29 @@ func _kill() -> void:
 	_dread.stop()
 	Sfx.play_2d(self, "attack_sting", -2.0)
 	_heart = Sfx.play_2d(self, "heartbeat", -4.0, "Master", 1.7)
+	if _cord:
+		_strangled()
+		return
 	killer.play_attack(_on_hit)
+
+
+## The cord: no blows, the picture closes in from the edges, the pulse
+## stumbles and stops.
+func _strangled() -> void:
+	killer.play_garrote()
+	chasing = false
+	Sfx.play_2d(self, "hurt", -6.0, Sfx.BUS, 0.8)
+	var tw := create_tween()
+	tw.tween_method(func(v: float) -> void: post.set_shader_parameter("vignette", v), 0.9, 2.4, 3.5)
+	tw.parallel().tween_property(player.head, "rotation:x", deg_to_rad(28.0), 3.5)
+	tw.parallel().tween_property(_heart, "pitch_scale", 0.5, 4.0)
+	tw.tween_callback(func() -> void:
+		player.die(killer.global_position)
+		Sfx.play_3d(view, "bodyfall", player.global_position + Vector3(0, 0.2, 0), 2.0)
+		Sfx.muffle(true))
+	tw.tween_property(_heart, "volume_db", -40.0, 3.0).set_ease(Tween.EASE_IN)
+	tw.tween_callback(_heart.stop)
+	_show_death()
 
 
 func _on_hit(i: int) -> void:
@@ -849,8 +1065,11 @@ func _show_death() -> void:
 		after = "Участковый Колесников записал: «Сторож оставил пост, находился в нетрезвом виде». Дело закрыли за неделю."
 	if chapter == "night5":
 		after = "В журнале обходов последняя запись почерком участкового: «Сторож оставил пост». Коробку из-под монпансье никто не искал.\nКонцовка «Смерть». Всего концовок пять."
+	var how := "Рядом лежал топорик из мясного отдела."
+	if _cord:
+		how = "На шее борозда от шнурка, как у Нины Лукиной и Галины Суровой."
 	hud.show_title("ГОРДЕЕВ НЕ ДОЖИЛ ДО УТРА",
-		"В 6:10 его нашли грузчики, у %s. Рядом лежал топорик из мясного отдела.\n%s\n\n%s" % [_where(player.global_position), after, again],
+		"В 6:10 его нашли грузчики, у %s. %s\n%s\n\n%s" % [_where(player.global_position), how, after, again],
 		Hud.RED)
 
 
@@ -888,6 +1107,7 @@ func end_shift() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
+	await _deduce()
 	if chapter == "night4":
 		var carried := night.clues.duplicate()
 		carried["has_box"] = (night as NightFour).has_box
@@ -896,18 +1116,58 @@ func end_shift() -> void:
 			"%s\n\nE: дальше, ночь пятая, последняя (день четвёртый в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	if chapter == "night3":
-		write_save("night4", night.clues, day_answers, {})
+		write_save("day3", night.clues, day_answers, {})
 		hud.show_title("06:00. КОНЕЦ ТРЕТЬЕЙ НОЧИ",
-			"%s\n\nE: дальше, ночь четвёртая (день третий с Ковпаком в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+			"%s\n\nE: дальше, день третий (Ковпак)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	if chapter == "night2":
-		write_save("night3", night.clues, day_answers, {})
+		write_save("day2", night.clues, day_answers, {})
 		hud.show_title("06:00. КОНЕЦ ВТОРОЙ НОЧИ",
-			"%s\n\nE: дальше, ночь третья (день второй с Ринатом в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+			"%s\n\nE: дальше, день второй (Ринат)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	write_save("day1", night.clues, [], {})
 	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
 		"%s\n\nE: дальше, день первый\nR: сыграть ночь ещё раз" % night.summary())
+
+
+## Six in the morning: what Gordeev makes of the night, one answer of three.
+func _deduce() -> void:
+	var q := Deductions.question(chapter)
+	if q.is_empty() or "--nighttest" in OS.get_cmdline_user_args():
+		return
+	_deducing = true
+	await get_tree().create_timer(1.5).timeout
+	var labels: Array[String] = []
+	for a: String in q[1]:
+		labels.append(a)
+	var pick := await hud.choose("Утро. Записываю в блокнот вывод. " + String(q[0]), labels)
+	deductions[chapter] = pick
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Sfx.play_2d(self, "pickup", -14.0, "Master", 0.8)
+	_deducing = false
+
+
+## Last morning's conclusion, in Gordeev's words, as the next shift starts.
+func _echo_deduction() -> void:
+	var prev: String = {"night2": "night1", "night3": "night2", "night4": "night3", "night5": "night4"}.get(chapter, "")
+	var line := Deductions.echo(prev, deductions)
+	if line == "":
+		return
+	await get_tree().create_timer(9.0).timeout
+	if phase == Phase.PLAY:
+		hud.say(line)
+
+
+## The right-hand page of the notebook, filled as it opens.
+func _fill_notebook_right() -> void:
+	var extra := ""
+	if tactics:
+		extra += "\n\nВалидол: %d %s." % [tactics.pills, "таблетка" if tactics.pills == 1 else "таблетки"]
+	if night and Settings.detective:
+		var left := night.clues.size() - night.clue_count()
+		if left > 0:
+			extra += "\nЧто-то я ещё упускаю. Мест, куда я не заглянул, %d." % left
+	hud.notebook_right.text = Deductions.people_page(chapter, deductions) + extra
 
 
 const ENDINGS := {
@@ -928,8 +1188,16 @@ func end_game(kind: String, summary: String) -> void:
 	hud.clear_subtitles()
 	hud.fade_to(0.95, 1.0)
 	write_save("night5", night_clues, day_answers, {})
+	Settings.saw_ending(kind)
 	var e: Array = ENDINGS[kind]
-	hud.show_title(e[0], "%s\n\n%s\nВсего концовок пять: прокурор, слово против слова, дело закрыто, самооборона и смерть.\n\nR: сыграть пятую ночь ещё раз      N: начать с первой ночи" % [e[1], summary])
+	summary += "\nВерных выводов в блокноте: %d из 4." % Deductions.count_right(deductions)
+	summary += "\nКонцовок открыто: %d из 5." % Settings.endings.size()
+	var tail := "%s\n\n%s\nВсего концовок пять: прокурор, слово против слова, дело закрыто, самооборона и смерть.\n\nR: сыграть пятую ночь ещё раз      N: начать с первой ночи" % [e[1], summary]
+	if Deductions.EPILOGUES.has(kind):
+		await get_tree().create_timer(1.2).timeout
+		hud.show_epilogue(e[0], Deductions.EPILOGUES[kind], tail)
+	else:
+		hud.show_title(e[0], tail)
 
 
 ## Gordeev walks out into the afternoon; the day's statements on the card.
@@ -942,9 +1210,28 @@ func end_day() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 1.0)
-	write_save("night2", night_clues, day.asked, {})
-	hud.show_title("КОНЕЦ ДНЯ ПЕРВОГО",
-		"%s\n\nE: дальше, ночь вторая\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
+	var next: Array = DAYS[chapter]
+	write_save(next[0], _day_carry(), _day_answers_after(), {})
+	hud.show_title(next[1],
+		"%s\n\nE: дальше, %s\nR: сыграть день ещё раз      N: начать с первой ночи" % [day.summary(), next[2]])
+
+
+## What a day hands on to the next night: the clues of the night before it,
+## plus the third key if Ковпак told about it on day three.
+func _day_carry() -> Dictionary:
+	var c := night_clues.duplicate()
+	if chapter == "day3" and (day as DayThree).confessed:
+		c["third_key"] = true
+	return c
+
+
+## Every question asked on every day so far, so later nights can refer to them.
+func _day_answers_after() -> Array:
+	var out: Array = day_answers.duplicate() if chapter != "day1" else []
+	for a in day.asked:
+		if not a in out:
+			out.append(a)
+	return out
 
 
 # --- the save file -----------------------------------------------------------------
@@ -957,25 +1244,27 @@ static func _dev() -> bool:
 ## Where the player is: the chapter to start, what the earlier chapters left,
 ## and the last signature in the journal (night only).
 static func write_save(ch: String, clues: Dictionary, answers: Array, cp: Dictionary) -> void:
+	Settings.reach(ch)
 	if _dev():
 		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify({"version": 1, "chapter": ch, "night_clues": clues,
-			"day_answers": answers, "checkpoint": cp}))
+			"day_answers": answers, "checkpoint": cp, "deductions": deductions}))
 
 
 static func _load_save() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "night3", "night4", "night5"]:
+	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "day2", "night3", "day3", "night4", "night5"]:
 		return
 	chapter = data.chapter
 	night_clues = data.get("night_clues", {})
 	day_answers = data.get("day_answers", [])
 	checkpoint = data.get("checkpoint", {})
-	if chapter == "day1":
+	deductions = data.get("deductions", {})
+	if chapter in DAYS:
 		checkpoint = {}
 
 

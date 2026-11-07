@@ -141,10 +141,14 @@ const CLUE_BOOTH := "Правая будка. Трубка висит на шн�
 const BOOTH_AGAIN := "Будка пустая. Трубку я повесил, окурок у меня."
 # Morning.
 const V_MORNING := "Вася Кран: — Открывай, служба! Живой, дед?"
+const G_VASYA_HANDS := "У Васи костяшки сбиты в кровь. Говорит, ящики разгружал. Ящики так не бьют."
 const K_END_OK := "Ковпак: — Подписи на месте. Свободен, Гордеев. До понедельника."
 const K_END_BAD := "Ковпак: — Обходы пропущены. Ещё раз, Гордеев, и пойдёшь сторожить овощебазу."
 const G_END := "Ковпак смотрит не на меня, а на дверь склада. Днём поговорю с Тамарой Ивановной. Она знает больше, чем сказала."
 
+## How often "he left" is a lie: the door slams, he stays in a dark row.
+const FAKE_LEAVE_CHANCE := 0.35
+var _faked := false
 ## When he stops dead at the end of an aisle down which Gordeev can see.
 const LURKS := [[0, 12], [3, 48], [4, 44]]
 const LURK_TIME := 26.0
@@ -333,10 +337,10 @@ func build_timeline() -> void:
 		store.flicker(0)
 		panel_warm = true
 		hud.say(G_FLICKER, -1.0, true))
-	m.at(1, 40, func(): _killer_leave())
+	m.at_min(Main.clock(1, 40) + randf_range(-20.0, 15.0), func(): _killer_leave())
 	m.at(1, 50, _kovpak_visit)
 	m.at(2, 30, func(): hud.say(G_0230))
-	m.at(2, 40, _killer_return)
+	m.at_min(Main.clock(2, 40) + randf_range(-15.0, 20.0), _killer_return)
 	m.at(3, 12, func():
 		if main.killer.is_active():
 			main.killer.wander_to(CANS_POS))
@@ -344,7 +348,7 @@ func build_timeline() -> void:
 		Sfx.play_3d(store, "cans", CANS_POS + Vector3(0, 0.3, 1.0), 0.0)
 		hud.say(G_CANS, -1.0, true))
 	m.at(4, 0, func(): hud.say(G_0400))
-	m.at(5, 10, func(): _killer_leave())
+	m.at_min(Main.clock(5, 10) + randf_range(-15.0, 15.0), func(): _killer_leave())
 	m.at(5, 30, func(): hud.say(G_0530))
 	m.at(6, 0, _morning)
 
@@ -499,6 +503,11 @@ func _killer_in() -> void:
 func _killer_leave() -> void:
 	if not main.killer.is_active():
 		return
+	# Sometimes the door slams and he is still in the hall, waiting in the dark.
+	if main.minutes < Main.clock(4, 0) and not _faked and randf() < FAKE_LEAVE_CHANCE:
+		_faked = true
+		_fake_leave()
+		return
 	main.killer.leave()
 	await main.killer.left
 	main.store.close_storage_door()
@@ -506,6 +515,33 @@ func _killer_leave() -> void:
 	var final: bool = main.minutes > Main.clock(4, 0)
 	killer_phase = "gone" if final else "out"
 	main.hud.say(G_LEFT_2 if final else G_LEFT_1, -1.0, true)
+
+
+## The storage door bangs shut as if he went, but he stands in a dark row
+## far from Gordeev for a few minutes, then goes for real without a sound.
+func _fake_leave() -> void:
+	var store: Store = main.store
+	Sfx.play_3d(store, "clank", Vector3(9, 1.2, 27.8), 4.0, 0.75)
+	Sfx.play_3d(store, "lock", Vector3(9, 1.0, 28.2), -2.0)
+	main.hud.say(G_LEFT_1, -1.0, true)
+	var me: Vector3 = main.player.global_position
+	var spot := store.random_patrol_point()
+	for i in 8:
+		var q := store.random_patrol_point()
+		if q.distance_to(me) > spot.distance_to(me) and not store.is_lit(q):
+			spot = q
+	main.killer.lurk_at(spot, 60.0)
+	main.after(randf_range(7.0, 13.0), _quiet_leave)
+
+
+func _quiet_leave() -> void:
+	if not main.killer.is_active():
+		return
+	main.killer.leave()
+	await main.killer.left
+	main.store.close_storage_door()
+	door_shut_by = "killer"
+	killer_phase = "out"
 
 
 func _killer_return() -> void:
@@ -1132,6 +1168,7 @@ func _morning() -> void:
 	kovpak.visible = true
 	kovpak.global_position = Vector3(-1.6, 0, -5.0)
 	hud.say(V_MORNING, -1.0, true)
+	hud.say(G_VASYA_HANDS)
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -1.2)]))
 	await kovpak.arrived
 	store.set_front_door(true)

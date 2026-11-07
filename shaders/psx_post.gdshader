@@ -15,6 +15,8 @@ uniform vec3 shadow_tint : source_color = vec3(0.075, 0.085, 0.07);
 uniform vec3 highlight_tint : source_color = vec3(1.0, 0.95, 0.84);
 uniform float halation = 0.35;
 uniform float fringe = 0.6;
+// The player's brightness setting: a gamma over the finished picture.
+uniform float brightness = 1.0;
 
 float rnd(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -51,5 +53,6 @@ void fragment() {
 
 	c *= 1.0 - smoothstep(0.12, 0.75, dot(q * vec2(1.1, 1.0), q * vec2(1.1, 1.0)) * 2.0) * vignette;
 	c = mix(c, flash_color, clamp(flash, 0.0, 1.0) * 0.6);
-	COLOR = vec4(clamp(c, 0.0, 1.0), 1.0);
+	c = pow(clamp(c, 0.0, 1.0), vec3(1.0 / brightness));
+	COLOR = vec4(c, 1.0);
 }
