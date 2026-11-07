@@ -61,6 +61,8 @@ BASE_ROUGH = {"floor": 0.28, "kafel": 0.15, "concrete": 0.6, "wall": 0.6, "metal
               "galv": 0.4, "locker": 0.5, "door": 0.5, "enamel": 0.3, "frozen": 0.25, "wood": 0.65,
               "cardboard": 0.85, "ceiling": 0.85, "ext_profnastil": 0.5, "corrugated": 0.5, "ext_asphalt": 0.85, "ext_slabs": 0.85, "ext_panel": 0.85}
 
+SMALL_RELIEF = {"ext_panel", "door", "wood", "cardboard", "corrugated", "locker", "enamel", "frozen", "ext_profnastil"}
+
 BASE = "https://huggingface.co/datasets/gvecchio/MatSynth/resolve/main/data/"
 
 
@@ -239,13 +241,18 @@ def build(scans: str, only: list) -> None:
         u = u * np.array([-1, -1, 1], np.float32)
         n = t * (t * u).sum(-1, keepdims=True) / t[..., 2:3] - u
         n /= np.linalg.norm(n, axis=-1, keepdims=True)
+        if name in SMALL_RELIEF:  # seen from further off: relief at 1024
+            n = np.stack([np.asarray(Image.fromarray(n[..., i].astype(np.float32), "F").resize((N // 2, N // 2), Image.LANCZOS))
+                          for i in range(3)], -1)
         save_webp(n * 0.5 + 0.5, OUT / f"{name}_n.webp", 92)
         # Gloss: the drawn roughness (mopped streaks, worn lanes) varied by
         # the scan's smudges and wipes around its own average.
         rb = TEX / f"{name}_r.png"
         r = up(load(rb, "L")) if rb.exists() else np.full((N, N), BASE_ROUGH.get(name, 0.8), np.float32)
         r = r + (s_r - blur(s_r, 32.0)) * r_amt + cav * dirt * 0.3
-        save_webp(np.clip(r, 0.03, 1.0), OUT / f"{name}_r.webp", 88)
+        # Gloss at 1024 (it varies slowly; keeps the game smaller).
+        r = np.asarray(Image.fromarray(np.clip(r, 0.03, 1.0).astype(np.float32), "F").resize((N // 2, N // 2), Image.LANCZOS))
+        save_webp(r, OUT / f"{name}_r.webp", 88)
         print("made", name, "from", scan)
     wet_mask()
     leaves()

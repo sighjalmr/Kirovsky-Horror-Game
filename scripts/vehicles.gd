@@ -84,7 +84,7 @@ static func build(s: Dictionary) -> Node3D:
 		l.spot_attenuation = 0.9
 		l.light_energy = 0.0
 		l.light_color = Color(1.0, 0.93, 0.78)
-		l.shadow_enabled = sx < 0.0
+		l.shadow_enabled = false  # the lamp sits inside the body: its own wing would shade it
 		l.set_meta("role", "beam")
 		car.add_child(l)
 		beams.append(l)
@@ -230,7 +230,7 @@ static func bobik() -> Node3D:
 		l.spot_angle = 30.0
 		l.light_energy = 0.0
 		l.light_color = Color(1.0, 0.92, 0.75)
-		l.shadow_enabled = sx < 0.0
+		l.shadow_enabled = false  # the lamp sits inside the body: its own wing would shade it
 		l.set_meta("role", "beam")
 		car.add_child(l)
 		beams.append(l)

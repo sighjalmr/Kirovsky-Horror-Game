@@ -3,10 +3,9 @@
 first conversion dropped, turned into gloss maps so skin, lips and eyes
 shine where they should and wool stays matt.
 
-Writes models/people/<folder>/hd/<part>_color.webp, <part>_normal.webp and
-<part>_spec.webp; Person loads them when «Текстуры 2K» is on. The killer's
-dyed clothes and Колесников's repainted uniform keep their game copies
-(only their heads get the 2K maps).
+Writes models/people/<folder>/hd/head_color.webp (2048 px) and
+head_spec.webp, body_spec.webp (1024 px gloss); Person loads them when
+«Текстуры 2K» is on.
 
     git clone --filter=blob:none --no-checkout --depth 1 https://github.com/microsoft/Microsoft-Rocketbox rb
     git -C rb sparse-checkout set --no-cone 'Assets/Avatars/Adults/Male_Adult_03/Textures/*' ...
@@ -31,8 +30,6 @@ CAST = {
     "woman6": "Professions/Business_Female_03", "man2": "Adults/Male_Adult_05", "man3": "Adults/Male_Adult_08",
     "man4": "Adults/Male_Adult_10", "man5": "Adults/Male_Adult_14", "man6": "Professions/Business_Male_04",
 }
-# Their clothes were repainted for the game: keep the game's body texture.
-OWN_BODY = {"killer", "kolesnikov"}
 
 IMPORT = """[remap]
 
@@ -68,9 +65,12 @@ def convert(rb: Path, folder: str, avatar: str) -> None:
         _, part, kind = tga.stem.split("_", 2)
         if kind not in ("color", "normal", "specular"):
             continue
-        if part == "body" and folder in OWN_BODY and kind != "specular":
+        # Only the faces at 2048 (seen close, in the torch beam); the clothes,
+        # hair cards and relief stay at the game's 1024, plus gloss maps for
+        # all, so the game does not grow by hundreds of megabytes.
+        if kind != "specular" and not (part == "head" and kind == "color"):
             continue
-        if part not in ("head", "body", "opacity", "equipment"):
+        if part not in ("head", "body"):
             continue
         im = Image.open(tga)
         if kind == "specular":

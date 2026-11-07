@@ -333,13 +333,24 @@ func _build_lobby() -> void:
 	if look == "night":
 		# The light falls out through the glass onto the porch.
 		var spill := SpotLight3D.new()
-		spill.position = Vector3(2.5, PORCH + 2.6, 1.0)
-		spill.rotation.x = deg_to_rad(-150)
-		spill.spot_range = 9.0
-		spill.spot_angle = 60.0
-		spill.light_energy = 1.2
+		# From just behind the glass, high, so its brightest spot lands on
+		# the porch outside and not on the floor right behind the doors.
+		spill.position = Vector3(2.5, PORCH + 3.0, -0.2)
+		spill.rotation.x = deg_to_rad(-135)
+		spill.spot_range = 10.0
+		spill.spot_angle = 75.0
+		spill.spot_attenuation = 1.4
+		spill.light_energy = 1.0
 		spill.light_color = Store.TUBE_COLOR
 		add_child(spill)
+		# Warm light on the steps, as the glass throws it out into the rain.
+		var porch := OmniLight3D.new()
+		porch.position = Vector3(2.5, PORCH + 1.6, -2.0)
+		porch.omni_range = 4.5
+		porch.omni_attenuation = 1.6
+		porch.light_energy = 1.6
+		porch.light_color = Store.TUBE_COLOR.lerp(Color(1.0, 0.8, 0.55), 0.5)
+		add_child(porch)
 
 
 ## The nine-storey panel blocks round the square, in 12 m sections.
