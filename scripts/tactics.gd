@@ -444,7 +444,7 @@ class PlanView extends Control:
 		draw_rect(r, line, false, w)
 
 	func _text(at: Vector2, s: String, sz := 18, c := Color(0.16, 0.15, 0.13)) -> void:
-		draw_string(ThemeDB.fallback_font, at, s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, c)
+		draw_string(ThemeDB.fallback_font, at, Loc.t(s, "plan"), HORIZONTAL_ALIGNMENT_LEFT, -1, sz, c)
 
 	func _draw() -> void:
 		var ink := Color(0.16, 0.15, 0.13)
