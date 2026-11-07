@@ -89,6 +89,26 @@ func _ready() -> void:
 
 func _shots(pb: Passersby) -> void:
 	await _wait(1.0)
+	if "--pano" in OS.get_cmdline_user_args():
+		# Round the square from three places: is there a district all round?
+		var g := Outdoors.GROUND
+		for at: Vector3 in [Vector3(0, g, -15.0), Vector3(-20.0, g, -19.0), Vector3(18.0, g, -18.0)]:
+			for k in 8:
+				var a := k * TAU / 8.0
+				main.player.global_position = at
+				main.player.face(Vector3(sin(a), 0.08, -cos(a)))
+				await _wait(0.3)
+				await RenderingServer.frame_post_draw
+				var id := "pano_%d_%d" % [int(at.x), k]
+				get_viewport().get_texture().get_image().save_png(out_dir.path_join(id + ".png"))
+		# The road: cars going by.
+		for k in 8:
+			main.player.global_position = Vector3(-4.0, g, -21.0)
+			main.player.face(Vector3(1.0 if k % 2 == 0 else -1.0, 0.0, -0.45))
+			await _wait(2.5)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png(out_dir.path_join("road_%d.png" % k))
+		return
 	var views: Array
 	if main.chapter == "day4":
 		var g := Outdoors.GROUND

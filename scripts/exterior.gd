@@ -52,6 +52,8 @@ func _ready() -> void:
 	_build_ground()
 	_build_store()
 	_build_blocks()
+	if look == "day":
+		_build_district()
 	_build_green()
 	_build_lamps()
 	_build_street()
@@ -117,8 +119,8 @@ func _build_env() -> void:
 	else:
 		env.background_color = Color(0.74, 0.76, 0.77)
 		env.fog_light_color = Color(0.74, 0.76, 0.77)
-		env.fog_depth_begin = 25.0
-		env.fog_depth_end = 160.0
+		env.fog_depth_begin = 30.0
+		env.fog_depth_end = 300.0
 		env.ambient_light_color = Color(0.85, 0.88, 0.92)
 		env.ambient_light_energy = 0.75
 		env.tonemap_exposure = 1.05
@@ -328,6 +330,107 @@ func _build_blocks() -> void:
 	_block(Vector3(-36, 0, -70), Vector3(36, 0, -70), 9, 12.0)   # across the road, behind the camera
 	_block(Vector3(-44, 0, 30), Vector3(-44, 0, -18), 9, 12.0)   # far right
 	_block(Vector3(40, 0, -44), Vector3(64, 0, -44), 9, 12.0)
+
+
+## By day the eye carries past the square (day four, the day cutscenes): the
+## rest of МЖК round it. A second ring of nine-storey blocks behind the first,
+## sixteen-storey towers and further blocks fading into the haze, the lawns
+## and yards between them with birches and firs, a row of tin garages and a
+## children's playground beside the store, ground all the way to the horizon.
+func _build_district() -> void:
+	# Ground out to the haze: lawn round the asphalt of the square and roads.
+	for r: Array in [[Vector3(0, -0.12, -170), Vector3(560, 0.1, 196)], [Vector3(0, -0.12, 170), Vector3(560, 0.1, 196)],
+			[Vector3(-176, -0.12, 0), Vector3(208, 0.1, 144)], [Vector3(176, -0.12, 0), Vector3(208, 0.1, 144)]]:
+		box(r[0], r[1], "ext_grass", Color(0.92, 0.92, 0.86), 6.0, MeshFactory.PY)
+	# The road runs on out of the square both ways.
+	for x: float in [-160.0, 160.0]:
+		box(Vector3(x, -0.07, ROAD_Z), Vector3(176, 0.1, 9), "ext_asphalt", Color(0.7, 0.7, 0.72), 3.0, MeshFactory.PY)
+		box(Vector3(x, -0.06, ROAD_Z + 6.1), Vector3(176, 0.1, 2.8), "ext_asphalt", Color(1.35, 1.32, 1.28), 3.0, MeshFactory.PY)
+		box(Vector3(x, -0.06, ROAD_Z - 6.1), Vector3(176, 0.1, 2.8), "ext_asphalt", Color(1.35, 1.32, 1.28), 3.0, MeshFactory.PY)
+	# The second ring of nine-storey blocks, then the towers.
+	_block(Vector3(-112, 0, -96), Vector3(-52, 0, -96), 9, 12.0)
+	_block(Vector3(50, 0, -102), Vector3(110, 0, -102), 9, 12.0)
+	_block(Vector3(-80, 0, -26), Vector3(-80, 0, -86), 9, 12.0)
+	_block(Vector3(40, 0, 78), Vector3(-44, 0, 78), 9, 12.0)
+	_block(Vector3(110, 0, -40), Vector3(110, 0, 22), 9, 12.0)
+	_block(Vector3(-30, 0, -138), Vector3(-8, 0, -138), 16, 14.0)
+	_block(Vector3(18, 0, -150), Vector3(40, 0, -150), 16, 14.0)
+	_block(Vector3(-124, 0, -36), Vector3(-124, 0, -58), 16, 14.0)
+	_block(Vector3(140, 0, -70), Vector3(140, 0, -48), 16, 14.0)
+	# Far off in the haze, the rest of the estate.
+	for f: Array in [[Vector3(-150, 0, -190), Vector3(-80, 0, -190), 9], [Vector3(-40, 0, -210), Vector3(30, 0, -210), 12],
+			[Vector3(70, 0, -200), Vector3(140, 0, -200), 9], [Vector3(-200, 0, -60), Vector3(-200, 0, -140), 9],
+			[Vector3(200, 0, -140), Vector3(200, 0, -60), 12], [Vector3(-190, 0, 40), Vector3(-190, 0, -20), 16],
+			[Vector3(190, 0, 0), Vector3(190, 0, 60), 9], [Vector3(60, 0, 170), Vector3(-60, 0, 170), 12]]:
+		_block(f[0], f[1], f[2], 12.0)
+	# Birches along the far pavement and in the yards, firs by the blocks.
+	for k in 14:
+		_birch(Vector3(-66.0 + k * 10.0 + _rng.randf_range(-2, 2), 0, ROAD_Z - 9.0 + _rng.randf_range(-0.8, 0.8)))
+	for c: Vector3 in [Vector3(-62, 0, -60), Vector3(-30, 0, -84), Vector3(70, 0, -86), Vector3(92, 0, -20),
+			Vector3(-68, 0, 20), Vector3(60, 0, 40)]:
+		for k in 3:
+			var p := c + Vector3(_rng.randf_range(-7, 7), 0, _rng.randf_range(-7, 7))
+			if k == 0:
+				_fir(p, _rng.randf_range(7.0, 10.0))
+			else:
+				_birch(p)
+	_garages(Vector3(-74, 0, -42), 8)
+	_playground(Vector3(-34, 0, -1))
+
+
+## A row of tin garages, each with its own colour of door and a padlock.
+func _garages(at: Vector3, count: int) -> void:
+	var kit := MeshBuilder.Kit.new()
+	kit.ao = false
+	var tin := kit.b("corrugated", Color(0.62, 0.62, 0.58))
+	var roof := kit.b("rubber", Color(0.18, 0.18, 0.18))
+	var doors := [Color(0.3, 0.42, 0.32), Color(0.5, 0.22, 0.18), Color(0.3, 0.36, 0.5), Color(0.62, 0.6, 0.55),
+		Color(0.45, 0.4, 0.3)]
+	for i in count:
+		var x := at.x + i * 3.2
+		tin.box(Props.at(x, 0, at.z - 3.0), Vector3(3.1, 2.3, 6.0))
+		roof.box(Props.at(x, 2.3, at.z - 3.0), Vector3(3.2, 0.06, 6.2))
+		kit.b("paint", doors[_rng.randi() % doors.size()]).box(Props.at(x, 0.05, at.z + 0.01), Vector3(2.6, 2.1, 0.04))
+		kit.b("metal", Color(0.2, 0.2, 0.2)).box(Props.at(x + 0.15, 1.0, at.z + 0.05), Vector3(0.08, 0.12, 0.05))
+	kit.build(self)
+
+
+## A yard playground of the 1980s: a steel slide, a swing on an A-frame, a
+## sandpit with a wooden rim and a bench for the grandmothers.
+func _playground(at: Vector3) -> void:
+	var kit := MeshBuilder.Kit.new()
+	kit.ao = false
+	var red := kit.b("paint", Color(0.7, 0.2, 0.15))
+	var blue := kit.b("paint", Color(0.25, 0.4, 0.62))
+	var steel := kit.b("chrome", Color(0.8, 0.8, 0.78))
+	var wood := kit.b("wood", Color(0.75, 0.62, 0.45))
+	box(at + Vector3(0, -0.04, 0), Vector3(16, 0.1, 9), "ext_grass", Color(0.85, 0.82, 0.7), 4.0, MeshFactory.PY)
+	# Slide: ladder up to a platform, the chute down to the grass.
+	var sl := at + Vector3(-4, 0, 0)
+	for sx: float in [-0.35, 0.35]:
+		red.box(Props.at(sl.x + sx, 0, sl.z + 1.0), Vector3(0.06, 1.8, 0.06))
+		red.box(Props.at(sl.x + sx, 0, sl.z + 0.4), Vector3(0.06, 1.8, 0.06))
+	blue.box(Props.at(sl.x, 1.75, sl.z + 0.7), Vector3(0.8, 0.06, 0.8))
+	for k in 5:
+		red.box(Props.at(sl.x, 0.3 + k * 0.32, sl.z + 1.25), Vector3(0.7, 0.04, 0.06))
+	steel.box(Props.rot(Vector3.RIGHT, -0.6, sl + Vector3(0, 0.95, -0.6)), Vector3(0.6, 0.03, 2.6))
+	# Swing: two A-frames and a bar, a seat on chains.
+	var sw := at + Vector3(2.5, 0, 0)
+	for sx: float in [-1.2, 1.2]:
+		for sz: float in [-0.5, 0.5]:
+			blue.box(Props.rot(Vector3.RIGHT, -sz * 0.5, sw + Vector3(sx, 0, sz)), Vector3(0.07, 2.4, 0.07))
+	blue.box(Props.at(sw.x, 2.3, sw.z), Vector3(2.5, 0.07, 0.07))
+	for sx: float in [-0.25, 0.25]:
+		steel.box(Props.at(sw.x + sx, 0.45, sw.z), Vector3(0.015, 1.85, 0.015))
+	wood.box(Props.at(sw.x, 0.42, sw.z), Vector3(0.6, 0.04, 0.25))
+	# Sandpit.
+	var sp := at + Vector3(0, 0, 3)
+	for side: Array in [[Vector3(0, 0, -1.0), Vector3(2.2, 0.25, 0.12)], [Vector3(0, 0, 1.0), Vector3(2.2, 0.25, 0.12)],
+			[Vector3(-1.05, 0, 0), Vector3(0.12, 0.25, 2.1)], [Vector3(1.05, 0, 0), Vector3(0.12, 0.25, 2.1)]]:
+		wood.box(Props.at(sp.x + side[0].x, 0, sp.z + side[0].z), side[1])
+	kit.b("concrete", Color(0.85, 0.75, 0.55)).box(Props.at(sp.x, 0, sp.z), Vector3(2.0, 0.15, 1.9))
+	kit.build(self)
+	Street.bench(self, at + Vector3(5.5, 0, 3.0), PI * 0.5)
 
 
 ## A panel block whose facade runs from `a` to `b` (seen from the front, a is
