@@ -17,6 +17,9 @@ library's `Assets/Animations`.
 | shopper | man1 | Adults/Male_Adult_02 |
 | the killer | killer | Adults/Male_Adult_20 (clothes dyed black) |
 | Колесников, участковый | kolesnikov | Professions/Police_Male_01 (redressed, see below) |
+| passers-by (day episodes) | woman3, woman4, woman5 | Adults/Female_Adult_02, Female_Adult_07, Female_Adult_11 |
+| cashier of till № 3 | woman6 | Professions/Business_Female_03 |
+| passers-by (day episodes) | man2, man3, man4, man5, man6 | Adults/Male_Adult_05, Male_Adult_08, Male_Adult_10, Male_Adult_14, Professions/Business_Male_04 |
 
 Changes: textures scaled from 2048 to 1024 px and saved as JPEG/PNG
 (specular maps dropped); the killer's body texture darkened; the clips in
@@ -27,7 +30,8 @@ f_sit_chair_idle_neutral_01 and m_hold_bag_idle / f_hold_bag_idle_01 by
 insignia painted out, Soviet shoulder boards and sleeve shield painted in,
 darker trousers, goatee shaved to a moustache); his peaked cap is the game's
 own. Kovpak's spectacles (tools/build_glasses.py), the hats, bags, the scarf and the cleaver are the
-game's own (scripts/characters.gd).
+game's own (scripts/characters.gd); the passers-by's berets, headscarves, caps and
+wire baskets are built in scripts/passersby.gd (converted by tools/make_passersby.py).
 
 Citation asked for by the authors: M. Gonzalez-Franco et al., "The Rocketbox
 library and the utility of freely available rigged avatars", Frontiers in

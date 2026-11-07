@@ -361,6 +361,18 @@ func say(text: String, duration := -1.0, now := false) -> void:
 		_queue.append([text, duration])
 
 
+## A stranger's remark in passing: shown only when no other subtitle is up
+## or waiting, so it never cuts into a conversation. Its voice is played by
+## the caller, from where the speaker stands. True if it was shown.
+func say_aside(text: String, duration: float) -> bool:
+	if not _queue.is_empty() or _sub_t > 0.0 or _voice.playing or choices.visible:
+		return false
+	Voice.note_missing(text)
+	subtitle.text = text
+	_sub_t = duration
+	return true
+
+
 func clear_subtitles() -> void:
 	_queue.clear()
 	_sub_t = 0.0

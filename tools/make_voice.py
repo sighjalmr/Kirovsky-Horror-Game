@@ -52,6 +52,9 @@ FX = {
     # A voice down the line of the post telephone: narrow band, a little crackle.
     "phone": "highpass=f=380,lowpass=f=3200,acompressor=threshold=-22dB:ratio=4:attack=3:release=80,"
              "aecho=0.6:0.2:8:0.1",
+    # Out on the square in the daytime: open air, no room round the voice.
+    "street": "highpass=f=120,acompressor=threshold=-18dB:ratio=3:attack=5:release=150,"
+              "aecho=0.8:0.2:60:0.05",
     # Shouted through the plate glass of the front door from the street.
     "glass": "highpass=f=180,lowpass=f=2800,acompressor=threshold=-18dB:ratio=3:attack=5:release=150,"
              "aecho=0.8:0.3:30|70:0.15|0.08",

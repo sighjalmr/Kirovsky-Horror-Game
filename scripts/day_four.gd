@@ -120,6 +120,7 @@ func _ready() -> void:
 	crowd.autoplay = true
 	crowd.position = TANK + Vector3(0, 1.2, 1.5)
 	main.world.add_child(crowd)
+	main.world.add_child(Passersby.new(main, "4"))
 	update_notebook()
 
 

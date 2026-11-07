@@ -96,6 +96,7 @@ func _ready() -> void:
 	crowd.bus = Sfx.BUS
 	crowd.autoplay = true
 	add_child(crowd)
+	main.world.add_child(Passersby.new(main, "1"))
 	update_notebook()
 
 

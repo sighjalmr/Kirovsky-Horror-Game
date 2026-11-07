@@ -155,7 +155,7 @@ func _ready() -> void:
 	menu.picked.connect(_on_menu)
 	Stats.notify = hud.show_achievement
 	apply_settings()
-	if "--daytest" in OS.get_cmdline_user_args():
+	if "--daytest" in OS.get_cmdline_user_args() or "--passtest" in OS.get_cmdline_user_args():
 		chapter = "day1"
 	for d in ["--day2", "--day3", "--day4"]:
 		if d in OS.get_cmdline_user_args():
@@ -383,6 +383,9 @@ func _ready_day() -> void:
 		player.face(DayFour.TANK - DayFour.START)
 	if "--daytest" in OS.get_cmdline_user_args():
 		add_child(load("res://scripts/dev_daytest.gd").new().with(self))
+		return
+	if "--passtest" in OS.get_cmdline_user_args():
+		add_child(load("res://scripts/dev_passersby.gd").new().with(self))
 		return
 	hud.fade.color.a = 1.0
 	_title_menu()

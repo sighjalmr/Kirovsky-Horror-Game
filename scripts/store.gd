@@ -1048,6 +1048,19 @@ func set_front_door(open: bool) -> void:
 		tw.tween_callback(func(): Sfx.play_3d(self, "lock", Vector3(-1, 1.0, -0.1), 0.0))
 
 
+## The left leaf pushed open by a shopper going in or out (the day episodes):
+## no key, just the swing and the closer pulling it back.
+func swing_front(open: bool) -> void:
+	if open == front_open:
+		return
+	front_open = open
+	var tw := create_tween()
+	tw.tween_property(_front_hinge, "rotation:y", deg_to_rad(75.0) if open else 0.0, 0.7 if open else 1.4) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT if open else Tween.EASE_IN_OUT)
+	if not open:
+		tw.tween_callback(func(): Sfx.play_3d(self, "clank", Vector3(-1, 1.2, 0.0), -16.0, 1.6))
+
+
 ## The «Волга» stands at the doors with its lights off (the prologue).
 func car_park() -> void:
 	car.visible = true
