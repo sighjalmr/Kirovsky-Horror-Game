@@ -34,6 +34,15 @@ const SUSPECT_FAR := 1.1
 ## Developer runs: he never notices Gordeev.
 static var blind := false
 
+## Habits he picks up night by night (Tactics sets them): from night three
+## he walks softly and leaves his keys still; from night four he hears
+## further. A cord from behind when he gets that close unseen (any night).
+var quiet := false
+var hear_mult := 1.0
+var garrote_ok := true
+## The last catch was from behind with the cord, not in a chase.
+var garrote := false
+
 var state := State.INACTIVE
 var store: Store
 var player: Player
@@ -186,6 +195,7 @@ func _start_leave() -> void:
 func hear(pos: Vector3, radius: float) -> void:
 	if state in [State.INACTIVE, State.CHASE, State.ATTACK, State.LEAVE]:
 		return
+	radius *= hear_mult
 	if global_position.distance_to(pos) > radius or Outdoors.is_out(pos):
 		return  # out on the square, behind glass and rain
 	if is_lurking() and global_position.distance_to(pos) > radius * 0.6:
@@ -271,6 +281,18 @@ func _physics_process(delta: float) -> void:
 			if suspicion <= 0.0:
 				_alerted = false
 
+	# Right behind Gordeev and unnoticed: the cord.
+	if state in [State.PATROL, State.INVESTIGATE, State.SEARCH] and garrote_ok and not blind \
+			and not player.dead and not player.hidden and not player.busy and player.controllable \
+			and _dist_to_player() < 0.95 and _behind_him():
+		garrote = true
+		_lurk_t = 0.0
+		state = State.ATTACK
+		velocity = Vector3.ZERO
+		_face(player.global_position, 1.0)
+		caught_player.emit()
+		return
+
 	if torch_on():
 		# The beam swings a little with his step and sweeps when he looks round.
 		_torch_t += delta
@@ -332,6 +354,7 @@ func _physics_process(delta: float) -> void:
 				lost.emit()
 			elif _dist_to_player() < REACH and not player.dead and not player.hidden:
 				state = State.ATTACK
+				garrote = false
 				velocity = Vector3.ZERO
 				_face(player.global_position, 1.0)
 				caught_player.emit()
@@ -360,6 +383,26 @@ func _start_chase() -> void:
 	_last_seen = player.global_position
 	_repath_t = 0.0
 	spotted.emit()
+
+
+## True when he stands behind Gordeev's back, out of his sight.
+func _behind_him() -> bool:
+	var fwd := -player.global_transform.basis.z
+	var to := global_position - player.global_position
+	to.y = 0.0
+	fwd.y = 0.0
+	return to.length() > 0.01 and fwd.normalized().dot(to.normalized()) < -0.25
+
+
+## The cord round Gordeev's neck from behind; he leans back with it.
+func play_garrote() -> void:
+	body.play("breathe")
+	var breath := Sfx.play_3d(self, "killer_breath", global_position + Vector3(0, 1.7, 0), 2.0, 0.85, 8.0)
+	breath.unit_size = 2.0
+	var tw := create_tween()
+	tw.tween_interval(6.0)
+	tw.tween_property(breath, "volume_db", -60.0, 3.0)
+	tw.tween_callback(breath.queue_free)
 
 
 func _dist_to_player() -> float:
@@ -449,7 +492,7 @@ func _animate(speed: float, delta: float) -> void:
 	else:
 		body.play("run", speed)
 	_keys_t -= delta
-	if _keys_t <= 0.0 and state == State.PATROL and speed > 0.0:
+	if _keys_t <= 0.0 and state == State.PATROL and speed > 0.0 and not quiet:
 		_keys_t = randf_range(8.0, 16.0)
 		Sfx.play_3d(get_parent(), "keys", global_position + Vector3(0, 1.0, 0), -8.0)
 
@@ -492,5 +535,6 @@ func _swing(t: float) -> void:
 
 
 func _on_footfall() -> void:
+	_steps.volume_db = -11.0 if quiet else -3.0
 	_steps.pitch_scale = randf_range(0.95, 1.03)
 	_steps.play()

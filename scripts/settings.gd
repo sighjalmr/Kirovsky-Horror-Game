@@ -29,6 +29,8 @@ static var detective := false
 static var hints_seen: Array = []
 ## Chapters reached at least once: the chapter menu opens these.
 static var reached: Array = ["night1"]
+## The evacuation plan has been copied into the notebook: M opens it.
+static var plan_copied := false
 ## Ending ids seen at least once (prosecutor, word, wrong, defence, death).
 static var endings: Array = []
 
@@ -55,6 +57,7 @@ static func load_all() -> void:
 	hints_seen = cf.get_value("game", "hints_seen", hints_seen)
 	reached = cf.get_value("game", "reached", reached)
 	endings = cf.get_value("game", "endings", endings)
+	plan_copied = cf.get_value("game", "plan_copied", plan_copied)
 
 
 static func save() -> void:
@@ -74,6 +77,7 @@ static func save() -> void:
 	cf.set_value("game", "hints_seen", hints_seen)
 	cf.set_value("game", "reached", reached)
 	cf.set_value("game", "endings", endings)
+	cf.set_value("game", "plan_copied", plan_copied)
 	cf.save(PATH)
 
 

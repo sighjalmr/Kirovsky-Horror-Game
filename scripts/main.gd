@@ -29,6 +29,10 @@ const G_WINDED := "Сердце колотится в горле. Мне не т
 ## Hiding and tearing free.
 const G_HIDE_LATE := "Он смотрит прямо на меня. Прятаться поздно."
 const G_ESCAPE := "Ударил его фонарём в лицо и вырвался. Второй раз так не повезёт."
+const G_ESCAPE_CORD := "Шнурок. Сзади, как Нину. Локтем ему под рёбра, и вывернулся. Шея горит."
+## The cord takes more: E presses in seconds.
+const CORD_PRESSES := 10
+const CORD_TIME := 3.0
 ## E presses needed in STRUGGLE_TIME seconds to tear free, once a night.
 const STRUGGLE_PRESSES := 7
 const STRUGGLE_TIME := 2.2
@@ -72,6 +76,8 @@ var hud: Hud
 var menu: GameMenu
 var night: NightOne
 var day: DayOne
+## Cans, broken glass, валидол, the plan and the man's habits (nights only).
+var tactics: Tactics
 var env: Environment
 var post: ShaderMaterial
 var chasing := false
@@ -89,6 +95,8 @@ var _morning := false
 var _escaped := false
 var _struggling := false
 var _mash := 0
+var _need := STRUGGLE_PRESSES
+var _cord := false
 var _hide_spot: Dictionary = {}
 ## Seconds of play in this chapter, for the first key hints.
 var _played := 0.0
@@ -156,6 +164,8 @@ func _ready() -> void:
 	else:
 		night = NightOne.new(self)
 	add_child(night)
+	tactics = Tactics.new(self, int(chapter.right(1)))
+	add_child(tactics)
 	night.build_timeline()
 	night.update_notebook()
 	hud.clock.text = _fmt(minutes)
@@ -351,6 +361,9 @@ func _setup_input() -> void:
 	_bind("restart", [KEY_R], [JOY_BUTTON_START], [])
 	_bind("new_night", [KEY_N], [], [])
 	_bind("tasks", [KEY_J], [JOY_BUTTON_X], [])
+	_bind("throw", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER], [])
+	_bind("pill", [KEY_V], [], [])
+	_bind("plan", [KEY_M], [], [])
 	# E works in the menus as well as Enter and Space.
 	var has_e := false
 	for ev in InputMap.action_get_events("ui_accept"):
@@ -520,6 +533,7 @@ func _process(delta: float) -> void:
 		day.update(delta)
 		return
 	night.update(delta)
+	tactics.update(delta)
 	store.update_compressors(killer.global_position if killer.is_active() else Vector3(999, 0, 999), delta)
 	var music_target := -6.0 if chasing else -80.0
 	_chase_music.volume_db = move_toward(_chase_music.volume_db, music_target, delta * (60.0 if chasing else 12.0))
@@ -568,7 +582,7 @@ func _update_interaction() -> void:
 			leave_hiding()
 		return
 	if _struggling:
-		hud.set_prompt("ВЫРЫВАЙТЕСЬ! Жмите E: %d" % maxi(0, STRUGGLE_PRESSES - _mash))
+		hud.set_prompt(("ШНУРОК НА ШЕЕ! Жмите E: %d" if _cord else "ВЫРЫВАЙТЕСЬ! Жмите E: %d") % maxi(0, _need - _mash))
 		return
 	if player.sitting:
 		hud.set_prompt("Сидите и ждёте. W / A / S / D — встать")
@@ -625,7 +639,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		player.look((event as InputEventMouseMotion).relative)
 	elif event is InputEventMouseButton and event.pressed and phase == Phase.PLAY and not hud.notebook.visible:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	elif event.is_action_pressed("ui_cancel") and not menu.is_open():
+	if tactics and tactics.plan_open():
+		if event.is_action_pressed("plan") or event.is_action_pressed("ui_cancel"):
+			tactics.close_plan()
+			get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("ui_cancel") and not menu.is_open():
 		if phase == Phase.PLAY and not _struggling and not hud.choices.visible:
 			if hud.notebook.visible:
 				hud.notebook.visible = false
@@ -661,6 +680,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		_go_to("night5", carried, day_answers)
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
 		_go_to("night2", night_clues.duplicate(), day.asked.duplicate())
+	elif phase == Phase.PLAY and tactics and player.controllable and not _struggling and event.is_action_pressed("throw"):
+		tactics.throw()
+	elif phase == Phase.PLAY and tactics and player.controllable and not _struggling and event.is_action_pressed("pill"):
+		tactics.take_pill()
+	elif phase == Phase.PLAY and tactics and not hud.notebook.visible and not hud.memo.visible and not _struggling \
+			and event.is_action_pressed("plan"):
+		if Settings.plan_copied:
+			tactics.open_plan()
+		else:
+			hud.say("План бы пригодился. Он висит на стене поста.", -1.0, true)
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible and not _struggling:
 		var open := not hud.notebook.visible
 		hud.notebook.visible = open
@@ -749,6 +778,8 @@ func start_now() -> void:
 # --- interactions -----------------------------------------------------------------
 
 func _interact(id: String) -> void:
+	if tactics and tactics.interact(id):
+		return
 	if day:
 		day.interact(id)
 	else:
@@ -848,6 +879,7 @@ func _on_lost() -> void:
 func _on_caught() -> void:
 	if phase != Phase.PLAY or _struggling:
 		return
+	_cord = killer.garrote
 	if not _escaped:
 		_struggle()
 		return
@@ -855,10 +887,13 @@ func _on_caught() -> void:
 
 
 ## His hands on Gordeev: one chance a night to tear free by hammering E.
+## From behind it is the cord: more presses, the picture closing in.
 func _struggle() -> void:
 	_escaped = true
 	_struggling = true
 	_mash = 0
+	_need = CORD_PRESSES if _cord else STRUGGLE_PRESSES
+	var limit := CORD_TIME if _cord else STRUGGLE_TIME
 	stand_up()
 	player.controllable = false
 	player.busy = true
@@ -870,14 +905,20 @@ func _struggle() -> void:
 	Sfx.play_3d(view, "killer_breath", killer.global_position + Vector3(0, 1.7, 0), -2.0, 1.0, 6.0)
 	_flash = 0.6
 	player.hit(0)
+	if _cord:
+		Sfx.play_2d(self, "cloth", -2.0, "Master", 0.7)
 	var t := 0.0
-	while t < STRUGGLE_TIME and phase == Phase.PLAY:
+	while t < limit and phase == Phase.PLAY:
 		await get_tree().process_frame
 		t += get_process_delta_time()
+		if _cord:
+			post.set_shader_parameter("vignette", lerpf(0.55, 1.6, t / limit))
 	_struggling = false
+	if _cord:
+		post.set_shader_parameter("vignette", 0.55)
 	if phase != Phase.PLAY:
 		return
-	if _mash < STRUGGLE_PRESSES:
+	if _mash < _need:
 		_kill()
 		return
 	Sfx.play_3d(view, "clank", killer.global_position + Vector3(0, 1.6, 0), 0.0, 0.8)
@@ -890,7 +931,7 @@ func _struggle() -> void:
 	player.breath = maxf(player.breath, 0.7)
 	player.winded = false
 	hud.set_prompt("")
-	hud.say(G_ESCAPE, -1.0, true)
+	hud.say(G_ESCAPE_CORD if _cord else G_ESCAPE, -1.0, true)
 	killer.stun(2.5)
 	on_noise(player.global_position, 10.0)
 
@@ -914,7 +955,29 @@ func _kill() -> void:
 	_dread.stop()
 	Sfx.play_2d(self, "attack_sting", -2.0)
 	_heart = Sfx.play_2d(self, "heartbeat", -4.0, "Master", 1.7)
+	if _cord:
+		_strangled()
+		return
 	killer.play_attack(_on_hit)
+
+
+## The cord: no blows, the picture closes in from the edges, the pulse
+## stumbles and stops.
+func _strangled() -> void:
+	killer.play_garrote()
+	chasing = false
+	Sfx.play_2d(self, "hurt", -6.0, Sfx.BUS, 0.8)
+	var tw := create_tween()
+	tw.tween_method(func(v: float) -> void: post.set_shader_parameter("vignette", v), 0.9, 2.4, 3.5)
+	tw.parallel().tween_property(player.head, "rotation:x", deg_to_rad(28.0), 3.5)
+	tw.parallel().tween_property(_heart, "pitch_scale", 0.5, 4.0)
+	tw.tween_callback(func() -> void:
+		player.die(killer.global_position)
+		Sfx.play_3d(view, "bodyfall", player.global_position + Vector3(0, 0.2, 0), 2.0)
+		Sfx.muffle(true))
+	tw.tween_property(_heart, "volume_db", -40.0, 3.0).set_ease(Tween.EASE_IN)
+	tw.tween_callback(_heart.stop)
+	_show_death()
 
 
 func _on_hit(i: int) -> void:
@@ -956,8 +1019,11 @@ func _show_death() -> void:
 		after = "Участковый Колесников записал: «Сторож оставил пост, находился в нетрезвом виде». Дело закрыли за неделю."
 	if chapter == "night5":
 		after = "В журнале обходов последняя запись почерком участкового: «Сторож оставил пост». Коробку из-под монпансье никто не искал.\nКонцовка «Смерть». Всего концовок пять."
+	var how := "Рядом лежал топорик из мясного отдела."
+	if _cord:
+		how = "На шее борозда от шнурка, как у Нины Лукиной и Галины Суровой."
 	hud.show_title("ГОРДЕЕВ НЕ ДОЖИЛ ДО УТРА",
-		"В 6:10 его нашли грузчики, у %s. Рядом лежал топорик из мясного отдела.\n%s\n\n%s" % [_where(player.global_position), after, again],
+		"В 6:10 его нашли грузчики, у %s. %s\n%s\n\n%s" % [_where(player.global_position), how, after, again],
 		Hud.RED)
 
 

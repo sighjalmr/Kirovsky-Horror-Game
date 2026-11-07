@@ -220,14 +220,14 @@ func build_timeline() -> void:
 		var r: Dictionary = rounds[i]
 		m.at_min(r.start, func(): _round_start(idx))
 	m.at(0, 40, func(): _ring("dispatch"))
-	m.at(1, 40, func(): _killer_leave())
+	m.at_min(Main.clock(1, 40) + randf_range(-20.0, 15.0), func(): _killer_leave())
 	m.at(1, 44, _floor_finds)
 	m.at(2, 30, func(): hud.say(N2_G_0230))
-	m.at(2, 40, _killer_return)
+	m.at_min(Main.clock(2, 40) + randf_range(-15.0, 20.0), _killer_return)
 	m.at(3, 20, _duty_out)
 	m.at(3, 40, func(): _ring("breath"))
 	m.at(4, 0, func(): hud.say(G_0400))
-	m.at(5, 10, func(): _killer_leave())
+	m.at_min(Main.clock(5, 10) + randf_range(-15.0, 15.0), func(): _killer_leave())
 	m.at(5, 30, func(): hud.say(G_0530))
 	m.at(6, 0, _morning)
 

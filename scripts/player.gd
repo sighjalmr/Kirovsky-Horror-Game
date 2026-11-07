@@ -32,6 +32,8 @@ const HAND_REACH := 0.55
 
 var controllable := false
 var busy := false
+## 0..1: the hand with the torch shakes with a racing heart (Tactics).
+var tremor := 0.0
 var dead := false
 var flashlight_on := false
 var force_flashlight := false  # dev screenshots
@@ -344,4 +346,6 @@ func _update_hand(delta: float) -> void:
 		want_pull = HAND_REACH - camera.global_position.distance_to(hit.position)
 	_pull = lerpf(_pull, want_pull, 1.0 - exp(-delta * 12.0))
 	hand.position = HAND_POS + Vector3(0, -(1.0 - lift) * 0.32, _pull)
+	if tremor > 0.05:
+		hand.position += Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * 0.005 * tremor
 	hand.rotation.x = HAND_ROT.x - (1.0 - lift) * 0.6
