@@ -275,8 +275,17 @@ func _on_menu(id: String) -> void:
 ## Brightness, subtitles and the detective mode, from Settings.
 func apply_settings() -> void:
 	post.set_shader_parameter("brightness", Settings.brightness)
+	if not _dev():
+		view.size = Settings.render_size(Vector2i(RENDER_W, RENDER_H))
+	Settings.apply_display()
 	if hud:
 		hud.apply_settings()
+
+
+## A point in the 3D picture (drawn at the chosen resolution) on the
+## 1920 × 1080 screen the HUD is laid out on.
+func to_screen(at: Vector2) -> Vector2:
+	return at * Vector2(RENDER_W, RENDER_H) / Vector2(view.size)
 
 
 ## A key hint shown once ever (Settings.hints_seen), if hints are on.
@@ -664,7 +673,7 @@ func _update_tasks() -> void:
 		# Hidden behind a shelf or a wall; the clue's own box may stop the ray close to it.
 		if not hit.is_empty() and eye.distance_to(hit.position) < d - 0.9:
 			continue
-		var at := cam.unproject_position(p)
+		var at := to_screen(cam.unproject_position(p))
 		if Rect2(0, 0, RENDER_W, RENDER_H).has_point(at):
 			pts.append([at, 1.0 - clampf((d - 1.2) / (reach - 1.2), 0.0, 1.0)])
 	hud.marks.points = pts

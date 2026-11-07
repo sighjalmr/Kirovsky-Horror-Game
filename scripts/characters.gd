@@ -20,6 +20,7 @@ const CAST := {
 	"shopper2": ["woman2", true, "", "handbag"],
 	"shopper_man": ["man1", false, "", ""],
 	"kolesnikov": ["kolesnikov", false, "furazhka", ""],
+	"rinat": ["man1", false, "butcher", ""],
 }
 
 
@@ -38,6 +39,10 @@ static func build(role: String) -> Person:
 			p.attach("Bip01 Head", _built(k))
 		"furazhka":
 			p.attach("Bip01 Head", furazhka())
+		"butcher":
+			p.attach("Bip01 Head", butcher_cap())
+			p.attach("Bip01 Spine2", apron_bib())
+			p.attach("Bip01 Pelvis", apron_skirt())
 		"cap":
 			var k := MeshBuilder.Kit.new()
 			k.ao = false
@@ -126,6 +131,81 @@ static func furazhka() -> Node3D:
 	# The peak dips a little to the front, as worn.
 	k.b("rubber", Color(0.08, 0.08, 0.08)).box(Props.rot(Vector3.RIGHT, -0.18, Vector3(0, 0.112, -0.152)), Vector3(0.15, 0.006, 0.05))
 	k.b("chrome", Color(1.0, 0.8, 0.35)).box(Props.at(0, 0.124, -0.131), Vector3(0.022, 0.022, 0.008))
+	return _built(k)
+
+
+## The butcher's apron: heavy white cotton gone grey with washing, with the
+## brown of old blood that never comes out and a fresh smear where he wipes
+## his hands. The bib hangs from a strap round the neck; the skirt is tied
+## at the waist and reaches below the knee.
+const APRON := Color(0.86, 0.84, 0.79)
+const APRON_DIRT := Color(0.62, 0.55, 0.47)
+
+
+## Points round the front of the body: an arc of an ellipse (half widths rx
+## and rz, -Z forward) from +x across to -x, so the sheet faces forward.
+static func _front_row(y: float, rx: float, rz: float, half: float, n: int) -> PackedVector3Array:
+	var row := PackedVector3Array()
+	for i in n + 1:
+		var t := lerpf(half, -half, i / float(n))
+		row.append(Vector3(rx * sin(t), y, -rz * cos(t)))
+	return row
+
+
+## The bib over the chest (on Bip01 Spine2), with the neck strap and the
+## two side ties.
+static func apron_bib() -> Node3D:
+	var k := MeshBuilder.Kit.new()
+	k.ao = false
+	var rows := []
+	# From the breastbone down to the waist, a little fuller over the belly.
+	for j in 7:
+		var y := lerpf(0.13, -0.27, j / 6.0)
+		var w := lerpf(0.5, 0.7, j / 6.0)
+		rows.append(_front_row(y, 0.19, lerpf(0.15, 0.19, sqrt(j / 6.0)), w, 6))
+	k.b("cloth", APRON, Color.BLACK, Mats.DOUBLE).sheet(Transform3D.IDENTITY, rows, Color.WHITE, 0.6)
+	# The strap round the back of the neck.
+	var strap := k.b("cloth", APRON * 0.92, Color.BLACK, Mats.DOUBLE)
+	for side in [-1.0, 1.0]:
+		var top := Vector3(side * 0.065, 0.23, 0.03)
+		var low := Vector3(side * 0.085, 0.13, -0.145)
+		strap.capsule(Transform3D.IDENTITY, low, top, 0.009, 0.009, 6)
+	# Stains: old brown splashes and a fresh smear at the hip.
+	var st := k.b("blood", Color(0.5, 0.4, 0.36))
+	st.ellipsoid(Props.at(0.05, -0.12, -0.188), Vector3(0.035, 0.05, 0.004), 10, 4)
+	st.ellipsoid(Props.at(-0.06, 0.03, -0.18), Vector3(0.02, 0.025, 0.004), 10, 4)
+	return _built(k)
+
+
+## The skirt of the apron (on Bip01 Pelvis), tied at the back over the waist.
+static func apron_skirt() -> Node3D:
+	var k := MeshBuilder.Kit.new()
+	k.ao = false
+	var rows := []
+	for j in 9:
+		var y := lerpf(0.15, -0.5, j / 8.0)
+		var rx := lerpf(0.19, 0.205, minf(1.0, j / 3.0))
+		var rz := lerpf(0.19, 0.18, minf(1.0, j / 3.0))
+		rows.append(_front_row(y, rx, rz, 1.25, 8))
+	k.b("cloth", APRON, Color.BLACK, Mats.DOUBLE).sheet(Transform3D.IDENTITY, rows, Color.WHITE, 0.6)
+	# The waist tie: a band round the back, the knot hanging down.
+	var tie := k.b("cloth", APRON * 0.92, Color.BLACK, Mats.DOUBLE)
+	tie.cylinder(_oval(Vector3(0, 0.12, 0.0), 1.0), 0.19, 0.19, 0.03, 20)
+	tie.box(Props.at(0, 0.09, 0.195), Vector3(0.025, 0.09, 0.012))
+	var st := k.b("blood", Color(0.5, 0.4, 0.36))
+	st.ellipsoid(Props.at(0.11, 0.02, -0.19), Vector3(0.04, 0.07, 0.004), 10, 4)
+	st.ellipsoid(Props.at(-0.04, -0.2, -0.185), Vector3(0.03, 0.035, 0.004), 10, 4)
+	st.ellipsoid(Props.at(0.02, -0.34, -0.185), Vector3(0.018, 0.022, 0.004), 10, 4)
+	return _built(k)
+
+
+## A white cotton butcher's cap, a low soft crown pulled down to the brows.
+static func butcher_cap() -> Node3D:
+	var k := MeshBuilder.Kit.new()
+	k.ao = false
+	var cap := k.b("cloth", Color(0.93, 0.92, 0.88))
+	cap.cylinder(_oval(Vector3(0, 0.112, -0.022), 1.15), 0.106, 0.11, 0.07, 20)
+	cap.ellipsoid(Props.at(0, 0.182, -0.022), Vector3(0.11, 0.035, 0.126), 16, 6)
 	return _built(k)
 
 

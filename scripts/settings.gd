@@ -16,6 +16,13 @@ static var voice := 1.0
 ## Mouse speed multiplier 0.3..2.5, and the pitch axis turned over.
 static var mouse := 1.0
 static var invert_y := false
+## Full screen, or a window of the chosen size.
+static var fullscreen := true
+## Index in RESOLUTIONS: the size the 3D picture is drawn at (and the window,
+## when not full screen). Menus and subtitles scale with the window.
+static var resolution := 2
+const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
+const RESOLUTION_NAMES := ["1280 × 720", "1600 × 900", "1920 × 1080 (Full HD)", "2560 × 1440 (2K)"]
 ## Picture gamma 0.7..1.5 (1 = as the artists left it).
 static var brightness := 1.0
 static var subtitles := true
@@ -50,6 +57,8 @@ static func load_all() -> void:
 	mouse = cf.get_value("input", "mouse", mouse)
 	invert_y = cf.get_value("input", "invert_y", invert_y)
 	brightness = cf.get_value("video", "brightness", brightness)
+	fullscreen = cf.get_value("video", "fullscreen", fullscreen)
+	resolution = clampi(cf.get_value("video", "resolution", resolution), 0, RESOLUTIONS.size() - 1)
 	subtitles = cf.get_value("video", "subtitles", subtitles)
 	sub_size = cf.get_value("video", "sub_size", sub_size)
 	hints = cf.get_value("game", "hints", hints)
@@ -70,6 +79,8 @@ static func save() -> void:
 	cf.set_value("input", "mouse", mouse)
 	cf.set_value("input", "invert_y", invert_y)
 	cf.set_value("video", "brightness", brightness)
+	cf.set_value("video", "fullscreen", fullscreen)
+	cf.set_value("video", "resolution", resolution)
 	cf.set_value("video", "subtitles", subtitles)
 	cf.set_value("video", "sub_size", sub_size)
 	cf.set_value("game", "hints", hints)
@@ -103,6 +114,35 @@ static func apply_audio() -> void:
 		AudioServer.set_bus_volume_db(v, db(voice))
 	# The Hall bus is ducked under speech by the HUD every frame, which adds
 	# db(sounds) to its own offset.
+
+
+## The size to draw a 1920 × 1080 picture at for the chosen resolution
+## (a portrait picture keeps its own size).
+static func render_size(base: Vector2i) -> Vector2i:
+	if base.x < base.y:
+		return base
+	var r := RESOLUTIONS[clampi(resolution, 0, RESOLUTIONS.size() - 1)]
+	return Vector2i(roundi(base.x * r.y / 1080.0), r.y)
+
+
+## Full screen or a window of the chosen size, centred on the screen. A window
+## larger than the screen is cut down to fit; the picture inside stays at the
+## chosen size. Developer runs (screenshots, tests) keep their own window.
+static func apply_display() -> void:
+	if not OS.get_cmdline_user_args().is_empty() or DisplayServer.get_name() == "headless":
+		return
+	if fullscreen:
+		if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		return
+	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_WINDOWED:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	var want := RESOLUTIONS[clampi(resolution, 0, RESOLUTIONS.size() - 1)]
+	var screen := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen())
+	var k := minf(1.0, minf(screen.size.x / float(want.x), (screen.size.y - 40) / float(want.y)))
+	var size := Vector2i(roundi(want.x * k), roundi(want.y * k))
+	DisplayServer.window_set_size(size)
+	DisplayServer.window_set_position(screen.position + (screen.size - size) / 2)
 
 
 static func reach(ch: String) -> void:

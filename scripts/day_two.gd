@@ -67,7 +67,7 @@ func _ready() -> void:
 	label.position = Vector3(5.0, 2.4, 27.9)
 	label.rotation.y = PI  # read from the hall side
 	store.add_child(label)
-	rinat = _person("shopper_man", RINAT, 0.0)
+	rinat = _person("rinat", RINAT, 0.0)
 	rinat.pose = "talk"
 	shopper = _person("shopper", QUEUE2[0], -PI * 0.1)
 	_person("shopper2", QUEUE2[1], -PI * 0.2)
