@@ -18,6 +18,8 @@ var subtitle: Label
 var prompt: Label
 var notebook: ColorRect
 var notebook_text: Label
+## The right-hand page: people and conclusions (Main fills it on opening).
+var notebook_right: RichTextLabel
 var fade: ColorRect
 var title: Label
 var title_sub: Label
@@ -86,19 +88,55 @@ func _ready() -> void:
 	hint.modulate.a = 0.0
 	apply_settings()
 
+	# A school notebook open on two pages of squared paper, written in blue
+	# ballpoint: the findings on the left, the people and conclusions right.
 	notebook = ColorRect.new()
-	notebook.color = Color(0.89, 0.87, 0.8, 0.97)
-	notebook.position = Vector2(510, 90)
-	notebook.size = Vector2(900, 900)
+	notebook.color = Color(0.9, 0.89, 0.83, 0.98)
+	notebook.position = Vector2(170, 80)
+	notebook.size = Vector2(1580, 920)
 	notebook.visible = false
 	add_child(notebook)
+	for i in 41:
+		var h := ColorRect.new()
+		h.color = Color(0.42, 0.55, 0.72, 0.16)
+		h.position = Vector2(0, 14 + i * 22.5)
+		h.size = Vector2(1580, 1)
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		notebook.add_child(h)
+	for i in 71:
+		var v := ColorRect.new()
+		v.color = Color(0.42, 0.55, 0.72, 0.12)
+		v.position = Vector2(10 + i * 22.5, 0)
+		v.size = Vector2(1, 920)
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		notebook.add_child(v)
+	var spine := ColorRect.new()
+	spine.color = Color(0.2, 0.18, 0.15, 0.35)
+	spine.position = Vector2(788, 0)
+	spine.size = Vector2(4, 920)
+	notebook.add_child(spine)
+	var margin := ColorRect.new()
+	margin.color = Color(0.8, 0.25, 0.25, 0.35)
+	margin.position = Vector2(1520, 0)
+	margin.size = Vector2(2, 920)
+	notebook.add_child(margin)
 	notebook_text = Label.new()
-	notebook_text.position = Vector2(44, 36)
-	notebook_text.size = Vector2(812, 830)
+	notebook_text.position = Vector2(40, 30)
+	notebook_text.size = Vector2(716, 860)
 	notebook_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	notebook_text.add_theme_font_size_override("font_size", 27)
-	notebook_text.add_theme_color_override("font_color", Color(0.14, 0.13, 0.11))
+	notebook_text.add_theme_font_size_override("font_size", 25)
+	notebook_text.add_theme_color_override("font_color", Color(0.13, 0.17, 0.4))
 	notebook.add_child(notebook_text)
+	notebook_right = RichTextLabel.new()
+	notebook_right.bbcode_enabled = true
+	notebook_right.position = Vector2(830, 30)
+	notebook_right.size = Vector2(680, 860)
+	notebook_right.scroll_active = false
+	notebook_right.add_theme_font_size_override("normal_font_size", 24)
+	notebook_right.add_theme_font_size_override("bold_font_size", 25)
+	notebook_right.add_theme_color_override("default_color", Color(0.13, 0.17, 0.4))
+	notebook_right.add_theme_constant_override("line_separation", 6)
+	notebook.add_child(notebook_right)
 
 	choices = ColorRect.new()
 	choices.color = Color(0.03, 0.03, 0.03, 0.78)
@@ -378,8 +416,8 @@ func set_prompt(text: String) -> void:
 ## hand so the page never runs off the bottom of the sheet.
 func set_notebook(text: String) -> void:
 	notebook_text.text = text
-	var size := 27
-	while size > 18:
+	var size := 25
+	while size > 16:
 		var per_line := int(notebook_text.size.x / (size * 0.5))
 		var lines := 0
 		for l in text.split("\n"):

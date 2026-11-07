@@ -59,6 +59,9 @@ static var night_clues: Dictionary = {}
 ## handed on to night two together with night_clues. Night two started from
 ## the title screen (night_clues empty) counts everything as known.
 static var day_answers: Array = []
+## Gordeev's morning conclusions: chapter -> index of the answer picked
+## (Deductions.QUESTIONS). Kept in the save file.
+static var deductions: Dictionary = {}
 ## The save file is read once, on the first start of the game.
 static var _booted := false
 ## Set before a reload that should go straight into the chapter (menu: new
@@ -97,6 +100,8 @@ var _struggling := false
 var _mash := 0
 var _need := STRUGGLE_PRESSES
 var _cord := false
+## The morning question is on screen: the end-of-shift keys wait.
+var _deducing := false
 var _hide_spot: Dictionary = {}
 ## Seconds of play in this chapter, for the first key hints.
 var _played := 0.0
@@ -605,7 +610,17 @@ func _update_interaction() -> void:
 ## The task list and the rings round clues near by.
 func _update_tasks() -> void:
 	var chap: Node = day if day else night
-	hud.set_tasks(chap.objectives())
+	var list: Array = chap.objectives()
+	if Settings.detective:
+		# No counters and no step-by-step directions: what to do, not where.
+		var kept: Array = []
+		for t: Dictionary in list:
+			var text: String = t.text
+			if text.begins_with("Улики") or (t.get("sub", false) and not t.get("urgent", false)):
+				continue
+			kept.append(t)
+		list = kept
+	hud.set_tasks(list)
 	var pts: Array = []
 	if Settings.detective:
 		hud.marks.points = pts
@@ -668,6 +683,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_mash += 1
 		Sfx.play_2d(self, "hurt", -14.0, Sfx.BUS, randf_range(1.1, 1.3))
 		return
+	if _deducing:
+		return
 	if phase == Phase.END and night and chapter == "night1" and event.is_action_pressed("interact"):
 		_go_to("day1", night.clues.duplicate(), [])
 	elif phase == Phase.END and night and chapter == "night2" and event.is_action_pressed("interact"):
@@ -692,6 +709,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			hud.say("План бы пригодился. Он висит на стене поста.", -1.0, true)
 	elif phase == Phase.PLAY and event.is_action_pressed("notebook") and not hud.memo.visible and not _struggling:
 		var open := not hud.notebook.visible
+		if open:
+			_fill_notebook_right()
 		hud.notebook.visible = open
 		get_tree().paused = open
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if open else Input.MOUSE_MODE_CAPTURED
@@ -710,6 +729,8 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Reloads the scene into another chapter.
 func _go_to(ch: String, clues: Dictionary, answers: Array) -> void:
 	_autostart = true
+	if ch == "night1":
+		deductions = {}
 	get_tree().paused = false
 	checkpoint = {}
 	chapter = ch
@@ -726,6 +747,7 @@ func _start() -> void:
 	checkpoint = {}
 	write_save(chapter, night_clues, day_answers, {})
 	start_now()
+	_echo_deduction()
 	if day:
 		day.start()
 	hud.fade.color.a = 1.0
@@ -1061,6 +1083,7 @@ func end_shift() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
+	await _deduce()
 	if chapter == "night4":
 		var carried := night.clues.duplicate()
 		carried["has_box"] = (night as NightFour).has_box
@@ -1083,6 +1106,46 @@ func end_shift() -> void:
 		"%s\n\nE: дальше, день первый\nR: сыграть ночь ещё раз" % night.summary())
 
 
+## Six in the morning: what Gordeev makes of the night, one answer of three.
+func _deduce() -> void:
+	var q := Deductions.question(chapter)
+	if q.is_empty():
+		return
+	_deducing = true
+	await get_tree().create_timer(1.5).timeout
+	var labels: Array[String] = []
+	for a: String in q[1]:
+		labels.append(a)
+	var pick := await hud.choose("Утро. Записываю в блокнот вывод. " + String(q[0]), labels)
+	deductions[chapter] = pick
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Sfx.play_2d(self, "pickup", -14.0, "Master", 0.8)
+	_deducing = false
+
+
+## Last morning's conclusion, in Gordeev's words, as the next shift starts.
+func _echo_deduction() -> void:
+	var prev: String = {"night2": "night1", "night3": "night2", "night4": "night3", "night5": "night4"}.get(chapter, "")
+	var line := Deductions.echo(prev, deductions)
+	if line == "":
+		return
+	await get_tree().create_timer(9.0).timeout
+	if phase == Phase.PLAY:
+		hud.say(line)
+
+
+## The right-hand page of the notebook, filled as it opens.
+func _fill_notebook_right() -> void:
+	var extra := ""
+	if tactics:
+		extra += "\n\nВалидол: %d %s." % [tactics.pills, "таблетка" if tactics.pills == 1 else "таблетки"]
+	if night and Settings.detective:
+		var left := night.clues.size() - night.clue_count()
+		if left > 0:
+			extra += "\nЧто-то я ещё упускаю. Мест, куда я не заглянул, %d." % left
+	hud.notebook_right.text = Deductions.people_page(chapter, deductions) + extra
+
+
 const ENDINGS := {
 	"prosecutor": ["КОНЕЦ. ПРОКУРОР", "Гордеев дожил до утра и довёл дело до прокурора: коробка, страница Пахомова и показания Эдика. Колесников осуждён, дело засекречено.\nЛучшая концовка."],
 	"word": ["КОНЕЦ. СЛОВО ПРОТИВ СЛОВА", "Гордеев дожил до утра, но для суда этого мало. Нужны и коробка, и свидетель: Эдик забирает сумку из камеры хранения в самом начале смены."],
@@ -1103,6 +1166,7 @@ func end_game(kind: String, summary: String) -> void:
 	write_save("night5", night_clues, day_answers, {})
 	Settings.saw_ending(kind)
 	var e: Array = ENDINGS[kind]
+	summary += "\nВерных выводов в блокноте: %d из 4." % Deductions.count_right(deductions)
 	hud.show_title(e[0], "%s\n\n%s\nВсего концовок пять: прокурор, слово против слова, дело закрыто, самооборона и смерть.\n\nR: сыграть пятую ночь ещё раз      N: начать с первой ночи" % [e[1], summary])
 
 
@@ -1137,7 +1201,7 @@ static func write_save(ch: String, clues: Dictionary, answers: Array, cp: Dictio
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify({"version": 1, "chapter": ch, "night_clues": clues,
-			"day_answers": answers, "checkpoint": cp}))
+			"day_answers": answers, "checkpoint": cp, "deductions": deductions}))
 
 
 static func _load_save() -> void:
@@ -1150,6 +1214,7 @@ static func _load_save() -> void:
 	night_clues = data.get("night_clues", {})
 	day_answers = data.get("day_answers", [])
 	checkpoint = data.get("checkpoint", {})
+	deductions = data.get("deductions", {})
 	if chapter == "day1":
 		checkpoint = {}
 
