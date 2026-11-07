@@ -2,12 +2,15 @@
 # and attaches it, zipped, to a GitHub Release.
 #
 # Start it by pushing a tag that begins with "v" (for example v0.9),
+# by changing RELEASE_TAG on the release branch,
 # or from the Actions tab with "Run workflow" once this file is on main.
 name: Windows release
 
 on:
   push:
     tags: ["v*"]
+    branches: ["claude/project-thread-n5b2r0"]
+    paths: [".github/workflows/release-windows.yml", "RELEASE_TAG"]
   workflow_dispatch:
     inputs:
       tag:
@@ -60,8 +63,9 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          TAG: ${{ github.event.inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
         run: |
+          if [ -z "$TAG" ]; then TAG=$(cat RELEASE_TAG); fi
           notes="Как запустить: скачайте Kirovsky-windows.zip ниже, распакуйте и откройте Kirovsky.exe. Если Windows покажет синее окно «Система Windows защитила ваш компьютер», нажмите «Подробнее» и «Выполнить в любом случае»."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" export/Kirovsky-windows.zip --clobber
