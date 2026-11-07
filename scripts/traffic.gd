@@ -53,6 +53,10 @@ func _spawn(at_x := NAN) -> void:
 		var v := Vehicles.VOLGA.duplicate()
 		v.paint = [Color(0.05, 0.05, 0.055), Color(0.85, 0.84, 0.8), Color(0.35, 0.42, 0.4)][_rng.randi() % 3]
 		car = Vehicles.build(v)
+	elif roll < 0.5 and ResourceLoader.exists(Vehicles.MOSKVICH.model):
+		var m := Vehicles.MOSKVICH.duplicate()
+		m.paint = [Color(0.55, 0.14, 0.1), Color(0.86, 0.82, 0.62), Color(0.2, 0.35, 0.3), Color(0.6, 0.6, 0.58)][_rng.randi() % 4]
+		car = Vehicles.build(m)
 	else:
 		var z := Vehicles.ZHIGULI.duplicate()
 		z.paint = PAINTS[_rng.randi() % PAINTS.size()]
