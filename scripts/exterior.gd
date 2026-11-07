@@ -683,7 +683,7 @@ func _build_rain() -> void:
 ## square, tumbling, drifting with the wind.
 func _build_leaves() -> void:
 	leaves = CPUParticles3D.new()
-	leaves.amount = 260
+	leaves.amount = 420
 	leaves.lifetime = 9.0
 	leaves.preprocess = 9.0
 	leaves.local_coords = false
@@ -703,7 +703,7 @@ func _build_leaves() -> void:
 	leaves.damping_min = 0.2
 	leaves.damping_max = 0.5
 	var q := QuadMesh.new()
-	q.size = Vector2(0.07, 0.07)
+	q.size = Vector2(0.1, 0.1)
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = load("res://textures/leaves.png")
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR

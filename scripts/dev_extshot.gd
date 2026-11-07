@@ -32,6 +32,7 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var look: String = args[0] if args.size() > 0 else "night"
 	var out: String = args[1] if args.size() > 1 else "/tmp"
+	Graphics.install(self)
 	var ext := Exterior.new(look)
 	root.add_child(ext)
 	await process_frame
@@ -88,7 +89,7 @@ func _initialize() -> void:
 			cam.global_transform = ext.zhiguli.global_transform * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-10.0)),
 				ext.zhiguli.get_meta("seat"))
 		ext.follow(cam)
-		for f in 4:
+		for f in 24:  # the volumetric fog settles over a few frames
 			await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_jpg("%s/%s_%d.jpg" % [out, look, i], 0.85)
