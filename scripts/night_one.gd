@@ -141,6 +141,7 @@ const CLUE_BOOTH := "Правая будка. Трубка висит на шн�
 const BOOTH_AGAIN := "Будка пустая. Трубку я повесил, окурок у меня."
 # Morning.
 const V_MORNING := "Вася Кран: — Открывай, служба! Живой, дед?"
+const G_VASYA_HANDS := "У Васи костяшки сбиты в кровь. Говорит, ящики разгружал. Ящики так не бьют."
 const K_END_OK := "Ковпак: — Подписи на месте. Свободен, Гордеев. До понедельника."
 const K_END_BAD := "Ковпак: — Обходы пропущены. Ещё раз, Гордеев, и пойдёшь сторожить овощебазу."
 const G_END := "Ковпак смотрит не на меня, а на дверь склада. Днём поговорю с Тамарой Ивановной. Она знает больше, чем сказала."
@@ -1167,6 +1168,7 @@ func _morning() -> void:
 	kovpak.visible = true
 	kovpak.global_position = Vector3(-1.6, 0, -5.0)
 	hud.say(V_MORNING, -1.0, true)
+	hud.say(G_VASYA_HANDS)
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -1.2)]))
 	await kovpak.arrived
 	store.set_front_door(true)

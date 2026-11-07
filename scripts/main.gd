@@ -1109,7 +1109,7 @@ func end_shift() -> void:
 ## Six in the morning: what Gordeev makes of the night, one answer of three.
 func _deduce() -> void:
 	var q := Deductions.question(chapter)
-	if q.is_empty():
+	if q.is_empty() or "--nighttest" in OS.get_cmdline_user_args():
 		return
 	_deducing = true
 	await get_tree().create_timer(1.5).timeout
@@ -1167,7 +1167,13 @@ func end_game(kind: String, summary: String) -> void:
 	Settings.saw_ending(kind)
 	var e: Array = ENDINGS[kind]
 	summary += "\nВерных выводов в блокноте: %d из 4." % Deductions.count_right(deductions)
-	hud.show_title(e[0], "%s\n\n%s\nВсего концовок пять: прокурор, слово против слова, дело закрыто, самооборона и смерть.\n\nR: сыграть пятую ночь ещё раз      N: начать с первой ночи" % [e[1], summary])
+	summary += "\nКонцовок открыто: %d из 5." % Settings.endings.size()
+	var tail := "%s\n\n%s\nВсего концовок пять: прокурор, слово против слова, дело закрыто, самооборона и смерть.\n\nR: сыграть пятую ночь ещё раз      N: начать с первой ночи" % [e[1], summary]
+	if Deductions.EPILOGUES.has(kind):
+		await get_tree().create_timer(1.2).timeout
+		hud.show_epilogue(e[0], Deductions.EPILOGUES[kind], tail)
+	else:
+		hud.show_title(e[0], tail)
 
 
 ## Gordeev walks out into the afternoon; the day's statements on the card.

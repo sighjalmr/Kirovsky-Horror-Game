@@ -59,6 +59,11 @@ const N2_KL_CASE := "Колесников: — Мать из Тагила зво
 const N2_G_CASE := "Дочка у мамы, а сумка с ключами и деньгами здесь. Не сходится. И он это знает."
 const N2_G_SILENT := "Промолчал. Пусть думает, что старик ничего не понял."
 const N2_G_TAKES := "Сам открыл тридцать первую, сам вынул сумку. Дорогу к ячейке не спрашивал."
+## He is friendly, and points at the butcher: suspicion goes elsewhere.
+const N2_KL_TIP := "Колесников: — И вот что, отец. Мясник ваш, Ринат, по молодости сидел. Ты за ним присмотри. По-дружески прошу."
+const N2_G_TIP := "Ринат сидел? В магазине об этом никто не говорил."
+const N2_V_CELLAR := "Вася Кран: — Дед, ты в подвал не лазь. Там крысы с кошку. Я тебе серьёзно."
+const N2_G_CELLAR := "Откуда грузчик знает, что я собирался в подвал?"
 const N2_KL_BYE := "Колесников: — Спокойной ночи, Гордеев. Не засыпай на посту."
 const N2_K_LOCK := "Ковпак: — Запираю. До шести."
 const N2_G_WALKS := "Колесников ушёл пешком, мимо «Волги», к киоску. А опорный пункт в другой стороне. Запасной ключ от входа у меня в будке."
@@ -312,6 +317,8 @@ func _prologue() -> void:
 	await kolesnikov.arrived
 	kolesnikov.look_at_point(main.player.global_position)
 	hud.say(N2_KL_BYE)
+	hud.say(N2_KL_TIP)
+	hud.say(N2_G_TIP)
 	hud.say(N2_K_LOCK)
 	store.set_front_door(true)
 	await get_tree().create_timer(2.2, false).timeout
@@ -839,6 +846,8 @@ func _morning() -> void:
 	kovpak.visible = true
 	kovpak.global_position = Vector3(-1.6, 0, -5.0)
 	hud.say(V_MORNING, -1.0, true)
+	hud.say(N2_V_CELLAR)
+	hud.say(N2_G_CELLAR)
 	kovpak.walk(PackedVector3Array([Vector3(-1.0, 0, -1.2)]))
 	await kovpak.arrived
 	store.set_front_door(true)

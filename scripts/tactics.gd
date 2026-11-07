@@ -35,6 +35,17 @@ const PILLS_A_NIGHT := 2
 ## Seconds of play with him far away before he drifts Gordeev's way.
 const CALM_LIMIT := 70.0
 const PLAN_POS := Vector3(8.0, 0, 4.1)
+## His own photograph, tucked into the glass of the post.
+const PHOTO_POS := Vector3(11.0, 0, 3.6)
+const G_PHOTO := "Фотокарточка за стеклом поста: Лида и Оля, Шарташ, семьдесят девятый год. Лиды нет четыре года. Оля в Челябинске, звонит по праздникам."
+## What he thinks of at four in the morning, the deadest hour, night by night.
+const PERSONAL := {
+	1: "Лида говорила: «На пенсии ты с ума сойдёшь». Четыре года, как её нет. Не сошёл. Сторожу.",
+	2: "Оля звонила в воскресенье. «Пап, ты опять в это лезешь?» Опять, Оля.",
+	3: "Сурову тоже нашли на третий день. Её мать сказала мне тогда: «Вы же обещали». Обещал.",
+	4: "Если со мной что-то случится, Оля узнает из газеты. Надо было ей позвонить.",
+	5: "Последняя смена. В восемьдесят шестом я тоже думал, что последняя.",
+}
 
 const G_TOOK_CAN := "Банка. Если бросить подальше, загремит на весь зал."
 const G_TOOK_BOTTLE := "Бутылка. Разобьётся громко."
@@ -78,6 +89,9 @@ func _ready() -> void:
 		var s: Array = SPOTS[id]
 		store.add_interactable(id, s[0], s[2], 1.1, false)
 	store.add_interactable("plan", PLAN_POS, "Посмотреть план эвакуации на стене поста", 1.2, false)
+	store.add_interactable("photo", PHOTO_POS, "Посмотреть фотокарточку", 1.0, false)
+	if PERSONAL.has(night_no):
+		main.at(4, 6, func() -> void: main.hud.say(PERSONAL[night_no]))
 	for p: Vector3 in SHARDS:
 		if p.distance_to(Vector3(3.3, 0, 22.4)) > 0.1:
 			Equip.decal(store, p, 0.8, "juice", randf() * TAU, Color(0.75, 0.8, 0.8))
@@ -104,6 +118,9 @@ func _ready() -> void:
 func interact(id: String) -> bool:
 	if SPOTS.has(id):
 		_take(SPOTS[id][1])
+		return true
+	if id == "photo":
+		main.hud.say(G_PHOTO, -1.0, true)
 		return true
 	if id == "plan":
 		Settings.plan_copied = true

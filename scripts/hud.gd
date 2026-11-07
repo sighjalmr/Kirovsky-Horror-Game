@@ -443,6 +443,49 @@ func show_title(t: String, sub: String, color := PAPER) -> void:
 	tw.tween_property(title_sub, "modulate:a", 1.0, 1.8)
 
 
+## The ending a year on: a newspaper cutting at the top, the fates and the
+## keys under it.
+func show_epilogue(heading: String, ep: Array, tail: String) -> void:
+	var paper := ColorRect.new()
+	paper.color = Color(0.86, 0.84, 0.76)
+	paper.position = Vector2(500, 40)
+	paper.size = Vector2(920, 470)
+	paper.rotation = deg_to_rad(-0.8)
+	paper.modulate.a = 0.0
+	add_child(paper)
+	var ink := Color(0.12, 0.11, 0.1)
+	var rows := [
+		[Vector2(30, 14), Vector2(860, 60), 44, "ВЕЧЕРНИЙ СВЕРДЛОВСК", HORIZONTAL_ALIGNMENT_CENTER],
+		[Vector2(30, 76), Vector2(860, 30), 20, "Орган Свердловского горкома КПСС и горисполкома  ·  %s  ·  Цена 3 коп." % ep[0], HORIZONTAL_ALIGNMENT_CENTER],
+		[Vector2(30, 128), Vector2(860, 48), 36, ep[1], HORIZONTAL_ALIGNMENT_LEFT],
+		[Vector2(30, 186), Vector2(860, 270), 25, ep[2], HORIZONTAL_ALIGNMENT_LEFT],
+	]
+	for r: Array in rows:
+		var l := Label.new()
+		l.position = r[0]
+		l.size = r[1]
+		l.text = r[3]
+		l.horizontal_alignment = r[4]
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_font_size_override("font_size", r[2])
+		l.add_theme_color_override("font_color", ink)
+		paper.add_child(l)
+	var rule := ColorRect.new()
+	rule.color = ink
+	rule.position = Vector2(30, 112)
+	rule.size = Vector2(860, 3)
+	paper.add_child(rule)
+	title.text = ""
+	title_sub.position = Vector2(300, 540)
+	title_sub.size = Vector2(1320, 530)
+	title_sub.add_theme_font_size_override("font_size", 24)
+	title_sub.text = "%s\n\n%s\n\n%s" % [heading, ep[3], tail]
+	title_sub.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(paper, "modulate:a", 1.0, 1.5)
+	tw.tween_property(title_sub, "modulate:a", 1.0, 1.5)
+
+
 func hide_title() -> void:
 	var tw := create_tween().set_parallel()
 	tw.tween_property(title, "modulate:a", 0.0, 0.6)
