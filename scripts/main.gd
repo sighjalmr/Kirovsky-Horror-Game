@@ -119,6 +119,9 @@ var _deducing := false
 ## Seconds to the next look at the night's clues for the statistics.
 var _clue_t := 1.0
 var _hide_spot: Dictionary = {}
+var _hide_tween: Tween
+## Time runs fast in the hiding place until the next event of the night.
+var _hide_fast := false
 ## Seconds of play in this chapter, for the first key hints.
 var _played := 0.0
 
@@ -594,7 +597,7 @@ func _process(delta: float) -> void:
 			_clue_t = 1.0
 			Stats.clues_seen(chapter, night.clues)
 	var rate := EARLY_RATE if minutes < KILLER_MIN or day else LATE_RATE
-	if player.sitting:
+	if player.sitting or (player.hidden and _hide_fast and not chasing):
 		rate *= WAIT_RATE
 		if Input.get_vector("strafe_left", "strafe_right", "move_forward", "move_back").length() > 0.3 \
 				or Input.is_action_just_pressed("interact") or chasing:
@@ -605,6 +608,7 @@ func _process(delta: float) -> void:
 		var ev: Array = _timeline.pop_front()
 		if player.sitting:
 			stand_up()
+		_hide_fast = false  # something happens: he stays hidden, the clock slows
 		(ev[1] as Callable).call()
 	hud.clock.text = _fmt(minutes)
 	_update_env(delta)
@@ -908,25 +912,62 @@ func stand_up() -> void:
 
 ## Gets into a hiding place: {"id", "pos" (where he crouches), "face", "out"
 ## (where he steps back out)}. Too late if the killer is watching him.
+## He gets down first, then crawls in on his knees and turns to face out;
+## under a desk he sits on the floor with the top just over his head. In
+## there he breathes, short and shallow, and the clock runs fast as on the
+## chair until something happens (see _process).
 func hide_in(spot: Dictionary) -> void:
 	if killer.has_him_in_sight():
 		hud.say(G_HIDE_LATE, -1.0, true)
 		return
 	_hide_spot = spot
 	Stats.add("hid")
+	var id: String = spot.get("id", "")
+	var under := id.contains("desk") or id.contains("booth") or id.contains("till")
 	player.crouching = false
 	player.hidden = true
 	player.busy = true
-	player.global_position = spot.pos
-	player.face(spot.face)
-	Sfx.play_3d(view, "cloth", spot.pos + Vector3(0, 0.5, 0), -12.0, 0.8)
+	player.hide_eye = spot.get("eye", 0.5 if under else 0.75)
+	player.collision_mask = 0  # he is in among the desk's legs, not pushed back out of them
+	_hide_fast = true
+	var to: Vector3 = spot.pos
+	var face: Vector3 = spot.face
+	var yaw := atan2(-face.x, -face.z)
+	var tw := create_tween()
+	_hide_tween = tw
+	tw.tween_interval(0.35)  # down on his knees first
+	tw.tween_property(player, "global_position", to, 1.1 if under else 0.7) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(player, "rotation:y", player.rotation.y + angle_difference(player.rotation.y, yaw), 1.1) \
+		.set_trans(Tween.TRANS_SINE)
+	tw.parallel().tween_property(player.head, "rotation:x", -0.08, 0.8)
+	Sfx.play_3d(view, "cloth", spot.pos + Vector3(0, 0.5, 0), -8.0, 0.8)
+	Sfx.play_3d(view, "creep_2", player.global_position + Vector3(0, 0.1, 0), -10.0, 0.8)
+	tw.tween_callback(func(): Sfx.play_3d(view, "cloth", spot.pos + Vector3(0, 0.3, 0), -14.0, 0.7))
+	_hide_breath()
+
+
+## His breathing in the hiding place, quiet and close; quicker and held
+## shorter while the man is near.
+func _hide_breath() -> void:
+	if not player.hidden:
+		return
+	var near := killer.global_position.distance_to(player.global_position) < 6.0
+	var b := Sfx.play_2d(self, "breath", -20.0 if near else -16.0)
+	if b:
+		b.pitch_scale = randf_range(1.05, 1.15) if near else randf_range(0.9, 1.0)
+	get_tree().create_timer(2.2 if near else 3.4, false).timeout.connect(_hide_breath)
 
 
 func leave_hiding() -> void:
 	if not player.hidden:
 		return
+	if _hide_tween and _hide_tween.is_valid():
+		_hide_tween.kill()
 	player.hidden = false
 	player.busy = false
+	player.collision_mask = 1 | 8
+	player.head.rotation.x = 0.0
 	if not _hide_spot.is_empty():
 		player.global_position = _hide_spot.out
 	_hide_spot = {}

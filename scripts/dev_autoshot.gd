@@ -520,6 +520,24 @@ func _prop_shots(p: Player, store: Store) -> void:
 	p.head.rotation.x = -0.75
 	await _wait(0.6)
 	await _shot("journal")
+	# Under the booth desk and under till 3, the man's boots going past.
+	for id: String in ["hide_booth", "hide_till3"]:
+		var h: Array = NightOne.HIDES[id]
+		_place(p, h[2], (h[0] as Vector3) - (h[2] as Vector3))
+		await _wait(0.3)
+		main.hide_in({"id": id, "pos": h[0], "face": h[1], "out": h[2]})
+		await _shot(id + "_0_going_in")
+		await _wait(0.6)
+		await _shot(id + "_1_crawling")
+		await _wait(1.6)
+		var k: Node3D = main.killer
+		k.visible = true
+		k.global_position = (h[0] as Vector3) + (h[1] as Vector3) * 1.3 + Vector3(0, 0, 0.6)
+		await _wait(0.4)
+		await _shot(id + "_2_hidden")
+		print("hidden ", p.hidden, " clock ", main.minutes)
+		main.leave_hiding()
+		k.global_position = Vector3(9.0, 0, 33.0)
 	for id: String in store.chests:
 		store.lift_cloth(id)
 		var c: Vector3 = store.chests[id].pos

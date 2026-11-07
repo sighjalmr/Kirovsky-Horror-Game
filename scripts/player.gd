@@ -44,6 +44,9 @@ var sitting := false
 ## Tucked away in a hiding place (Main.hide_in): the killer cannot see him.
 var hidden := false
 const HIDE_EYE := 0.75
+## Eye height in the hiding place he is in: sitting on the floor under a
+## desk it is lower than behind the cartons (Main.hide_in sets it).
+var hide_eye := HIDE_EYE
 ## 1 fresh, 0 out of breath.
 var breath := 1.0
 var winded := false
@@ -165,7 +168,7 @@ func _physics_process(delta: float) -> void:
 		# Head bob: small, PS1 games kept it subtle.
 		_bob += delta * moved * 4.2
 		var amp := clampf(moved / WALK_SPEED, 0.0, 1.5)
-		var eye_to := HIDE_EYE if hidden else (SIT_EYE if sitting else (CROUCH_EYE if crouching else EYE_HEIGHT))
+		var eye_to := hide_eye if hidden else (SIT_EYE if sitting else (CROUCH_EYE if crouching else EYE_HEIGHT))
 		_eye = move_toward(_eye, eye_to, delta * 2.5)
 		head.position = Vector3(cos(_bob * 0.5) * 0.025 * amp, _eye + absf(sin(_bob)) * 0.035 * amp, 0)
 		_update_hand(delta)
