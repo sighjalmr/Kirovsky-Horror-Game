@@ -25,35 +25,53 @@ func _ready() -> void:
 	main.start_now()
 	main.day.start()
 	await _wait(1.0)
-	await _shot("20_day_entrance")
+	await _shot("20_%s_entrance" % main.chapter)
 	_use("door_front")
 	_check(not main.day.done, "door refuses before the talk")
-	_place(Vector3(1.2, 0, 2.6), main.day.edik.global_position)
+	var talk := "talk_tamara_day"
+	match main.chapter:
+		"day2":
+			talk = "talk_rinat"
+			_use("rinat_photo")
+			_place(DayTwo.COUNTER + Vector3(0, 0, -1.6), DayTwo.RINAT + Vector3(0, 1.4, 0))
+		"day3":
+			talk = "talk_kovpak_day"
+			_place(DayThree.KOVPAK + Vector3(0.9, 0, 1.6), DayThree.KOVPAK + Vector3(0, 1.4, 0))
+		_:
+			_place(Vector3(1.2, 0, 2.6), main.day.edik.global_position)
+			await _wait(0.6)
+			await _shot("21_edik")
+			_use("talk_edik")
+			_place(Vector3(-0.2, 0, 6.3), main.day.tamara.global_position + Vector3(0, 0, 0.2))
 	await _wait(0.6)
-	await _shot("21_edik")
-	_use("talk_edik")
-	_place(Vector3(-0.2, 0, 6.3), main.day.tamara.global_position + Vector3(0, 0, 0.2))
-	await _wait(0.6)
-	await _shot("22_till")
-	_use("talk_tamara_day")
+	await _shot("22_%s_talk" % main.chapter)
+	_use(talk)
 	var picks := 0
+	# day three: lay the third thing (the call) last, so the confession shows
+	var want := 3 if main.chapter == "day3" else 0
 	while not main.day.done:
 		if main.hud.choices.visible:
-			print("   choices: ", main.hud._choice_box.get_children().map(func(b): return b.text))
+			var labels: Array = main.hud._choice_box.get_children().map(func(b): return b.text)
+			print("   choices: ", labels)
 			if picks == 0:
-				await _shot("23_choices")
-			main.hud.chosen.emit(0)
+				await _shot("23_%s_choices" % main.chapter)
+			var pick := 0
+			if want > 0 and picks == 2:
+				pick = mini(want - 2, labels.size() - 2)
+			main.hud.chosen.emit(pick)
 			picks += 1
 		await _wait(0.2)
 	print("asked: ", main.day.asked)
 	_check(main.day.asked.size() == DayOne.ASK_LIMIT, "three questions asked")
+	if main.chapter == "day3":
+		_check((main.day as DayThree).confessed, "Ковпак told about the third key")
 	_check(not main.player.busy, "player free after the talk")
 	_use("door_front")
 	await _until_true(func(): return main.phase == Main.Phase.END, 20.0)
 	_check(main.phase == Main.Phase.END, "day ended")
 	print("END: ", main.hud.title_sub.text.replace("\n", " | "))
 	await _wait(2.0)
-	await _shot("24_day_end")
+	await _shot("24_%s_end" % main.chapter)
 	get_tree().quit()
 
 

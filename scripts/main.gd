@@ -50,7 +50,7 @@ enum Phase { TITLE, CUT, PLAY, DEAD, END }
 ## The last signed round, kept across a scene reload after death.
 static var checkpoint: Dictionary = {}
 static var _resume := false
-## "night1", "day1", "night2" or "night3"; survives the reload between chapters.
+## "night1", "day1" … "night5"; survives the reload between chapters.
 static var chapter := "night1"
 ## What night one turned up, handed on to the day. Starting the day from the
 ## title screen counts every clue as found.
@@ -79,6 +79,12 @@ var hud: Hud
 var menu: GameMenu
 var night: NightOne
 var day: DayOne
+## Each day -> [the night after it, end title, "next" hint].
+const DAYS := {
+	"day1": ["night2", "КОНЕЦ ДНЯ ПЕРВОГО", "ночь вторая"],
+	"day2": ["night3", "КОНЕЦ ДНЯ ВТОРОГО", "ночь третья"],
+	"day3": ["night4", "КОНЕЦ ДНЯ ТРЕТЬЕГО", "ночь четвёртая"],
+}
 ## Cans, broken glass, валидол, the plan and the man's habits (nights only).
 var tactics: Tactics
 var env: Environment
@@ -137,6 +143,9 @@ func _ready() -> void:
 	apply_settings()
 	if "--daytest" in OS.get_cmdline_user_args():
 		chapter = "day1"
+	for d in ["--day2", "--day3"]:
+		if d in OS.get_cmdline_user_args():
+			chapter = d.substr(2)
 	if "--night2" in OS.get_cmdline_user_args():
 		chapter = "night2"
 	if "--night3" in OS.get_cmdline_user_args():
@@ -155,7 +164,7 @@ func _ready() -> void:
 		if a.begins_with("--cut="):
 			chapter = a.get_slice("=", 1)
 			get_tree().create_timer(2.0).timeout.connect(_start)
-	if chapter == "day1":
+	if chapter in DAYS:
 		_ready_day()
 		return
 	if chapter == "night5":
@@ -310,9 +319,19 @@ func _night_name() -> String:
 ## Day one: the lights on, people in the hall, no killer and no rounds.
 func _ready_day() -> void:
 	minutes = DAY_START_MIN
-	if night_clues.is_empty():
-		night_clues = {"bag": true, "clip": true, "tape": true, "page": true, "invoice": true}
-	day = DayOne.new(self, night_clues)
+	match chapter:
+		"day2":
+			if night_clues.is_empty():
+				night_clues = {"seizure": true, "pahomov": true, "token": true, "lock": true, "butt": true}
+			day = DayTwo.new(self, night_clues)
+		"day3":
+			if night_clues.is_empty():
+				night_clues = {"handset": true, "letter": true, "body": true, "cord": true, "boots": true}
+			day = DayThree.new(self, night_clues)
+		_:
+			if night_clues.is_empty():
+				night_clues = {"bag": true, "clip": true, "tape": true, "page": true, "invoice": true}
+			day = DayOne.new(self, night_clues)
 	add_child(day)
 	hud.clock.text = _fmt(minutes)
 	_day_look()
@@ -688,15 +707,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if phase == Phase.END and night and chapter == "night1" and event.is_action_pressed("interact"):
 		_go_to("day1", night.clues.duplicate(), [])
 	elif phase == Phase.END and night and chapter == "night2" and event.is_action_pressed("interact"):
-		_go_to("night3", night.clues.duplicate(), day_answers)
+		_go_to("day2", night.clues.duplicate(), day_answers)
 	elif phase == Phase.END and night and chapter == "night3" and event.is_action_pressed("interact"):
-		_go_to("night4", night.clues.duplicate(), day_answers)
+		_go_to("day3", night.clues.duplicate(), day_answers)
 	elif phase == Phase.END and night and chapter == "night4" and event.is_action_pressed("interact"):
 		var carried := night.clues.duplicate()
 		carried["has_box"] = (night as NightFour).has_box
 		_go_to("night5", carried, day_answers)
 	elif phase == Phase.END and day and event.is_action_pressed("interact"):
-		_go_to("night2", night_clues.duplicate(), day.asked.duplicate())
+		_go_to(DAYS[chapter][0], _day_carry(), _day_answers_after())
 	elif phase == Phase.PLAY and tactics and player.controllable and not _struggling and event.is_action_pressed("throw"):
 		tactics.throw()
 	elif phase == Phase.PLAY and tactics and player.controllable and not _struggling and event.is_action_pressed("pill"):
@@ -1092,14 +1111,14 @@ func end_shift() -> void:
 			"%s\n\nE: дальше, ночь пятая, последняя (день четвёртый в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	if chapter == "night3":
-		write_save("night4", night.clues, day_answers, {})
+		write_save("day3", night.clues, day_answers, {})
 		hud.show_title("06:00. КОНЕЦ ТРЕТЬЕЙ НОЧИ",
-			"%s\n\nE: дальше, ночь четвёртая (день третий с Ковпаком в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+			"%s\n\nE: дальше, день третий (Ковпак)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	if chapter == "night2":
-		write_save("night3", night.clues, day_answers, {})
+		write_save("day2", night.clues, day_answers, {})
 		hud.show_title("06:00. КОНЕЦ ВТОРОЙ НОЧИ",
-			"%s\n\nE: дальше, ночь третья (день второй с Ринатом в работе)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
+			"%s\n\nE: дальше, день второй (Ринат)\nR: сыграть ночь ещё раз      N: начать с первой ночи" % night.summary())
 		return
 	write_save("day1", night.clues, [], {})
 	hud.show_title("06:00. КОНЕЦ ПЕРВОЙ НОЧИ",
@@ -1186,9 +1205,28 @@ func end_day() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 1.0)
-	write_save("night2", night_clues, day.asked, {})
-	hud.show_title("КОНЕЦ ДНЯ ПЕРВОГО",
-		"%s\n\nE: дальше, ночь вторая\nR: сыграть день ещё раз      N: начать с первой ночи" % day.summary())
+	var next: Array = DAYS[chapter]
+	write_save(next[0], _day_carry(), _day_answers_after(), {})
+	hud.show_title(next[1],
+		"%s\n\nE: дальше, %s\nR: сыграть день ещё раз      N: начать с первой ночи" % [day.summary(), next[2]])
+
+
+## What a day hands on to the next night: the clues of the night before it,
+## plus the third key if Ковпак told about it on day three.
+func _day_carry() -> Dictionary:
+	var c := night_clues.duplicate()
+	if chapter == "day3" and (day as DayThree).confessed:
+		c["third_key"] = true
+	return c
+
+
+## Every question asked on every day so far, so later nights can refer to them.
+func _day_answers_after() -> Array:
+	var out: Array = day_answers.duplicate() if chapter != "day1" else []
+	for a in day.asked:
+		if not a in out:
+			out.append(a)
+	return out
 
 
 # --- the save file -----------------------------------------------------------------
@@ -1214,14 +1252,14 @@ static func _load_save() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "night3", "night4", "night5"]:
+	if not data is Dictionary or not data.get("chapter", "") in ["night1", "day1", "night2", "day2", "night3", "day3", "night4", "night5"]:
 		return
 	chapter = data.chapter
 	night_clues = data.get("night_clues", {})
 	day_answers = data.get("day_answers", [])
 	checkpoint = data.get("checkpoint", {})
 	deductions = data.get("deductions", {})
-	if chapter == "day1":
+	if chapter in DAYS:
 		checkpoint = {}
 
 
