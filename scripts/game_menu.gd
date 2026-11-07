@@ -291,7 +291,8 @@ func _sure(question: String, id: String) -> void:
 
 
 func _settings() -> void:
-	_page("НАСТРОЙКИ", Vector2(460, 250))
+	_page("НАСТРОЙКИ", Vector2(460, 210))
+	_option("Язык субтитров и текста", Loc.NAMES, Settings.language, _set_language, false)
 	_slider("Общая громкость", 0.0, 1.0, Settings.master, _set_master)
 	_slider("Звуки", 0.0, 1.0, Settings.sounds, _set_sounds)
 	_slider("Голоса", 0.0, 1.0, Settings.voice, _set_voice)
@@ -307,6 +308,13 @@ func _settings() -> void:
 	_toggle("Режим «Следователь»: без колец у улик и без счётчика", Settings.detective, _set_detective)
 	_button("Готово", _settings_done, true)
 	_focus_first()
+
+
+## Subtitles and every word on the screen change at once; the voices stay.
+func _set_language(i: int) -> void:
+	Settings.language = i
+	Loc.apply()
+	picked.emit("apply")
 
 
 func _set_master(v: float) -> void:
@@ -471,9 +479,11 @@ func _toggle(text: String, value: bool, on_change: Callable) -> void:
 	row.add_child(c)
 
 
-func _option(text: String, items: Array, value: int, on_change: Callable) -> void:
+func _option(text: String, items: Array, value: int, on_change: Callable, translate := true) -> void:
 	var row := _row(text)
 	var o := OptionButton.new()
+	if not translate:  # language names stay in their own language
+		o.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	for it: String in items:
 		o.add_item(it)
 	o.select(value)
