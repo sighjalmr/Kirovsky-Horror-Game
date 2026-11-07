@@ -226,20 +226,21 @@ static func aisle_sign(parent: Node3D, pos: Vector3, text: String, ceiling: floa
 ## shared material so the whole row switches together.
 static func fixture(parent: Node3D, pos: Vector3, tube_mat: Material) -> void:
 	var kit := MeshBuilder.Kit.new()
-	var body := kit.b("paint", Color(0.86, 0.87, 0.84))
-	body.box(at(pos.x, pos.y, pos.z), Vector3(0.3, 0.07, 1.3))
-	for sx: float in [-1.0, 1.0]:
-		body.box(rot(Vector3.BACK, -sx * 0.5, Vector3(pos.x + sx * 0.14, pos.y - 0.06, pos.z)), Vector3(0.008, 0.08, 1.28))
-	for sz: float in [-0.635, 0.635]:
-		body.box(at(pos.x, pos.y - 0.08, pos.z + sz), Vector3(0.34, 0.08, 0.03))
-		kit.b("white", Color(0.75, 0.73, 0.68)).box(at(pos.x, pos.y - 0.05, pos.z + sz * 0.97), Vector3(0.16, 0.03, 0.02))
-	var louvre := kit.b("paint", Color(0.92, 0.92, 0.9))
-	for sx: float in [-0.165, 0.165]:
-		louvre.box(at(pos.x + sx, pos.y - 0.085, pos.z), Vector3(0.01, 0.035, 1.24))
-	var k := -0.56
-	while k < 0.57:
-		louvre.box(at(pos.x, pos.y - 0.085, pos.z + k), Vector3(0.33, 0.035, 0.006))
-		k += 0.08
+	if not Models.add(kit, "interior", "fixture", Transform3D(Basis.IDENTITY, pos)):
+		var body := kit.b("paint", Color(0.86, 0.87, 0.84))
+		body.box(at(pos.x, pos.y, pos.z), Vector3(0.3, 0.07, 1.3))
+		for sx: float in [-1.0, 1.0]:
+			body.box(rot(Vector3.BACK, -sx * 0.5, Vector3(pos.x + sx * 0.14, pos.y - 0.06, pos.z)), Vector3(0.008, 0.08, 1.28))
+		for sz: float in [-0.635, 0.635]:
+			body.box(at(pos.x, pos.y - 0.08, pos.z + sz), Vector3(0.34, 0.08, 0.03))
+			kit.b("white", Color(0.75, 0.73, 0.68)).box(at(pos.x, pos.y - 0.05, pos.z + sz * 0.97), Vector3(0.16, 0.03, 0.02))
+		var louvre := kit.b("paint", Color(0.92, 0.92, 0.9))
+		for sx: float in [-0.165, 0.165]:
+			louvre.box(at(pos.x + sx, pos.y - 0.085, pos.z), Vector3(0.01, 0.035, 1.24))
+		var k := -0.56
+		while k < 0.57:
+			louvre.box(at(pos.x, pos.y - 0.085, pos.z + k), Vector3(0.33, 0.035, 0.006))
+			k += 0.08
 	var flies := kit.b("white", Color(0.05, 0.04, 0.03))
 	for f in 5:
 		var h := float((int(pos.x * 13.0 + pos.z * 7.0) + f * 37) % 100) / 100.0
@@ -284,29 +285,30 @@ static func chest_contents(root: Node3D, rng: RandomNumberGenerator, id := "") -
 ## Gordeev says he sees) are their own node, root's meta "contents".
 static func chest(root: Node3D, rng: RandomNumberGenerator, id := "") -> Node3D:
 	var kit := MeshBuilder.Kit.new()
-	kit.b("enamel").box(at(0, 0, 0), Vector3(1.0, 0.72, 2.4), Color.WHITE, NO_RECT, Vector2(1.2, 0.72), SIDES, 0.5)
-	kit.b("rubber").box(at(0, 0, 0), Vector3(0.94, 0.06, 2.34), Color.WHITE, NO_RECT, Vector2.ONE, SIDES)
-	var liner := kit.b("enamel", Color(0.85, 0.88, 0.9))
-	for x: float in [-0.47, 0.47]:
-		liner.box(at(x, 0.45, 0), Vector3(0.06, 0.27, 2.34), Color.WHITE, Rect2(0, 0.5, 1, 0.4))
-	for z: float in [-1.17, 1.17]:
-		liner.box(at(0, 0.45, z), Vector3(0.88, 0.27, 0.06), Color.WHITE, Rect2(0, 0.5, 1, 0.4))
-	# The metal tub under the frost (seen when it is scraped clean).
-	kit.b("galv", Color(0.7, 0.72, 0.74)).box(at(0, 0.44, 0), Vector3(0.88, 0.01, 2.28), Color.WHITE, NO_RECT,
-		Vector2.ONE, MeshFactory.PY)
 	chest_contents(root, rng, id)
-	var ch := kit.b("chrome")
-	for x: float in [-0.49, 0.49]:
-		ch.box(at(x, 0.72, 0), Vector3(0.04, 0.035, 2.42))
-	for z: float in [-1.19, 1.19]:
-		ch.box(at(0, 0.72, z), Vector3(1.02, 0.035, 0.04))
-	ch.box(at(0, 0.72, 0), Vector3(0.9, 0.03, 0.03))
-	var glass := kit.b("white", Color(0.7, 0.85, 0.95, 0.2), Color.BLACK, Mats.GLASS)
-	glass.box(at(0, 0.745, -0.6), Vector3(0.94, 0.005, 1.18), Color.WHITE, NO_RECT, Vector2.ONE, MeshFactory.PY)
-	glass.box(at(0, 0.76, 0.6), Vector3(0.94, 0.005, 1.18), Color.WHITE, NO_RECT, Vector2.ONE, MeshFactory.PY)
-	for x: float in [-0.505, 0.505]:
-		kit.b("grille").box(at(x, 0.08, 0.7), Vector3(0.01, 0.14, 0.7), Color.WHITE, FULL, Vector2.ONE,
-			MeshFactory.PX | MeshFactory.NX)
+	if not Models.add(kit, "equip", "chest", Transform3D.IDENTITY):
+		kit.b("enamel").box(at(0, 0, 0), Vector3(1.0, 0.72, 2.4), Color.WHITE, NO_RECT, Vector2(1.2, 0.72), SIDES, 0.5)
+		kit.b("rubber").box(at(0, 0, 0), Vector3(0.94, 0.06, 2.34), Color.WHITE, NO_RECT, Vector2.ONE, SIDES)
+		var liner := kit.b("enamel", Color(0.85, 0.88, 0.9))
+		for x: float in [-0.47, 0.47]:
+			liner.box(at(x, 0.45, 0), Vector3(0.06, 0.27, 2.34), Color.WHITE, Rect2(0, 0.5, 1, 0.4))
+		for z: float in [-1.17, 1.17]:
+			liner.box(at(0, 0.45, z), Vector3(0.88, 0.27, 0.06), Color.WHITE, Rect2(0, 0.5, 1, 0.4))
+		# The metal tub under the frost (seen when it is scraped clean).
+		kit.b("galv", Color(0.7, 0.72, 0.74)).box(at(0, 0.44, 0), Vector3(0.88, 0.01, 2.28), Color.WHITE, NO_RECT,
+			Vector2.ONE, MeshFactory.PY)
+		var ch := kit.b("chrome")
+		for x: float in [-0.49, 0.49]:
+			ch.box(at(x, 0.72, 0), Vector3(0.04, 0.035, 2.42))
+		for z: float in [-1.19, 1.19]:
+			ch.box(at(0, 0.72, z), Vector3(1.02, 0.035, 0.04))
+		ch.box(at(0, 0.72, 0), Vector3(0.9, 0.03, 0.03))
+		var glass := kit.b("white", Color(0.7, 0.85, 0.95, 0.2), Color.BLACK, Mats.GLASS)
+		glass.box(at(0, 0.745, -0.6), Vector3(0.94, 0.005, 1.18), Color.WHITE, NO_RECT, Vector2.ONE, MeshFactory.PY)
+		glass.box(at(0, 0.76, 0.6), Vector3(0.94, 0.005, 1.18), Color.WHITE, NO_RECT, Vector2.ONE, MeshFactory.PY)
+		for x: float in [-0.505, 0.505]:
+			kit.b("grille").box(at(x, 0.08, 0.7), Vector3(0.01, 0.14, 0.7), Color.WHITE, FULL, Vector2.ONE,
+				MeshFactory.PX | MeshFactory.NX)
 	kit.build(root)
 
 	var cloth := Node3D.new()
@@ -411,41 +413,44 @@ static func booth(parent: Node3D, rect: Rect2) -> void:
 	var wood := kit.b("wood")
 	var dark := kit.b("wood", Color(0.7, 0.62, 0.55))
 	var ch := kit.b("chrome")
-	# Desk along the right wall: top, drawer pedestal at the near end, legs.
-	wood.box(at(11.15, 0.74, 2.1), Vector3(1.1, 0.04, 2.6), Color.WHITE, NO_RECT, Vector2(0.8, 0.8))
-	dark.box(at(11.15, 0, 1.15), Vector3(1.0, 0.74, 0.6), Color.WHITE, NO_RECT, Vector2(0.8, 0.8), ALL, 0.5)
-	for i in 3:
-		var y := 0.06 + i * 0.23
-		dark.box(at(10.645, y, 1.15), Vector3(0.012, 0.2, 0.54), Color(1.1, 1.05, 1.0), NO_RECT, Vector2(0.5, 0.5),
-			MeshFactory.NX | MeshFactory.PY | MeshFactory.NY | MeshFactory.PZ | MeshFactory.NZ)
-		ch.box(at(10.632, y + 0.1, 1.15), Vector3(0.015, 0.02, 0.12))
-	for z: float in [1.5, 3.33]:
-		dark.box(at(10.65, 0, z), Vector3(0.05, 0.74, 0.05))
-		dark.box(at(11.65, 0, z), Vector3(0.05, 0.74, 0.05))
-	dark.box(at(11.65, 0.3, 2.4), Vector3(0.03, 0.4, 1.8))
-	# Chair.
-	wood.box(at(10.2, 0.44, 2.2), Vector3(0.42, 0.035, 0.42))
-	wood.box(at(9.98, 0.5, 2.2), Vector3(0.03, 0.42, 0.38))
-	for o: Vector2 in [Vector2(-0.18, -0.18), Vector2(0.18, -0.18), Vector2(-0.18, 0.18), Vector2(0.18, 0.18)]:
-		ch.box(at(10.2 + o.x, 0, 2.2 + o.y), Vector3(0.025, 0.44, 0.025))
-	# Rotary phone: dark red body, tilted dial towards the chair, handset on the cradle.
-	var red := kit.b("white", Color(0.42, 0.09, 0.07))
-	red.box(at(11.1, 0.76, 1.2), Vector3(0.24, 0.07, 0.21))
-	red.box(rot(Vector3.BACK, 0.25, Vector3(11.09, 0.83, 1.2)), Vector3(0.17, 0.05, 0.17))
-	kit.b("dial").cylinder(rot(Vector3.BACK, 0.45, Vector3(11.03, 0.865, 1.2)), 0.06, 0.06, 0.008, 12, Color.WHITE,
-		Rect2(0, 0.45, 1, 0.1), FULL)
-	red.box(at(11.14, 0.9, 1.2), Vector3(0.05, 0.03, 0.24))
-	for z: float in [1.09, 1.31]:
-		red.box(at(11.14, 0.875, z), Vector3(0.07, 0.04, 0.06))
-	# Radio "Альпинист" with a grille facing the chair.
-	wood.box(at(11.3, 0.76, 2.2), Vector3(0.16, 0.2, 0.32), Color(0.75, 0.55, 0.42))
-	kit.b("grille").box(at(11.218, 0.78, 2.15), Vector3(0.005, 0.15, 0.2), Color.WHITE, FULL, Vector2.ONE, MeshFactory.NX)
-	ch.cylinder(rot(Vector3.BACK, PI * 0.5, Vector3(11.222, 0.86, 2.31)), 0.018, 0.018, 0.02, 6, Color.WHITE)
+	var blender := Models.add(kit, "interior", "booth", Transform3D.IDENTITY)
+	if not blender:
+		# Desk along the right wall: top, drawer pedestal at the near end, legs.
+		wood.box(at(11.15, 0.74, 2.1), Vector3(1.1, 0.04, 2.6), Color.WHITE, NO_RECT, Vector2(0.8, 0.8))
+		dark.box(at(11.15, 0, 1.15), Vector3(1.0, 0.74, 0.6), Color.WHITE, NO_RECT, Vector2(0.8, 0.8), ALL, 0.5)
+		for i in 3:
+			var y := 0.06 + i * 0.23
+			dark.box(at(10.645, y, 1.15), Vector3(0.012, 0.2, 0.54), Color(1.1, 1.05, 1.0), NO_RECT, Vector2(0.5, 0.5),
+				MeshFactory.NX | MeshFactory.PY | MeshFactory.NY | MeshFactory.PZ | MeshFactory.NZ)
+			ch.box(at(10.632, y + 0.1, 1.15), Vector3(0.015, 0.02, 0.12))
+		for z: float in [1.5, 3.33]:
+			dark.box(at(10.65, 0, z), Vector3(0.05, 0.74, 0.05))
+			dark.box(at(11.65, 0, z), Vector3(0.05, 0.74, 0.05))
+		dark.box(at(11.65, 0.3, 2.4), Vector3(0.03, 0.4, 1.8))
+		# Chair.
+		wood.box(at(10.2, 0.44, 2.2), Vector3(0.42, 0.035, 0.42))
+		wood.box(at(9.98, 0.5, 2.2), Vector3(0.03, 0.42, 0.38))
+		for o: Vector2 in [Vector2(-0.18, -0.18), Vector2(0.18, -0.18), Vector2(-0.18, 0.18), Vector2(0.18, 0.18)]:
+			ch.box(at(10.2 + o.x, 0, 2.2 + o.y), Vector3(0.025, 0.44, 0.025))
+		# Rotary phone: dark red body, tilted dial towards the chair, handset on the cradle.
+		var red := kit.b("white", Color(0.42, 0.09, 0.07))
+		red.box(at(11.1, 0.76, 1.2), Vector3(0.24, 0.07, 0.21))
+		red.box(rot(Vector3.BACK, 0.25, Vector3(11.09, 0.83, 1.2)), Vector3(0.17, 0.05, 0.17))
+		kit.b("dial").cylinder(rot(Vector3.BACK, 0.45, Vector3(11.03, 0.865, 1.2)), 0.06, 0.06, 0.008, 12, Color.WHITE,
+			Rect2(0, 0.45, 1, 0.1), FULL)
+		red.box(at(11.14, 0.9, 1.2), Vector3(0.05, 0.03, 0.24))
+		for z: float in [1.09, 1.31]:
+			red.box(at(11.14, 0.875, z), Vector3(0.07, 0.04, 0.06))
+		# Radio "Альпинист" with a grille facing the chair.
+		wood.box(at(11.3, 0.76, 2.2), Vector3(0.16, 0.2, 0.32), Color(0.75, 0.55, 0.42))
+		kit.b("grille").box(at(11.218, 0.78, 2.15), Vector3(0.005, 0.15, 0.2), Color.WHITE, FULL, Vector2.ONE, MeshFactory.NX)
+		ch.cylinder(rot(Vector3.BACK, PI * 0.5, Vector3(11.222, 0.86, 2.31)), 0.018, 0.018, 0.02, 6, Color.WHITE)
 	# Logbook, open: a thick ledger in a dark red cover on the desk, its white
 	# pages a little lit by the lamp so it stands out from the wood.
-	var cover := kit.b("white", Color(0.5, 0.1, 0.07))
-	cover.box(at(10.9, 0.76, 2.6), Vector3(0.32, 0.016, 0.46))
-	cover.box(at(10.9, 0.76, 2.6), Vector3(0.3, 0.034, 0.03))  # the spine
+	if not blender:
+		var cover := kit.b("white", Color(0.5, 0.1, 0.07))
+		cover.box(at(10.9, 0.76, 2.6), Vector3(0.32, 0.016, 0.46))
+		cover.box(at(10.9, 0.76, 2.6), Vector3(0.3, 0.034, 0.03))  # the spine
 	var pages := kit.b("tags", Color(1.1, 1.1, 1.05), Color(0.1, 0.1, 0.09))
 	pages.box(rot(Vector3.UP, 0.02, Vector3(10.9, 0.776, 2.49)), Vector3(0.29, 0.024, 0.2), Color.WHITE,
 		Rect2(0, 0, 1, 0.5), Vector2.ONE, MeshFactory.PY | MeshFactory.NX | MeshFactory.PX | MeshFactory.NZ)
@@ -454,13 +459,15 @@ static func booth(parent: Node3D, rect: Rect2) -> void:
 	kit.b("white", Color(0.1, 0.1, 0.3)).box(rot(Vector3.UP, 0.6, Vector3(10.95, 0.802, 2.79)), Vector3(0.01, 0.008, 0.14))
 	# Desk lamp: base, stem, green cone shade lit from inside.
 	var green := kit.b("paint", Color(0.55, 0.85, 0.6))
-	green.cylinder(at(11.35, 0.76, 3.05), 0.08, 0.07, 0.025, 10, Color.WHITE)
-	ch.box(rot(Vector3.BACK, 0.25, Vector3(11.35, 0.78, 3.05)), Vector3(0.015, 0.4, 0.015))
+	if not blender:
+		green.cylinder(at(11.35, 0.76, 3.05), 0.08, 0.07, 0.025, 10, Color.WHITE)
+		ch.box(rot(Vector3.BACK, 0.25, Vector3(11.35, 0.78, 3.05)), Vector3(0.015, 0.4, 0.015))
 	kit.b("paint", Color(0.55, 0.85, 0.6), Color(0.25, 0.18, 0.08), Mats.DOUBLE).cylinder(
 		at(11.25, 1.04, 3.0), 0.13, 0.05, 0.14, 10, Color.WHITE, Rect2(0, 0, 1, 1), NO_RECT, true)
-	# Thermos and a glass in a podstakannik.
-	green.cylinder(at(11.45, 0.76, 1.65), 0.05, 0.045, 0.3, 8, Color(0.6, 0.7, 1.0))
-	ch.cylinder(at(11.0, 0.76, 1.7), 0.035, 0.04, 0.1, 8, Color.WHITE)
+	if not blender:
+		# Thermos and a glass in a podstakannik.
+		green.cylinder(at(11.45, 0.76, 1.65), 0.05, 0.045, 0.3, 8, Color(0.6, 0.7, 1.0))
+		ch.cylinder(at(11.0, 0.76, 1.7), 0.035, 0.04, 0.1, 8, Color.WHITE)
 	# Calendar on the wall and a shelf of key boards.
 	kit.b("calendar").box(at(11.96, 1.25, 3.7), Vector3(0.008, 0.6, 0.4), Color.WHITE, FULL, Vector2.ONE, MeshFactory.NX)
 	# Key board: a varnished plank with two rows of hooks, keys with
@@ -477,15 +484,17 @@ static func booth(parent: Node3D, rect: Rect2) -> void:
 		tags.box(at(11.948, ky - 0.13, kz), Vector3(0.006, 0.05, 0.035))
 	# Electric kettle, a newspaper, a fire extinguisher in the corner, the
 	# guard's coat on a hook.
-	var en := kit.b("enamel", Color(0.75, 0.82, 0.9))
-	en.cylinder(at(11.45, 0.76, 2.75), 0.075, 0.065, 0.19, 10)
-	en.box(rot(Vector3.BACK, 0.6, Vector3(11.37, 0.86, 2.75)), Vector3(0.02, 0.09, 0.02))
-	kit.b("rubber").box(at(11.53, 0.84, 2.75), Vector3(0.02, 0.11, 0.025))
+	if not blender:
+		var en := kit.b("enamel", Color(0.75, 0.82, 0.9))
+		en.cylinder(at(11.45, 0.76, 2.75), 0.075, 0.065, 0.19, 10)
+		en.box(rot(Vector3.BACK, 0.6, Vector3(11.37, 0.86, 2.75)), Vector3(0.02, 0.09, 0.02))
+		kit.b("rubber").box(at(11.53, 0.84, 2.75), Vector3(0.02, 0.11, 0.025))
 	kit.b("white", Color(0.86, 0.84, 0.76)).box(rot(Vector3.UP, 0.3, Vector3(10.95, 0.762, 3.25)),
 		Vector3(0.3, 0.006, 0.42))
-	kit.b("paint", Color(0.7, 0.1, 0.07)).cylinder(at(11.6, 0.0, 4.5), 0.08, 0.08, 0.5, 10)
-	kit.b("rubber").cylinder(at(11.6, 0.5, 4.5), 0.03, 0.02, 0.08, 8)
-	kit.b("rubber").box(rot(Vector3.BACK, 0.4, Vector3(11.52, 0.52, 4.5)), Vector3(0.018, 0.25, 0.018))
+	if not blender:
+		kit.b("paint", Color(0.7, 0.1, 0.07)).cylinder(at(11.6, 0.0, 4.5), 0.08, 0.08, 0.5, 10)
+		kit.b("rubber").cylinder(at(11.6, 0.5, 4.5), 0.03, 0.02, 0.08, 8)
+		kit.b("rubber").box(rot(Vector3.BACK, 0.4, Vector3(11.52, 0.52, 4.5)), Vector3(0.018, 0.25, 0.018))
 	ch.box(at(11.97, 1.75, 4.2), Vector3(0.06, 0.015, 0.015))
 	var coat := kit.b("quilted", Color(0.55, 0.52, 0.45))
 	coat.box(at(11.9, 0.95, 4.2), Vector3(0.12, 0.72, 0.42), Color.WHITE, NO_RECT, Vector2(0.6, 0.6))
@@ -508,6 +517,8 @@ static func baskets(parent: Node3D, pos: Vector3, count: int) -> void:
 	var red := kit.b("basket", Color.WHITE, Color.BLACK, Mats.DOUBLE)
 	for i in count:
 		var y := pos.y + i * 0.07
+		if Models.add(kit, "equip", "basket", Transform3D(Basis(Vector3.UP, 0.04 * (i % 2)), Vector3(pos.x, y, pos.z))):
+			continue
 		red.box(at(pos.x, y, pos.z), Vector3(0.46 + i * 0.002, 0.22, 0.32 + i * 0.002), Color.WHITE, NO_RECT,
 			Vector2(0.46, 0.22), SIDES | MeshFactory.NY)
 	var ch := kit.b("chrome")
@@ -529,17 +540,19 @@ static func clutter(parent: Node3D, rng: RandomNumberGenerator) -> void:
 	var sack := kit.b("cloth", Color(1.0, 0.95, 0.8))
 	for i in 6:
 		var o := Vector3((i % 2) * 0.55 - 0.27, 0.13 + (i / 2) * 0.18, rng.randf_range(-0.05, 0.05))
-		sack.box(rot(Vector3.UP, rng.randf_range(-0.15, 0.15), p + o), Vector3(0.5, 0.18, 0.85), Color.WHITE, NO_RECT,
-			Vector2(0.6, 0.6))
+		var sxf := rot(Vector3.UP, rng.randf_range(-0.15, 0.15), p + o)
+		if not Models.add(kit, "interior", Models.pick("interior", "sack", i), sxf):
+			sack.box(sxf, Vector3(0.5, 0.18, 0.85), Color.WHITE, NO_RECT, Vector2(0.6, 0.6))
 	collider(parent, p, Vector3(1.2, 0.7, 1.0))
 	# Trolley with boxes.
 	var t := Vector3(2.0, 0, 27.2)
 	var ch := kit.b("chrome")
-	ch.box(at(t.x, 0.12, t.z), Vector3(0.6, 0.03, 0.9))
-	ch.box(at(t.x, 0.12, t.z + 0.45), Vector3(0.6, 0.9, 0.03))
-	for o: Vector2 in [Vector2(-0.25, -0.38), Vector2(0.25, -0.38), Vector2(-0.25, 0.38), Vector2(0.25, 0.38)]:
-		kit.b("rubber").cylinder(rot(Vector3.BACK, PI * 0.5, Vector3(t.x + o.x + 0.02, 0.05, t.z + o.y)), 0.05, 0.05, 0.04,
-			6, Color.WHITE)
+	if not Models.add(kit, "interior", "trolley", Transform3D(Basis.IDENTITY, t)):
+		ch.box(at(t.x, 0.12, t.z), Vector3(0.6, 0.03, 0.9))
+		ch.box(at(t.x, 0.12, t.z + 0.45), Vector3(0.6, 0.9, 0.03))
+		for o: Vector2 in [Vector2(-0.25, -0.38), Vector2(0.25, -0.38), Vector2(-0.25, 0.38), Vector2(0.25, 0.38)]:
+			kit.b("rubber").cylinder(rot(Vector3.BACK, PI * 0.5, Vector3(t.x + o.x + 0.02, 0.05, t.z + o.y)), 0.05, 0.05, 0.04,
+				6, Color.WHITE)
 	var card := kit.b("cardboard")
 	card.box(at(t.x, 0.15, t.z), Vector3(0.55, 0.4, 0.6), Color.WHITE, NO_RECT, Vector2(0.6, 0.6))
 	card.box(rot(Vector3.UP, 0.2, Vector3(t.x, 0.55, t.z + 0.05)), Vector3(0.45, 0.3, 0.5), Color(0.9, 0.9, 0.9), NO_RECT,
@@ -551,7 +564,8 @@ static func clutter(parent: Node3D, rng: RandomNumberGenerator) -> void:
 		Vector2(0.8, 0.8))
 	collider(parent, Vector3(-3.5, 0, 27.3), Vector3(1.2, 1.3, 0.8))
 	var b := Vector3(5.2, 0, 27.5)
-	kit.b("paint", Color(0.6, 0.65, 0.9)).cylinder(at(b.x, 0, b.z), 0.15, 0.18, 0.3, 10, Color.WHITE)
-	kit.b("wood", Color(1.0, 0.9, 0.7)).box(rot(Vector3.BACK, 0.2, Vector3(b.x, 0.05, b.z)), Vector3(0.03, 1.3, 0.03))
-	kit.b("cloth", Color(0.6, 0.55, 0.45)).box(at(b.x, 0.12, b.z), Vector3(0.18, 0.15, 0.18))
+	if not Models.add(kit, "interior", "mop_bucket", Transform3D(Basis.IDENTITY, b)):
+		kit.b("paint", Color(0.6, 0.65, 0.9)).cylinder(at(b.x, 0, b.z), 0.15, 0.18, 0.3, 10, Color.WHITE)
+		kit.b("wood", Color(1.0, 0.9, 0.7)).box(rot(Vector3.BACK, 0.2, Vector3(b.x, 0.05, b.z)), Vector3(0.03, 1.3, 0.03))
+		kit.b("cloth", Color(0.6, 0.55, 0.45)).box(at(b.x, 0.12, b.z), Vector3(0.18, 0.15, 0.18))
 	kit.build(parent)

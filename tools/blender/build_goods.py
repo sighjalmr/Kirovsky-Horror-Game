@@ -797,4 +797,5 @@ def main():
         render_preview(ARGS["preview"], objs, (x / 2, -3.5, 1.2), (x / 2, 0, 0.1), lens=24, size=(3000, 900))
 
 
-main()
+if __name__ == "__main__":
+    main()

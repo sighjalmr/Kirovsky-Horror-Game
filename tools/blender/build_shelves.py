@@ -257,4 +257,5 @@ def main():
     export("shelves", objs)
 
 
-main()
+if __name__ == "__main__":
+    main()

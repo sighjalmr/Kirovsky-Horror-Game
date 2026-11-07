@@ -319,6 +319,10 @@ const KIT_VIEWS := [
 	["k08_back", Vector3(9.4, 0, 24.2), Vector3(0.6, 0, 1), -0.2],
 	["k09_shelf_close", Vector3(0.75, 0, 16.0), Vector3(-1, 0, 0.25), -0.45],
 	["k10_hall", Vector3(-3.0, 0, 11.0), Vector3(0.1, 0, 1), -0.1],
+	["k11_booth", Vector3(9.5, 0, 2.3), Vector3(1, 0, -0.15), -0.5],
+	["k12_lockers", Vector3(-7.3, 0, 2.9), Vector3(-0.25, 0, -1), -0.05],
+	["k13_radiator", Vector3(-10.4, 0, 4.6), Vector3(-1, 0, 0.45), -0.45],
+	["k14_passage", Vector3(-4.6, 0, 24.6), Vector3(-0.55, 0, 1), -0.3],
 ]
 
 

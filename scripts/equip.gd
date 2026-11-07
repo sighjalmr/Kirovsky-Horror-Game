@@ -44,52 +44,57 @@ static func checkout(parent: Node3D, pos: Vector3, n: int, sign_mat: Material) -
 	var steel := kit.b("paint", CABIN)
 	var ch := kit.b("chrome")
 	var top := kit.b("formica", TOP)
-	# The customer's counter: a laminate top on a steel cabinet, kick plate,
-	# a chrome rail along the customer's edge to slide the basket on.
-	steel.box(at(0, 0.08, 0.15), Vector3(0.7, 0.77, 2.2), Color.WHITE, Props.NO_RECT, Vector2(0.6, 0.6), Props.SIDES)
-	kit.b("rubber").box(at(0, 0, 0.15), Vector3(0.66, 0.08, 2.16))
-	top.box(at(0, 0.85, 0.15), Vector3(0.8, 0.03, 2.3), Color.WHITE, Props.NO_RECT, Vector2(0.5, 0.5))
-	ch.box(at(-0.41, 0.84, 0.15), Vector3(0.02, 0.045, 2.3))
-	ch.box(at(0.41, 0.84, 0.15), Vector3(0.02, 0.045, 2.3))
-	ch.box(at(-0.45, 0.9, 0.3), Vector3(0.025, 0.025, 1.7))
-	for z: float in [-0.5, 0.45, 1.12]:
-		ch.box(at(-0.45, 0.86, z), Vector3(0.02, 0.06, 0.02))
-	# Panels of the cabinet: darker inset sheets with a seam between.
-	for z: float in [-0.6, 0.15, 0.9]:
-		kit.b("paint", CABIN * 0.82).box(at(-0.352, 0.16, z), Vector3(0.004, 0.6, 0.66), Color.WHITE, Props.NO_RECT,
-			Vector2(0.6, 0.6), MeshFactory.NX)
-	# The register stand at the near end, the drawer under it on the cashier's side.
-	steel.box(at(0.15, 0.85, -0.3), Vector3(0.5, 0.04, 0.5))
-	kit.b("wood", Color(0.75, 0.6, 0.45)).box(at(0.3, 0.62, -0.3), Vector3(0.4, 0.16, 0.42), Color.WHITE, Props.NO_RECT,
-		Vector2(0.5, 0.5), Props.ALL)
-	ch.box(at(0.502, 0.69, -0.3), Vector3(0.012, 0.025, 0.14))
+	var blender := Models.add(kit, "equip", "checkout", Transform3D.IDENTITY)
+	if not blender:
+		# The customer's counter: a laminate top on a steel cabinet, kick plate,
+		# a chrome rail along the customer's edge to slide the basket on.
+		steel.box(at(0, 0.08, 0.15), Vector3(0.7, 0.77, 2.2), Color.WHITE, Props.NO_RECT, Vector2(0.6, 0.6), Props.SIDES)
+		kit.b("rubber").box(at(0, 0, 0.15), Vector3(0.66, 0.08, 2.16))
+		top.box(at(0, 0.85, 0.15), Vector3(0.8, 0.03, 2.3), Color.WHITE, Props.NO_RECT, Vector2(0.5, 0.5))
+		ch.box(at(-0.41, 0.84, 0.15), Vector3(0.02, 0.045, 2.3))
+		ch.box(at(0.41, 0.84, 0.15), Vector3(0.02, 0.045, 2.3))
+		ch.box(at(-0.45, 0.9, 0.3), Vector3(0.025, 0.025, 1.7))
+		for z: float in [-0.5, 0.45, 1.12]:
+			ch.box(at(-0.45, 0.86, z), Vector3(0.02, 0.06, 0.02))
+		# Panels of the cabinet: darker inset sheets with a seam between.
+		for z: float in [-0.6, 0.15, 0.9]:
+			kit.b("paint", CABIN * 0.82).box(at(-0.352, 0.16, z), Vector3(0.004, 0.6, 0.66), Color.WHITE, Props.NO_RECT,
+				Vector2(0.6, 0.6), MeshFactory.NX)
+		# The register stand at the near end, the drawer under it on the cashier's side.
+		steel.box(at(0.15, 0.85, -0.3), Vector3(0.5, 0.04, 0.5))
+		kit.b("wood", Color(0.75, 0.6, 0.45)).box(at(0.3, 0.62, -0.3), Vector3(0.4, 0.16, 0.42), Color.WHITE, Props.NO_RECT,
+			Vector2(0.5, 0.5), Props.ALL)
+		ch.box(at(0.502, 0.69, -0.3), Vector3(0.012, 0.025, 0.14))
 	register(kit, at(0.15, 0.89, -0.3))
-	# The bagging end: a lower shelf with a lip; a stack of baskets under it.
-	top.box(at(0.0, 0.7, 1.45), Vector3(0.8, 0.03, 0.5))
-	ch.box(at(0.0, 0.73, 1.69), Vector3(0.8, 0.04, 0.015))
-	for o: Vector2 in [Vector2(-0.38, 1.68), Vector2(0.38, 1.68)]:
-		ch.box(at(o.x, 0, o.y), Vector3(0.03, 0.7, 0.03))
-	# The cashier's things: an abacus, the coin dish, the spare tape roll, a cup.
-	abacus(kit, Transform3D(Basis(Vector3.UP, 0.15), Vector3(0.22, 0.88, 0.45)))
-	ch.cylinder(at(0.0, 0.87, -0.05), 0.09, 0.11, 0.015, 12)
-	kit.b("white", Color(0.95, 0.94, 0.88)).cylinder(Transform3D(Basis(Vector3.BACK, PI * 0.5), Vector3(0.32, 0.92, 0.0)),
-		0.035, 0.035, 0.06, 10)
-	kit.b("enamel").cylinder(at(0.3, 0.87, 0.8), 0.04, 0.045, 0.09, 10)
-	# The till number on a pole at the near corner, lit from inside.
-	ch.cylinder(at(0.42, 0.86, -0.85), 0.018, 0.018, 1.45, 8)
-	steel.box(at(0.42, 2.28, -0.85), Vector3(0.14, 0.34, 0.66), Color(0.3, 0.3, 0.3))
+	if not Models.add(kit, "equip", "abacus", Transform3D(Basis(Vector3.UP, 0.15), Vector3(0.22, 0.87, 0.45))):
+		abacus(kit, Transform3D(Basis(Vector3.UP, 0.15), Vector3(0.22, 0.88, 0.45)))
+	if not blender:
+		# The bagging end: a lower shelf with a lip; a stack of baskets under it.
+		top.box(at(0.0, 0.7, 1.45), Vector3(0.8, 0.03, 0.5))
+		ch.box(at(0.0, 0.73, 1.69), Vector3(0.8, 0.04, 0.015))
+		for o: Vector2 in [Vector2(-0.38, 1.68), Vector2(0.38, 1.68)]:
+			ch.box(at(o.x, 0, o.y), Vector3(0.03, 0.7, 0.03))
+		# The cashier's things: an abacus, the coin dish, the spare tape roll, a cup.
+		ch.cylinder(at(0.0, 0.87, -0.05), 0.09, 0.11, 0.015, 12)
+		kit.b("white", Color(0.95, 0.94, 0.88)).cylinder(Transform3D(Basis(Vector3.BACK, PI * 0.5), Vector3(0.32, 0.92, 0.0)),
+			0.035, 0.035, 0.06, 10)
+		kit.b("enamel").cylinder(at(0.3, 0.87, 0.8), 0.04, 0.045, 0.09, 10)
+		# The till number on a pole at the near corner, lit from inside.
+		ch.cylinder(at(0.42, 0.86, -0.85), 0.018, 0.018, 1.45, 8)
+		steel.box(at(0.42, 2.28, -0.85), Vector3(0.14, 0.34, 0.66), Color(0.3, 0.3, 0.3))
 	var lit := kit.custom(sign_mat)
 	var face := cell("kassa%d" % n)
 	lit.box(at(0.42, 2.3, -0.85), Vector3(0.15, 0.3, 0.62), Color.WHITE, face, Vector2.ONE,
 		MeshFactory.PX | MeshFactory.NX)
-	# Cashier's swivel chair.
-	var legs := kit.b("chrome")
-	legs.cylinder(at(0.85, 0.05, -0.5), 0.025, 0.025, 0.45, 8)
-	for k in 4:
-		var a := k * PI * 0.5 + 0.3
-		legs.box(Transform3D(Basis(Vector3.UP, a), Vector3(0.85, 0.02, -0.5)) * at(0.12, 0, 0), Vector3(0.24, 0.03, 0.03))
-	kit.b("leather").cylinder(at(0.85, 0.5, -0.5), 0.2, 0.2, 0.06, 12, Color.WHITE, Props.FULL, Props.FULL)
-	kit.b("leather").box(at(1.06, 0.6, -0.5), Vector3(0.03, 0.32, 0.36))
+	if not blender:
+		# Cashier's swivel chair.
+		var legs := kit.b("chrome")
+		legs.cylinder(at(0.85, 0.05, -0.5), 0.025, 0.025, 0.45, 8)
+		for k in 4:
+			var a := k * PI * 0.5 + 0.3
+			legs.box(Transform3D(Basis(Vector3.UP, a), Vector3(0.85, 0.02, -0.5)) * at(0.12, 0, 0), Vector3(0.24, 0.03, 0.03))
+		kit.b("leather").cylinder(at(0.85, 0.5, -0.5), 0.2, 0.2, 0.06, 12, Color.WHITE, Props.FULL, Props.FULL)
+		kit.b("leather").box(at(1.06, 0.6, -0.5), Vector3(0.03, 0.32, 0.36))
 	kit.build(root)
 	Props.collider(root, Vector3(0, 0, 0.15), Vector3(0.85, 0.9, 2.3))
 	Props.baskets(root, Vector3(0.0, 0, 1.45), 4)
@@ -177,6 +182,10 @@ static func plate(parent: Node3D, pos: Vector3, normal: Vector3, which: String, 
 
 ## A printed carton, bottom-centred, its print on all four sides.
 static func carton(kit: MeshBuilder.Kit, xf: Transform3D, size: Vector3, which: String) -> void:
+	if size.is_equal_approx(Vector3(0.38, 0.28, 0.48)):
+		var v := Models.pick("equip", which, Models.seed_of(xf))
+		if v != "" and Models.add(kit, "equip", v, xf):
+			return
 	var mb := kit.b(TEX)
 	mb.box(xf, size, Color.WHITE, cell(which), Vector2.ONE, Props.SIDES)
 	mb.box(xf, size, Color(0.9, 0.9, 0.9), sub(cell(which), 0.0, 1.0, 0.42, 0.58), Vector2.ONE, MeshFactory.PY)
@@ -187,10 +196,11 @@ static func carton_stack(parent: Node3D, rng: RandomNumberGenerator, pos: Vector
 	var root := Props.node(parent, pos, yaw)
 	var kit := MeshBuilder.Kit.new()
 	var wood := kit.b("wood", Color(0.9, 0.8, 0.65))
-	for i in 5:
-		wood.box(at(-0.5 + i * 0.25, 0.11, 0), Vector3(0.1, 0.025, 1.0))
-	for sx: float in [-0.5, 0.0, 0.5]:
-		wood.box(at(sx, 0, 0), Vector3(0.1, 0.11, 1.0))
+	if not Models.add(kit, "equip", "pallet", Transform3D.IDENTITY):
+		for i in 5:
+			wood.box(at(-0.5 + i * 0.25, 0.11, 0), Vector3(0.1, 0.025, 1.0))
+		for sx: float in [-0.5, 0.0, 0.5]:
+			wood.box(at(sx, 0, 0), Vector3(0.1, 0.11, 1.0))
 	var kinds := ["carton_fish", "carton_milk", "carton_tins"]
 	var which: String = kinds[rng.randi() % kinds.size()]
 	var s := Vector3(0.38, 0.28, 0.48)
@@ -215,7 +225,8 @@ static func bottle_crates(parent: Node3D, rng: RandomNumberGenerator, pos: Vecto
 	for c in count:
 		var o := Vector3((c % 2) * 0.42 - 0.21, (c / 2) * s.y, rng.randf_range(-0.02, 0.02))
 		var xf := Transform3D(Basis(Vector3.UP, rng.randf_range(-0.05, 0.05)), o)
-		wire.box(xf, s, Color.WHITE, cell("bottle_crate"), Vector2.ONE, Props.SIDES | MeshFactory.NY)
+		if not Models.add(kit, "equip", "bottle_crate", xf):
+			wire.box(xf, s, Color.WHITE, cell("bottle_crate"), Vector2.ONE, Props.SIDES | MeshFactory.NY)
 		for i in 4:
 			for j in 6:
 				if rng.randf() < 0.3:

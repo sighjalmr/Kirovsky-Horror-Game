@@ -341,12 +341,19 @@ def _combine(o, strength):
         t = tint.data[i].color if tint else (1, 1, 1, 1)
         a = ao.data[i].color[0] if ao else 1.0
         k = 1.0 - strength + strength * a
-        col.data[i].color = (t[0] * k, t[1] * k, t[2] * k, 1.0)
+        # Godot's glTF import treats COLOR_0 as linear and turns it into
+        # sRGB; store linear so the game gets back the tint as written.
+        col.data[i].color = (lin(t[0] * k), lin(t[1] * k), lin(t[2] * k), 1.0)
     for nm in ("AO", "Tint"):
         if nm in me.color_attributes:
             me.color_attributes.remove(me.color_attributes[nm])
     me.color_attributes.active_color = me.color_attributes["Col"]
     me.color_attributes.render_color_index = 0
+
+
+def lin(c):
+    c = max(0.0, min(1.0, c))
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
 
 
 def plain_colors(o):

@@ -113,22 +113,23 @@ static func radiator(parent: Node3D, pos: Vector3, normal: Vector3, sections := 
 	var x := Vector3.UP.cross(normal)
 	var xf := Transform3D(Basis(x, Vector3.UP, normal), pos)
 	var kit := MeshBuilder.Kit.new()
-	var cast := kit.b("paint", RAD_COLOR)
 	var pitch := 0.09
 	var w := sections * pitch
-	for i in sections:
-		var cx := -w * 0.5 + pitch * (i + 0.5)
-		cast.box(xf * at(cx, 0.17, 0.12), Vector3(0.065, 0.5, 0.12))
-		cast.box(xf * at(cx, 0.24, 0.12), Vector3(0.075, 0.36, 0.16))
-	for yy: float in [0.2, 0.62]:
-		cast.cylinder(xf * rot(Vector3.BACK, PI * 0.5, Vector3(-w * 0.5 - 0.02, yy, 0.12)), 0.03, 0.03, w + 0.04, 8)
-	# Feed and return pipes: up from the floor at each end, then in to the hubs.
-	var pipe := kit.b("paint", RAD_COLOR * Color(0.92, 0.92, 0.92))
-	for side: float in [-1.0, 1.0]:
-		var px := side * (w * 0.5 + 0.1)
-		var hub := 0.62 if side < 0.0 else 0.2
-		pipe.cylinder(xf * at(px, 0.0, 0.12), 0.016, 0.016, hub, 8)
-		pipe.cylinder(xf * rot(Vector3.BACK, -PI * 0.5 * side, Vector3(px, hub, 0.12)), 0.016, 0.016, 0.1, 8)
+	if not Models.add(kit, "interior", "radiator_%d" % sections, xf):
+		var cast := kit.b("paint", RAD_COLOR)
+		for i in sections:
+			var cx := -w * 0.5 + pitch * (i + 0.5)
+			cast.box(xf * at(cx, 0.17, 0.12), Vector3(0.065, 0.5, 0.12))
+			cast.box(xf * at(cx, 0.24, 0.12), Vector3(0.075, 0.36, 0.16))
+		for yy: float in [0.2, 0.62]:
+			cast.cylinder(xf * rot(Vector3.BACK, PI * 0.5, Vector3(-w * 0.5 - 0.02, yy, 0.12)), 0.03, 0.03, w + 0.04, 8)
+		# Feed and return pipes: up from the floor at each end, then in to the hubs.
+		var pipe := kit.b("paint", RAD_COLOR * Color(0.92, 0.92, 0.92))
+		for side: float in [-1.0, 1.0]:
+			var px := side * (w * 0.5 + 0.1)
+			var hub := 0.62 if side < 0.0 else 0.2
+			pipe.cylinder(xf * at(px, 0.0, 0.12), 0.016, 0.016, hub, 8)
+			pipe.cylinder(xf * rot(Vector3.BACK, -PI * 0.5 * side, Vector3(px, hub, 0.12)), 0.016, 0.016, 0.1, 8)
 	kit.build(parent)
 	var foot := Vector3(w + 0.3, 0.7, 0.26)
 	var body := StaticBody3D.new()

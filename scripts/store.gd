@@ -330,21 +330,30 @@ func _build_shop_window(front: Array[MeshInstance3D]) -> void:
 func _build_entrance() -> void:
 	# Left-luggage lockers: 12 columns × 4 rows, numbered left to right, top down;
 	# the texture is the whole bank, mapped once on the front.
-	box(Vector3(-8, 0.1, 0.3), Vector3(6, 2.0, 0.5), "locker", Color.WHITE, Vector2(6, 2), true, MeshFactory.PZ)
-	box(Vector3(-8, 0.1, 0.3), Vector3(6, 2.0, 0.5), "paint", Color(0.42, 0.48, 0.43), 1.0, false, MeshFactory.ALL & ~MeshFactory.PZ)
-	box(Vector3(-8, 0, 0.32), Vector3(5.96, 0.1, 0.46), "rubber", Color.WHITE, 1.0, false)
-	box(Vector3(-8, 2.1, 0.3), Vector3(6.1, 0.08, 0.56), "paint", Color(0.35, 0.4, 0.36))
+	var bank := box(Vector3(-8, 0.1, 0.3), Vector3(6, 2.0, 0.5), "locker", Color.WHITE, Vector2(6, 2), true, MeshFactory.PZ)
+	var blender := Models.has("interior", "lockers")
+	if blender:  # the Blender bank (models/kit/interior.glb); the box above stays as the collider
+		bank.visible = false
+		Models.instance(self, "interior", "lockers", Transform3D.IDENTITY)
+	else:
+		box(Vector3(-8, 0.1, 0.3), Vector3(6, 2.0, 0.5), "paint", Color(0.42, 0.48, 0.43), 1.0, false, MeshFactory.ALL & ~MeshFactory.PZ)
+		box(Vector3(-8, 0, 0.32), Vector3(5.96, 0.1, 0.46), "rubber", Color.WHITE, 1.0, false)
+	box(Vector3(-8, 2.1, 0.3), Vector3(6.1, 0.08, 0.56), "paint", Color(0.35, 0.4, 0.36)).visible = not blender
 	# Locker № 31 (row 3, column 7) stands ajar: a dark hole and the door swung out,
 	# a strap of Nina's bag hanging over the edge.
-	box(Vector3(-7.75, 0.62, 0.553), Vector3(0.46, 0.46, 0.006), "white", Color(0.02, 0.02, 0.02), 1.0, false, MeshFactory.PZ)
+	if not blender:
+		box(Vector3(-7.75, 0.62, 0.553), Vector3(0.46, 0.46, 0.006), "white", Color(0.02, 0.02, 0.02), 1.0, false, MeshFactory.PZ)
 	_bag_strap = box(Vector3(-7.62, 0.5, 0.57), Vector3(0.03, 0.14, 0.01), "leather", Color.WHITE, 1.0, false)
 	var hinge := Node3D.new()
 	hinge.position = Vector3(-8.0, 0.62, 0.57)
 	hinge.rotation.y = deg_to_rad(-35)
 	add_child(hinge)
-	box(Vector3(0.24, 0, 0), Vector3(0.47, 0.47, 0.03), "paint", Color(0.42, 0.48, 0.43), 0.5, false, MeshFactory.ALL, hinge)
-	for k in 3:
-		box(Vector3(0.24, 0.3 + k * 0.05, 0.016), Vector3(0.3, 0.012, 0.004), "rubber", Color.WHITE, 1.0, false, MeshFactory.ALL, hinge)
+	if blender:
+		Models.instance(hinge, "interior", "locker_door", Transform3D.IDENTITY)
+	else:
+		box(Vector3(0.24, 0, 0), Vector3(0.47, 0.47, 0.03), "paint", Color(0.42, 0.48, 0.43), 0.5, false, MeshFactory.ALL, hinge)
+		for k in 3:
+			box(Vector3(0.24, 0.3 + k * 0.05, 0.016), Vector3(0.3, 0.012, 0.004), "rubber", Color.WHITE, 1.0, false, MeshFactory.ALL, hinge)
 	add_interactable("locker31", Vector3(-7.75, 0, 0.75), "Осмотреть ячейку № 31", 1.4)
 	# Ribbed rubber mat inside the doors, a stack of baskets.
 	box(Vector3(0, -0.02, 1.0), Vector3(3, 0.03, 1.4), "grille", Color(0.35, 0.33, 0.3), 0.5, false)
