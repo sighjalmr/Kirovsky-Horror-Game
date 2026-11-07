@@ -87,15 +87,27 @@ static func build_killer() -> Person:
 	# The scarf: from the bridge of the nose down round the neck.
 	k.b("knit", Color(0.6, 0.55, 0.52)).cylinder(_oval(Vector3(0, -0.04, -0.025), 1.3), 0.105, 0.1, 0.135, 20)
 	p.attach("Bip01 Head", _built(k))
+	p.attach("Bip01 R Hand", cleaver())
+	return p
+
+
+## Night five: Колесников himself, in uniform and cap, unmasked, with the
+## butcher's cleaver.
+static func build_killer_unmasked() -> Person:
+	var p := build("kolesnikov")
+	p.attach("Bip01 R Hand", cleaver())
+	return p
+
+
+## Cleaver: wooden grip in the fist, a wide blade pointing forward.
+static func cleaver() -> Node3D:
 	var ck := MeshBuilder.Kit.new()
 	ck.ao = false
-	# Cleaver: wooden grip in the fist, a wide blade pointing forward.
 	ck.b("wood").box(Props.at(0.0, -0.06, -0.03), Vector3(0.03, 0.035, 0.14))
 	ck.b("chrome", Color(0.85, 0.8, 0.78)).box(Props.at(0.0, -0.13, -0.23), Vector3(0.006, 0.13, 0.22))
 	ck.b("blood").box(Props.at(0.0, -0.13, -0.27), Vector3(0.008, 0.08, 0.13), Color(1.2, 1.0, 1.0),
 		Rect2(0.3, 0.3, 0.4, 0.4))
-	p.attach("Bip01 R Hand", _built(ck))
-	return p
+	return _built(ck)
 
 
 ## A militia officer's peaked cap, 1988: a blue-grey crown flaring out over a

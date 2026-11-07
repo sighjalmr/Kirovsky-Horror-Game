@@ -27,7 +27,10 @@ func _ready() -> void:
 		main.store.switch_off(i, true)
 	n.interact("spare_key")
 	main.store.set_front_door(true)
-	if n is NightFour:
+	if n is NightFive:
+		main.store.set_front_door(false)
+		await _night_five(n as NightFive)
+	elif n is NightFour:
 		main.store.set_front_door(false)
 		await _night_four(n as NightFour)
 	elif n is NightThree:
@@ -140,12 +143,76 @@ func _night_four(n: NightFour) -> void:
 	await _shot4(only, "v09_notebook", Vector3(0, 0, 5), Vector3(0, 0, 1), 0.0, false)
 
 
-func _shot4(only: String, id: String, pos: Vector3, dir: Vector3, pitch: float, torch: bool) -> void:
+func _night_five(n: NightFive) -> void:
+	var only := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--only="):
+			only = a.get_slice("=", 1)
+	n.kovpak.visible = false
+	for i in main.store.rows.size():
+		main.store.switch_on(i)
+	main._lit = 1.0
+	n.edik.visible = true
+	n.edik.global_position = Vector3(-6.6, 0, 1.4)
+	n.edik.look_at_point(Vector3(-5.2, 0, 3.6))
+	await _frames(8)
+	await _shot4(only, "w01_edik", Vector3(-5.0, 0, 3.8), Vector3.ZERO, 0.0, false, n.edik.global_position + Vector3(0, 0, 0))
+	n.edik.visible = false
+	var koles := n._person("kolesnikov")
+	koles.visible = true
+	koles.global_position = Vector3(-0.6, 0, -1.6)
+	koles.look_at_point(Vector3(-0.4, 0, 2.6))
+	await _frames(8)
+	await _shot4(only, "w02_glass", Vector3(-0.4, 0, 2.6), Vector3.ZERO, 0.02, false, koles.global_position)
+	koles.visible = false
+	await _shot4(only, "w03_button", Vector3(10.9, 0, 2.05), Vector3(1, 0, 0), -0.1, false)
+	for i in main.store.rows.size():
+		main.store.switch_off(i, true)
+	main._lit = 0.0
+	var k: Killer = main.killer
+	k.activate(Vector3(-2.7, 0, 17.0))
+	k.look_at(Vector3(-3.0, 0, 13.0), Vector3.UP)
+	k.deactivate()
+	k.visible = true
+	k.set_torch(true)
+	await _frames(6)
+	k.torch.rotation.x = deg_to_rad(-12.0)
+	await _shot4(only, "w04_him", Vector3(-3.0, 0, 13.2), Vector3(0.05, 0, 1), 0.08, true)
+	k.visible = false
+	k.set_torch(false)
+	main.store.open_office(true)
+	n.planshet_out = true
+	n._planshet.visible = true
+	n._lamp.visible = true
+	await _shot4(only, "w05_planshet", Vector3(2.25, 0, 29.45), Vector3(0, 0, 1), -0.75, false)
+	n._open_planshet()
+	await _shot4(only, "w06_page", Vector3(2.25, 0, 29.45), Vector3(0, 0, 1), -0.75, false)
+	n.update_notebook()
+	main.hud.notebook.visible = only == "" or only == "w07_notebook"
+	await _shot4(only, "w07_notebook", Vector3(0, 0, 5), Vector3(0, 0, 1), 0.0, false)
+	main.hud.notebook.visible = false
+	for i in main.store.rows.size():
+		main.store.switch_on(i)
+	main._lit = 1.0
+	koles.visible = true
+	koles.global_position = Vector3(6.2, 0, 3.0)
+	koles.look_at_point(Vector3(10.3, 0, 3.4))
+	n.kovpak.visible = true
+	n.kovpak.global_position = Vector3(3.6, 0, 4.2)
+	n.kovpak.look_at_point(koles.global_position)
+	await _frames(8)
+	if only == "" or only == "w08_morning":
+		main.hud.choose(NightFive.BOX_HEAD, NightFive._labels(NightFive.BOX))
+	await _shot4(only, "w08_morning", Vector3(10.3, 0, 3.4), Vector3.ZERO, 0.03, false, koles.global_position)
+	main.hud.choices.visible = false
+
+
+func _shot4(only: String, id: String, pos: Vector3, dir: Vector3, pitch: float, torch: bool, look := Vector3.INF) -> void:
 	if only != "" and only != id:
 		return
 	main.hud.clear_subtitles()
 	main.player.force_flashlight = torch
-	await _shot(id, pos, dir, pitch)
+	await _shot(id, pos, dir, pitch, look)
 	main.player.force_flashlight = false
 
 

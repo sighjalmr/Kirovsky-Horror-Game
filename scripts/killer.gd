@@ -97,6 +97,16 @@ func _ready() -> void:
 	add_child(_steps)
 
 
+## Night five: he no longer hides his face. Swaps the man in black for
+## Колесников in his uniform and cap, the cleaver in the same hand.
+func set_body(p: Person) -> void:
+	if body:
+		body.queue_free()
+	body = p
+	add_child(body)
+	body.footfall.connect(_on_footfall)
+
+
 func is_active() -> bool:
 	return state != State.INACTIVE
 
