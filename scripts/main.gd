@@ -108,6 +108,8 @@ var _need := STRUGGLE_PRESSES
 var _cord := false
 ## The morning question is on screen: the end-of-shift keys wait.
 var _deducing := false
+## Seconds to the next look at the night's clues for the statistics.
+var _clue_t := 1.0
 var _hide_spot: Dictionary = {}
 ## Seconds of play in this chapter, for the first key hints.
 var _played := 0.0
@@ -128,6 +130,8 @@ func _ready() -> void:
 	if not _booted:
 		_booted = true
 		Settings.load_all()
+		Stats.load_all()
+		Stats.catch_up()
 		if not _dev():
 			_load_save()
 	_setup_input()
@@ -140,6 +144,7 @@ func _ready() -> void:
 	menu = GameMenu.new()
 	add_child(menu)
 	menu.picked.connect(_on_menu)
+	Stats.notify = hud.show_achievement
 	apply_settings()
 	if "--daytest" in OS.get_cmdline_user_args():
 		chapter = "day1"
@@ -245,11 +250,13 @@ func _on_menu(id: String) -> void:
 			menu.close()
 		"quit":
 			Settings.save()
+			Stats.save()
 			get_tree().quit()
 		"to_title":
 			menu.close()
 			get_tree().paused = false
 			Settings.save()
+			Stats.save()
 			get_tree().reload_current_scene()
 		"continue":
 			menu.close()
@@ -260,6 +267,7 @@ func _on_menu(id: String) -> void:
 				_start()
 		"new":
 			menu.close()
+			Stats.new_run()
 			if chapter == "night1" and checkpoint.is_empty() and night_clues.is_empty():
 				_start()
 			else:
@@ -268,6 +276,7 @@ func _on_menu(id: String) -> void:
 		_:
 			if id.begins_with("chapter:"):
 				menu.close()
+				Stats.chapter_jump()
 				_autostart = true
 				_go_to(id.get_slice(":", 1), {}, [])
 
@@ -549,6 +558,12 @@ func _process(delta: float) -> void:
 		return
 	if not _morning and player.controllable:
 		_update_hints(delta)
+	Stats.tick(delta)
+	if night:
+		_clue_t -= delta
+		if _clue_t <= 0.0:
+			_clue_t = 1.0
+			Stats.clues_seen(chapter, night.clues)
 	var rate := EARLY_RATE if minutes < KILLER_MIN or day else LATE_RATE
 	if player.sitting:
 		rate *= WAIT_RATE
@@ -780,6 +795,7 @@ func _start() -> void:
 	checkpoint = {}
 	write_save(chapter, night_clues, day_answers, {})
 	start_now()
+	Stats.chapter_started(chapter)
 	_echo_deduction()
 	if day:
 		day.start()
@@ -862,6 +878,7 @@ func hide_in(spot: Dictionary) -> void:
 		hud.say(G_HIDE_LATE, -1.0, true)
 		return
 	_hide_spot = spot
+	Stats.add("hid")
 	player.crouching = false
 	player.hidden = true
 	player.busy = true
@@ -886,6 +903,7 @@ func save_checkpoint() -> void:
 	checkpoint = night.save_state()
 	checkpoint["minutes"] = minutes
 	write_save(chapter, night_clues, day_answers, checkpoint)
+	Stats.save()
 	hud.flash_note("Смена сохранена: %s" % _fmt(minutes))
 
 
@@ -923,11 +941,15 @@ func _on_winded() -> void:
 
 
 func _on_spotted() -> void:
+	if not chasing:
+		Stats.add("spotted")
 	chasing = true
 	Sfx.play_2d(self, "stinger", -4.0)
 
 
 func _on_lost() -> void:
+	if chasing and phase == Phase.PLAY:
+		Stats.add("lost_him")
 	chasing = false
 
 
@@ -978,6 +1000,7 @@ func _struggle() -> void:
 		return
 	Sfx.play_3d(view, "clank", killer.global_position + Vector3(0, 1.6, 0), 0.0, 0.8)
 	_flash = 0.3
+	Stats.tore_free(_cord)
 	# Night five: he is down, and Gordeev may finish it (an ending).
 	if await night.on_tore_free():
 		return
@@ -995,6 +1018,7 @@ func _kill() -> void:
 	phase = Phase.DEAD
 	if chapter == "night5":
 		Settings.saw_ending("death")
+	Stats.died(_cord, chapter)
 	stand_up()
 	player.controllable = false
 	player.busy = true
@@ -1116,6 +1140,7 @@ func end_shift() -> void:
 	hud.set_prompt("")
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 2.5)
+	Stats.night_survived(chapter, night, Settings.detective)
 	await _deduce()
 	if chapter == "night4":
 		var carried := night.clues.duplicate()
@@ -1198,9 +1223,12 @@ func end_game(kind: String, summary: String) -> void:
 	hud.fade_to(0.95, 1.0)
 	write_save("night5", night_clues, day_answers, {})
 	Settings.saw_ending(kind)
+	Stats.ending(kind)
+	Stats.game_finished(Deductions.count_right(deductions))
 	var e: Array = ENDINGS[kind]
 	summary += "\nВерных выводов в блокноте: %d из 4." % Deductions.count_right(deductions)
 	summary += "\nКонцовок открыто: %d из 5." % Settings.endings.size()
+	summary += "\nДостижений получено: %d из %d." % [Stats.earned.size(), Stats.ACHIEVEMENTS.size()]
 	var tail := "%s\n\n%s\nВсего концовок пять: прокурор, слово против слова, дело закрыто, самооборона и смерть.\n\nR: сыграть пятую ночь ещё раз      N: начать с первой ночи" % [e[1], summary]
 	if Deductions.EPILOGUES.has(kind):
 		await get_tree().create_timer(1.2).timeout
@@ -1220,6 +1248,7 @@ func end_day() -> void:
 	hud.clear_subtitles()
 	hud.fade_to(0.92, 1.0)
 	var next: Array = DAYS[chapter]
+	Stats.day_done(chapter, chapter == "day3" and (day as DayThree).confessed)
 	write_save(next[0], _day_carry(), _day_answers_after(), {})
 	hud.show_title(next[1],
 		"%s\n\nE: дальше, %s\nR: сыграть день ещё раз      N: начать с первой ночи" % [day.summary(), next[2]])

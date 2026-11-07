@@ -168,6 +168,7 @@ func throw() -> void:
 		return
 	var kind := held
 	held = ""
+	Stats.add("thrown")
 	_held_mesh.visible = false
 	var cam: Camera3D = main.player.camera
 	var fwd := -cam.global_transform.basis.z
@@ -190,6 +191,7 @@ func take_pill() -> void:
 		main.hud.say(G_PILL_NOT_NOW, -1.0, true)
 		return
 	pills -= 1
+	Stats.add("pills")
 	p.breath = 1.0
 	p.winded = false
 	strain = 0.0

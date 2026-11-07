@@ -513,3 +513,68 @@ class ClueMarks extends Control:
 			draw_arc(at, r + 1.5, 0, TAU, 48, Color(0, 0, 0, a * 0.45), 4.0, true)
 			draw_arc(at, r, 0, TAU, 48, Color(0.93, 0.9, 0.78, a), 2.0, true)
 			draw_circle(at, 2.2, Color(0.93, 0.9, 0.78, a * 0.8))
+
+
+# --- achievements ----------------------------------------------------------------
+
+var _ach_queue: Array = []
+var _ach_busy := false
+var _ach_panel: PanelContainer
+var _ach_name: Label
+var _ach_desc: Label
+
+
+## A small card in the top right corner: «Достижение получено» and its name.
+## Several wait their turn. Shows over the fades and the end titles.
+func show_achievement(name_text: String, desc: String) -> void:
+	_ach_queue.append([name_text, desc])
+	if _ach_busy:
+		return
+	_ach_busy = true
+	if _ach_panel == null:
+		_build_achievement_card()
+	while not _ach_queue.is_empty():
+		var a: Array = _ach_queue.pop_front()
+		_ach_name.text = "«%s»" % a[0]
+		_ach_desc.text = a[1]
+		move_child(_ach_panel, get_child_count() - 1)
+		Sfx.play_2d(self, "pickup", -10.0, "Master", 0.7)
+		var tw := create_tween()
+		tw.tween_property(_ach_panel, "modulate:a", 1.0, 0.5)
+		tw.tween_interval(4.5)
+		tw.tween_property(_ach_panel, "modulate:a", 0.0, 1.0)
+		await tw.finished
+	_ach_busy = false
+
+
+func _build_achievement_card() -> void:
+	_ach_panel = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.06, 0.05, 0.88)
+	sb.border_color = Color(0.62, 0.55, 0.38)
+	sb.set_border_width_all(2)
+	sb.set_content_margin_all(18)
+	_ach_panel.add_theme_stylebox_override("panel", sb)
+	_ach_panel.position = Vector2(1290, 96)
+	_ach_panel.custom_minimum_size = Vector2(600, 0)
+	_ach_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ach_panel.modulate.a = 0.0
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	_ach_panel.add_child(box)
+	var head := Label.new()
+	head.text = Stats.tr_text(Stats.UI.toast)
+	head.add_theme_font_size_override("font_size", 20)
+	head.add_theme_color_override("font_color", Color(0.78, 0.68, 0.45))
+	box.add_child(head)
+	_ach_name = Label.new()
+	_ach_name.add_theme_font_size_override("font_size", 30)
+	_ach_name.add_theme_color_override("font_color", PAPER)
+	box.add_child(_ach_name)
+	_ach_desc = Label.new()
+	_ach_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ach_desc.custom_minimum_size = Vector2(564, 0)
+	_ach_desc.add_theme_font_size_override("font_size", 20)
+	_ach_desc.add_theme_color_override("font_color", Color(0.7, 0.7, 0.64))
+	box.add_child(_ach_desc)
+	add_child(_ach_panel)
