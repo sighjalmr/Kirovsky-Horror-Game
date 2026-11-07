@@ -28,10 +28,28 @@ func _ready() -> void:
 	main.menu._chapters()
 	await _wait(0.3)
 	await _shot("03_chapters")
+	# Some made-up progress for the achievements and statistics pages.
+	Stats.earned = ["first_shift", "witness", "all_rounds", "tore_free", "first_death", "third_key",
+		"night_five", "end_word", "end_death"]
+	Stats.counts = {"time": 4.0 * 3600.0 + 23.0 * 60.0, "runs": 2, "shifts": 6, "days": 3, "deaths": 7,
+		"deaths_axe": 5, "deaths_cord": 2, "spotted": 19, "lost_him": 12, "tore_free": 3, "hid": 31,
+		"thrown": 8, "pills": 5, "rounds": 15}
+	Stats.clues_found = ["night1:bag", "night1:clip", "night1:tape", "night2:token", "night3:body", "night4:box"]
+	Stats.ending_counts = {"word": 1, "death": 2}
+	Stats.best_deductions = 3
+	main.menu._achievements()
+	await _wait(0.3)
+	await _shot("03a_achievements")
+	main.menu._statistics()
+	await _wait(0.3)
+	await _shot("03b_statistics")
+	main.hud.show_achievement("Третий ключ", "Добиться от Ковпака признания про третий ключ.")
 	main.menu.close()
 	main.hud.fade.color.a = 0.0
 	main.start_now()
-	await _wait(3.0)
+	await _wait(1.0)
+	await _shot("03c_toast")
+	await _wait(2.0)
 	main.menu.open_pause()
 	await _wait(0.3)
 	await _shot("04_pause")

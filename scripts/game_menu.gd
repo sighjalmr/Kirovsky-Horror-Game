@@ -88,6 +88,7 @@ func show_title_menu() -> void:
 		_button("Новая игра", "new")
 	if Settings.reached.size() > 1:
 		_button("Главы", _chapters)
+	_button(Stats.tr_text(Stats.UI.menu), _achievements)
 	_button("Настройки", _settings)
 	_button("Управление", _keys)
 	_button("Выход", "quit")
@@ -107,6 +108,7 @@ func _pause_page() -> void:
 	_bg.color.a = 0.72
 	_page("ПАУЗА", Vector2(560, 380))
 	_button("Продолжить", "resume")
+	_button(Stats.tr_text(Stats.UI.menu), _achievements)
 	_button("Настройки", _settings)
 	_button("Управление", _keys)
 	_button("Выйти в главное меню", _ask_title)
@@ -135,6 +137,7 @@ func close() -> void:
 
 
 func _back() -> void:
+	_bg.color.a = 0.0
 	if mode == "pause":
 		_pause_page()
 	else:
@@ -159,6 +162,112 @@ func _chapters() -> void:
 			_button(c[1], "chapter:" + c[0])
 	_button("Назад", _back, true)
 	_focus_first()
+
+
+## Every achievement in two columns: earned ones bright with a gold mark,
+## the rest dim; secret ones keep their name to themselves until earned.
+func _achievements() -> void:
+	_page(Stats.tr_text(Stats.UI.achievements), Vector2(150, 150))
+	_heading.position = Vector2(460, 80)
+	_dark()
+	var count := Label.new()
+	count.text = Stats.tr_text(Stats.UI.earned) % [Stats.earned.size(), Stats.ACHIEVEMENTS.size()]
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.add_theme_font_size_override("font_size", 24)
+	count.add_theme_color_override("font_color", DIM)
+	_panel.add_child(count)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 60)
+	grid.add_theme_constant_override("v_separation", 10)
+	_panel.add_child(grid)
+	for a: Array in Stats.ACHIEVEMENTS:
+		var got: bool = a[0] in Stats.earned
+		var secret: bool = a[3] and not got
+		grid.add_child(_achievement_cell(
+			Stats.tr_text(Stats.UI.secret) if secret else Stats.tr_text(a[1]),
+			Stats.tr_text(Stats.UI.secret_desc) if secret else Stats.tr_text(a[2]), got))
+	_bottom_buttons(Stats.tr_text(Stats.UI.to_stats), _statistics)
+	_focus_first()
+
+
+func _achievement_cell(name_text: String, desc: String, got: bool) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	row.custom_minimum_size = Vector2(780, 0)
+	var mark := Panel.new()
+	mark.custom_minimum_size = Vector2(22, 22)
+	mark.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.86, 0.68, 0.3) if got else Color(0, 0, 0, 0)
+	sb.border_color = Color(0.86, 0.68, 0.3) if got else Color(0.4, 0.4, 0.37)
+	sb.set_border_width_all(2)
+	mark.add_theme_stylebox_override("panel", sb)
+	var wrap := MarginContainer.new()
+	wrap.add_theme_constant_override("margin_top", 6)
+	wrap.add_child(mark)
+	row.add_child(wrap)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(col)
+	var n := Label.new()
+	n.text = name_text
+	n.add_theme_font_size_override("font_size", 26)
+	n.add_theme_color_override("font_color", PAPER if got else Color(0.6, 0.6, 0.55))
+	col.add_child(n)
+	var d := Label.new()
+	d.text = desc
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.add_theme_font_size_override("font_size", 19)
+	d.add_theme_color_override("font_color", Color(0.72, 0.72, 0.66) if got else Color(0.5, 0.5, 0.47))
+	col.add_child(d)
+	return row
+
+
+## The counters: what was done on the left, clues, conclusions and endings right.
+func _statistics() -> void:
+	_page(Stats.tr_text(Stats.UI.stats), Vector2(250, 180))
+	_heading.position = Vector2(460, 110)
+	_dark()
+	var lines := Stats.stat_lines()
+	var split := lines.find("")
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 80)
+	_panel.add_child(cols)
+	for part: PackedStringArray in [lines.slice(0, split), lines.slice(split + 1)]:
+		var l := Label.new()
+		l.text = "\n".join(part)
+		l.custom_minimum_size = Vector2(660, 0)
+		l.add_theme_font_size_override("font_size", 26)
+		l.add_theme_color_override("font_color", PAPER)
+		l.add_theme_constant_override("line_spacing", 6)
+		l.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		cols.add_child(l)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 24)
+	_panel.add_child(gap)
+	_bottom_buttons(Stats.tr_text(Stats.UI.to_achievements), _achievements)
+	_focus_first()
+
+
+## Long lists of small print need the hall behind them nearly black.
+func _dark() -> void:
+	_bg.color.a = maxf(_bg.color.a, 0.9)
+
+
+## [other page] [Назад] in a row under a page.
+func _bottom_buttons(other: String, go: Callable) -> void:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 80)
+	_panel.add_child(row)
+	var a := _button(other, go)
+	_panel.remove_child(a)
+	row.add_child(a)
+	var b := _button(Stats.tr_text(Stats.UI.back), _back, true)
+	_panel.remove_child(b)
+	row.add_child(b)
 
 
 func _keys() -> void:
