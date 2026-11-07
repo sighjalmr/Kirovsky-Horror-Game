@@ -120,6 +120,8 @@ func _ready() -> void:
 	crowd.autoplay = true
 	crowd.position = TANK + Vector3(0, 1.2, 1.5)
 	main.world.add_child(crowd)
+	main.world.add_child(Passersby.new(main, "4"))
+	main.world.add_child(Traffic.new())
 	update_notebook()
 
 
@@ -133,8 +135,11 @@ func _outdoor_look() -> void:
 	env.fog_density = 1.0
 	env.fog_depth_curve = 1.4
 	env.fog_light_color = Color(0.74, 0.76, 0.77)
-	env.fog_depth_begin = 25.0
-	env.fog_depth_end = 160.0
+	env.fog_depth_begin = 30.0
+	env.fog_depth_end = 300.0
+	# In the hall the eye never needs more than 40 m; out here the whole
+	# estate stands round the square (Exterior._build_district).
+	main.player.camera.far = 600.0
 	env.background_color = Color(0.74, 0.76, 0.77)
 	env.ambient_light_color = Color(0.85, 0.88, 0.92)
 	env.ambient_light_energy = 0.75
