@@ -69,6 +69,8 @@ const EDGES := [
 var rows: Array[LightRow] = []
 var interactables: Array[Dictionary] = []
 var chests: Dictionary = {}
+## What only the nights show (hidden by dress_for_day).
+var _night_marks: Array = []
 var astar := AStar3D.new()
 var booth_rect := Rect2(7.0, 0.2, 4.8, 4.6)
 var duty_rect := Rect2(-2.5, 0.0, 5.0, 2.5)
@@ -445,7 +447,7 @@ func _dress_life() -> void:
 	Equip.decal(self, Vector3(-7.95, 0, 15.1), 0.9, "puddle", 0.4)
 	Equip.decal(self, Vector3(8.0, 0, 19.8), 0.8, "puddle", 2.1)
 	Equip.decal(self, Vector3(-8.0, 0, 20.9), 0.6, "puddle", 1.0)
-	Equip.decal(self, Vector3(3.3, 0, 22.4), 0.85, "juice", 0.7)
+	_night_marks.append(Equip.decal(self, Vector3(3.3, 0, 22.4), 0.85, "juice", 0.7))
 	Equip.decal(self, Vector3(-1.3, 0, 9.5), 0.7, "litter", 0.3)
 	Equip.decal(self, Vector3(4.1, 0, 9.7), 0.6, "litter", 2.4)
 	Equip.decal(self, Vector3(-6.2, 0, 10.6), 0.5, "litter", 1.2)
@@ -459,7 +461,7 @@ func _build_chest(id: String, pos: Vector3, rng: RandomNumberGenerator) -> void:
 	root.position = pos
 	add_child(root)
 	Props.collider(root, Vector3.ZERO, Vector3(1.0, 0.8, 2.4))
-	var cloth := Props.chest(root, rng)
+	var cloth := Props.chest(root, rng, id)
 	var folded := box(Vector3(0, 0.77, 1.0), Vector3(0.9, 0.14, 0.36), "cloth", Color.WHITE, 0.5, false, MeshFactory.ALL, root)
 	folded.visible = false
 	var hum := AudioStreamPlayer3D.new()
@@ -472,7 +474,8 @@ func _build_chest(id: String, pos: Vector3, rng: RandomNumberGenerator) -> void:
 	hum.autoplay = true
 	root.add_child(hum)
 	hum.position = Vector3(0, 0.3, 0)
-	chests[id] = {"cloth": cloth, "folded": folded, "lifted": false, "hum": hum, "pos": pos}
+	chests[id] = {"cloth": cloth, "folded": folded, "lifted": false, "hum": hum, "pos": pos,
+		"contents": root.get_meta("contents")}
 	add_interactable("chest_" + id, pos, "Поднять покрывало", 1.8)
 
 
@@ -835,8 +838,11 @@ func _build_panel() -> void:
 		kit.b("white", Color(0.85, 0.8, 0.6)).box(Props.at(x, 1.62, 27.835), Vector3(0.08, 0.04, 0.004))
 		kit.b("chrome").box(Props.at(x, 1.3, 27.83), Vector3(0.02, 0.18, 0.02))
 		handle.box(Props.rot(Vector3.RIGHT, 0.5, Vector3(x, 1.2, 27.8)), Vector3(0.05, 0.03, 0.08))
-	kit.b("blood", Color(0.9, 0.2, 0.15)).box(Props.at(-0.5, 1.75, 27.835), Vector3(0.18, 0.12, 0.004))
 	kit.build(self)
+	# A smear on the panel door: his hand, after the night of the 7th.
+	var smear := MeshBuilder.Kit.new()
+	smear.b("blood", Color(0.9, 0.2, 0.15)).box(Props.at(-0.5, 1.75, 27.835), Vector3(0.18, 0.12, 0.004))
+	_night_marks.append_array(smear.build(self))
 	add_interactable("panel", Vector3(-0.5, 0, 27.2), "Проверить электрощиток", 1.4)
 	# The delivery note Kovpak drops on his way out; shown after his visit.
 	_invoice = Node3D.new()
@@ -1019,7 +1025,7 @@ func close_storage_door() -> void:
 	storage_open = false
 	var tw := create_tween()
 	tw.tween_property(_storage_hinge, "rotation:y", 0.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_callback(func(): Sfx.play_3d(self, "clank", Vector3(9, 1.2, 27.8), 4.0, 0.75))
+	tw.tween_callback(func(): Sfx.play_3d(self, "door_steel", Vector3(9, 1.2, 27.8), 2.0, 1.0, 40.0))
 	tw.tween_interval(0.6)
 	tw.tween_callback(func(): Sfx.play_3d(self, "lock", Vector3(9, 1.0, 28.2), -2.0))
 
@@ -1043,7 +1049,7 @@ func set_front_door(open: bool) -> void:
 	tw.tween_property(_front_hinge, "rotation:y", deg_to_rad(80.0) if open else 0.0, 1.1) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT if open else Tween.EASE_IN)
 	if not open:
-		tw.tween_callback(func(): Sfx.play_3d(self, "clank", Vector3(-1, 1.2, 0.0), -8.0, 1.4))
+		tw.tween_callback(func(): Sfx.play_3d(self, "door_glass", Vector3(-1, 1.2, 0.0), 0.0, 1.0, 40.0))
 		tw.tween_interval(0.4)
 		tw.tween_callback(func(): Sfx.play_3d(self, "lock", Vector3(-1, 1.0, -0.1), 0.0))
 
@@ -1058,7 +1064,9 @@ func swing_front(open: bool) -> void:
 	tw.tween_property(_front_hinge, "rotation:y", deg_to_rad(75.0) if open else 0.0, 0.7 if open else 1.4) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT if open else Tween.EASE_IN_OUT)
 	if not open:
-		tw.tween_callback(func(): Sfx.play_3d(self, "clank", Vector3(-1, 1.2, 0.0), -16.0, 1.6))
+		# The closer pulls it shut with a bang of the frame and the pane.
+		tw.tween_callback(func(): Sfx.play_3d(self, "door_glass", Vector3(-1, 1.2, 0.0), -4.0,
+			randf_range(0.93, 1.07), 35.0))
 
 
 ## The «Волга» stands at the doors with its lights off (the prologue).
@@ -1214,6 +1222,30 @@ func route(from: Vector3, to: Vector3) -> PackedVector3Array:
 	var pts := astar.get_point_path(closest_node(from), closest_node(to))
 	pts.append(Vector3(to.x, 0, to.z))
 	return pts
+
+
+## Daytime: a shop open for business. The freezer chests stand uncovered
+## with their ordinary stock, and nothing red is left about the hall (the
+## smear on the fuse panel, the smashed tomato juice that reads as blood).
+func dress_for_day() -> void:
+	for m: Node3D in _night_marks:
+		m.visible = false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1988
+	for id: String in chests:
+		var c: Dictionary = chests[id]
+		(c.cloth as Node3D).visible = false
+		(c.folded as Node3D).visible = false
+		var old: Node3D = c.contents
+		var root := old.get_parent() as Node3D
+		old.queue_free()
+		c.contents = Props.chest_contents(root, rng)
+		c.lifted = true
+
+
+## Night two on: the clue chest scraped to the metal and washed out.
+func empty_chest(id: String) -> void:
+	(chests[id].contents as Node3D).visible = false
 
 
 func lift_cloth(id: String) -> void:

@@ -512,6 +512,11 @@ func _update_swatch() -> void:
 
 func _page(heading: String, at: Vector2) -> void:
 	_sub = heading != "" and heading != "ПАУЗА"
+	# A sub-page hides whatever is under it: the game's name on the title
+	# screen, the clock and the hall in the pause, so nothing shows through
+	# the rows of settings, achievements or statistics.
+	if _sub:
+		_bg.color.a = 1.0
 	for c in _panel.get_children():
 		_panel.remove_child(c)
 		c.queue_free()

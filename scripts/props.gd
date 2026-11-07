@@ -236,9 +236,38 @@ static func fixture(parent: Node3D, pos: Vector3, tube_mat: Material) -> void:
 	kit.build(parent, false)
 
 
+## The frost and the goods in a freezer chest, as one node (root's meta
+## "contents"); by day the store rebuilds them as a shop's ordinary stock.
+static func chest_contents(root: Node3D, rng: RandomNumberGenerator, id := "") -> Node3D:
+	var inside := MeshBuilder.Kit.new()
+	if id == "":
+		inside.b("frozen").box(at(0, 0.45, 0), Vector3(0.88, 0.02, 2.28), Color.WHITE, NO_RECT, Vector2(0.5, 0.5),
+			MeshFactory.PY, 0.6)
+	else:
+		# Plain white frost: the «frozen» picture is packs of goods itself, and
+		# these chests hold only what Gordeev says is in them.
+		inside.b("white", Color(0.86, 0.9, 0.93)).box(at(0, 0.45, 0), Vector3(0.88, 0.02, 2.28), Color.WHITE,
+			NO_RECT, Vector2.ONE, MeshFactory.PY)
+		if id == "A4":
+			# Frost wiped off the bottom by a broad palm.
+			var wipe := inside.b("galv", Color(0.74, 0.77, 0.8))
+			for k in 4:
+				wipe.box(rot(Vector3.UP, 0.08 * k - 0.12, Vector3(-0.1 + 0.075 * k, 0.471, 0.1 * k - 0.1)),
+					Vector3(0.065, 0.002, 0.5), Color.WHITE, NO_RECT, Vector2.ONE, MeshFactory.PY)
+	Cases.chest_goods(inside, rng, id)
+	var contents := Node3D.new()
+	contents.name = "Contents"
+	root.add_child(contents)
+	inside.build(contents, false)
+	root.set_meta("contents", contents)
+	return contents
+
+
 ## Enamel freezer chest with a chrome rim and two sliding glass lids over the
-## frozen goods. Returns the draped cloth node (hidden when lifted).
-static func chest(root: Node3D, rng: RandomNumberGenerator) -> Node3D:
+## frozen goods. Returns the draped cloth node (hidden when lifted). The frost
+## and what lies on it (Cases.chest_goods, by the chest's id, so it is what
+## Gordeev says he sees) are their own node, root's meta "contents".
+static func chest(root: Node3D, rng: RandomNumberGenerator, id := "") -> Node3D:
 	var kit := MeshBuilder.Kit.new()
 	kit.b("enamel").box(at(0, 0, 0), Vector3(1.0, 0.72, 2.4), Color.WHITE, NO_RECT, Vector2(1.2, 0.72), SIDES, 0.5)
 	kit.b("rubber").box(at(0, 0, 0), Vector3(0.94, 0.06, 2.34), Color.WHITE, NO_RECT, Vector2.ONE, SIDES)
@@ -247,9 +276,10 @@ static func chest(root: Node3D, rng: RandomNumberGenerator) -> Node3D:
 		liner.box(at(x, 0.45, 0), Vector3(0.06, 0.27, 2.34), Color.WHITE, Rect2(0, 0.5, 1, 0.4))
 	for z: float in [-1.17, 1.17]:
 		liner.box(at(0, 0.45, z), Vector3(0.88, 0.27, 0.06), Color.WHITE, Rect2(0, 0.5, 1, 0.4))
-	kit.b("frozen").box(at(0, 0.45, 0), Vector3(0.88, 0.02, 2.28), Color.WHITE, NO_RECT, Vector2(0.5, 0.5),
-		MeshFactory.PY, 0.6)
-	Cases.chest_goods(kit, rng)
+	# The metal tub under the frost (seen when it is scraped clean).
+	kit.b("galv", Color(0.7, 0.72, 0.74)).box(at(0, 0.44, 0), Vector3(0.88, 0.01, 2.28), Color.WHITE, NO_RECT,
+		Vector2.ONE, MeshFactory.PY)
+	chest_contents(root, rng, id)
 	var ch := kit.b("chrome")
 	for x: float in [-0.49, 0.49]:
 		ch.box(at(x, 0.72, 0), Vector3(0.04, 0.035, 2.42))
@@ -396,14 +426,17 @@ static func booth(parent: Node3D, rect: Rect2) -> void:
 	wood.box(at(11.3, 0.76, 2.2), Vector3(0.16, 0.2, 0.32), Color(0.75, 0.55, 0.42))
 	kit.b("grille").box(at(11.218, 0.78, 2.15), Vector3(0.005, 0.15, 0.2), Color.WHITE, FULL, Vector2.ONE, MeshFactory.NX)
 	ch.cylinder(rot(Vector3.BACK, PI * 0.5, Vector3(11.222, 0.86, 2.31)), 0.018, 0.018, 0.02, 6, Color.WHITE)
-	# Logbook, open: blue cover, two pages of ruled entries.
-	kit.b("white", Color(0.2, 0.25, 0.42)).box(at(10.9, 0.76, 2.6), Vector3(0.3, 0.008, 0.44))
-	var pages := kit.b("tags", Color(1.05, 1.05, 1.0))
-	pages.box(rot(Vector3.UP, 0.02, Vector3(10.9, 0.768, 2.495)), Vector3(0.28, 0.012, 0.2), Color.WHITE,
-		Rect2(0, 0, 1, 0.5), Vector2.ONE, MeshFactory.PY)
-	pages.box(rot(Vector3.UP, -0.02, Vector3(10.9, 0.768, 2.705)), Vector3(0.28, 0.012, 0.2), Color.WHITE,
-		Rect2(0, 0.5, 1, 0.5), Vector2.ONE, MeshFactory.PY)
-	kit.b("white", Color(0.1, 0.1, 0.3)).box(rot(Vector3.UP, 0.6, Vector3(10.95, 0.78, 2.79)), Vector3(0.01, 0.008, 0.14))
+	# Logbook, open: a thick ledger in a dark red cover on the desk, its white
+	# pages a little lit by the lamp so it stands out from the wood.
+	var cover := kit.b("white", Color(0.5, 0.1, 0.07))
+	cover.box(at(10.9, 0.76, 2.6), Vector3(0.32, 0.016, 0.46))
+	cover.box(at(10.9, 0.76, 2.6), Vector3(0.3, 0.034, 0.03))  # the spine
+	var pages := kit.b("tags", Color(1.1, 1.1, 1.05), Color(0.1, 0.1, 0.09))
+	pages.box(rot(Vector3.UP, 0.02, Vector3(10.9, 0.776, 2.49)), Vector3(0.29, 0.024, 0.2), Color.WHITE,
+		Rect2(0, 0, 1, 0.5), Vector2.ONE, MeshFactory.PY | MeshFactory.NX | MeshFactory.PX | MeshFactory.NZ)
+	pages.box(rot(Vector3.UP, -0.02, Vector3(10.9, 0.776, 2.71)), Vector3(0.29, 0.024, 0.2), Color.WHITE,
+		Rect2(0, 0.5, 1, 0.5), Vector2.ONE, MeshFactory.PY | MeshFactory.NX | MeshFactory.PX | MeshFactory.PZ)
+	kit.b("white", Color(0.1, 0.1, 0.3)).box(rot(Vector3.UP, 0.6, Vector3(10.95, 0.802, 2.79)), Vector3(0.01, 0.008, 0.14))
 	# Desk lamp: base, stem, green cone shade lit from inside.
 	var green := kit.b("paint", Color(0.55, 0.85, 0.6))
 	green.cylinder(at(11.35, 0.76, 3.05), 0.08, 0.07, 0.025, 10, Color.WHITE)

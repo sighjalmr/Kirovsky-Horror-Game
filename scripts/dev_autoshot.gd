@@ -19,6 +19,10 @@ func _ready() -> void:
 	var p: Player = main.player
 	var store: Store = main.store
 	var night: NightOne = main.night
+	if "--propshot" in OS.get_cmdline_user_args():
+		await _prop_shots(p, store)
+		get_tree().quit()
+		return
 	if "--handshot" in OS.get_cmdline_user_args():
 		await _hand_shots(p, store, night)
 		get_tree().quit()
@@ -567,3 +571,40 @@ func _polish_late(p: Player, store: Store, night: NightOne) -> void:
 	await _until(func(): return k.is_lurking(), 60.0)
 	await _wait(3.0)
 	await _shot("p4_lurk_torch_low")
+
+
+## --propshot: the round journal on the booth desk, and every freezer chest
+## with its cloth off (what lies in it should match the line about it).
+func _prop_shots(p: Player, store: Store) -> void:
+	main._timeline.clear()
+	await _wait(1.0)
+	_place(p, Vector3(10.2, 0, 2.6), Vector3(0.6, 0, 0))
+	p.head.rotation.x = -0.75
+	await _wait(0.6)
+	await _shot("journal")
+	# Under the booth desk and under till 3, the man's boots going past.
+	for id: String in ["hide_booth", "hide_till3"]:
+		var h: Array = NightOne.HIDES[id]
+		_place(p, h[2], (h[0] as Vector3) - (h[2] as Vector3))
+		await _wait(0.3)
+		main.hide_in({"id": id, "pos": h[0], "face": h[1], "out": h[2]})
+		await _shot(id + "_0_going_in")
+		await _wait(0.6)
+		await _shot(id + "_1_crawling")
+		await _wait(1.6)
+		var k: Node3D = main.killer
+		k.visible = true
+		k.global_position = (h[0] as Vector3) + (h[1] as Vector3) * 1.3 + Vector3(0, 0, 0.6)
+		await _wait(0.4)
+		await _shot(id + "_2_hidden")
+		print("hidden ", p.hidden, " clock ", main.minutes)
+		main.leave_hiding()
+		k.global_position = Vector3(9.0, 0, 33.0)
+	for id: String in store.chests:
+		store.lift_cloth(id)
+		var c: Vector3 = store.chests[id].pos
+		var side := 1.0 if c.x < 0.0 else -1.0
+		_place(p, c + Vector3(side * 1.3, 0, 0), Vector3(-side, 0, 0))
+		p.head.rotation.x = -0.8
+		await _wait(0.5)
+		await _shot("chest_" + id)
