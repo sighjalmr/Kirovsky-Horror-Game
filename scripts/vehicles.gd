@@ -31,6 +31,13 @@ const VOLGA := {
 	"lamps": [0.73], "lamp_y": 0.60, "front": -2.373, "cabin": false,
 }
 
+## АЗЛК-2140, in the traffic on the road (tools/build_cars.py "moskvich").
+const MOSKVICH := {
+	"model": "res://models/cars/moskvich.glb", "hw": 0.775, "paint": Color(0.55, 0.14, 0.1),
+	"hood": [0.80, 0.86, 0.88], "glass": [-0.8, -0.2, 0.64, 1.16], "roof": 1.43, "belt": 0.9,
+	"lamps": [0.6], "lamp_y": 0.60, "front": -2.125, "cabin": false,
+}
+
 const HEADLIGHT := 9.0
 
 
@@ -139,6 +146,8 @@ static func set_lights(car: Node3D, on: bool, energy := HEADLIGHT) -> void:
 ## wheels on the ground at y = 0, driver on the left (-X). Same metas as the
 ## other cars: "beams", "lamps", "tail"; and "seat", the driver's hip point.
 static func bobik() -> Node3D:
+	if ResourceLoader.exists(BOBIK):
+		return _bobik_model()
 	var car := Node3D.new()
 	var kit := MeshBuilder.Kit.new()
 	var yellow := kit.b("paint", Color(0.78, 0.62, 0.2))
@@ -231,6 +240,70 @@ static func bobik() -> Node3D:
 		l.light_energy = 0.0
 		l.light_color = Color(1.0, 0.92, 0.75)
 		l.shadow_enabled = false  # the lamp sits inside the body: its own wing would shade it
+		l.set_meta("role", "beam")
+		car.add_child(l)
+		beams.append(l)
+	car.set_meta("beams", beams)
+	car.set_meta("lamps", [lamp_mat])
+	car.set_meta("tail", tail_mat)
+	car.set_meta("seat", Vector3(-0.42, 0.81, 0.25))
+	return car
+
+
+const BOBIK := "res://models/cars/bobik.glb"
+
+
+## The УАЗ from tools/blender/build_bobik.py: one mesh per material kind.
+static func _bobik_model() -> Node3D:
+	var car := Node3D.new()
+	var model: Node3D = (load(BOBIK) as PackedScene).instantiate()
+	car.add_child(model)
+	var hw := 0.88
+	var lamp_mat := Mats.unique("white", Color(0.85, 0.85, 0.8), Color.BLACK)
+	var tail_mat := Mats.unique("white", Color(0.7, 0.08, 0.06), Color(0.2, 0.01, 0.0))
+	var mats := {
+		"body": Mats.get_mat("paint", Color(0.78, 0.62, 0.2)),
+		"band": Mats.get_mat("paint", Color(0.12, 0.2, 0.42)),
+		"top": Mats.get_mat("paint", Color(0.72, 0.72, 0.68)),
+		"black": Mats.get_mat("rubber", Color(0.06, 0.06, 0.06)),
+		"chrome": Mats.get_mat("chrome"),
+		"glass": Mats.get_mat("glass", Color(0.1, 0.12, 0.14, 0.45), Color.BLACK, Mats.GLASS),
+		"lamp": lamp_mat,
+		"tail": tail_mat,
+		"amber": Mats.get_mat("white", Color(1.0, 0.55, 0.15), Color(0.15, 0.07, 0.01)),
+		"plate": Mats.get_mat("ext_plate"),
+		"tyre": Mats.get_mat("rubber", Color(0.07, 0.07, 0.07)),
+		"rim": Mats.get_mat("metal", Color(0.45, 0.47, 0.42)),
+		"inside": Mats.get_mat("leather", Color(0.12, 0.11, 0.1)),
+		"seat": Mats.get_mat("leather", Color(0.1, 0.09, 0.08)),
+		"beacon": Mats.get_mat("glass", Color(0.15, 0.3, 0.8, 0.8), Color.BLACK, Mats.GLASS),
+	}
+	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		var kind := String(mi.name).get_slice("_", 0)
+		if mats.has(kind):
+			mi.material_override = mats[kind]
+		if kind in ["glass", "lamp", "tail", "amber", "plate", "beacon"]:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for sx: float in [-1.0, 1.0]:
+		var word := Label3D.new()
+		word.text = "МИЛИЦИЯ"
+		word.font_size = 64
+		word.pixel_size = 0.0028
+		word.modulate = Color(0.92, 0.92, 0.88)
+		word.shaded = true
+		word.position = Vector3(sx * (hw + 0.012), 0.785, 0.35)
+		word.rotation.y = sx * PI * 0.5
+		car.add_child(word)
+	var beams: Array[SpotLight3D] = []
+	for sx: float in [-0.62, 0.62]:
+		var l := SpotLight3D.new()
+		l.position = Vector3(sx, 0.72, -2.2)
+		l.rotation.x = deg_to_rad(-4.0)
+		l.spot_range = 30.0
+		l.spot_angle = 30.0
+		l.light_energy = 0.0
+		l.light_color = Color(1.0, 0.92, 0.75)
+		l.shadow_enabled = false
 		l.set_meta("role", "beam")
 		car.add_child(l)
 		beams.append(l)

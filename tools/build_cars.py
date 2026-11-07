@@ -45,6 +45,13 @@ CARS = {
         rim_r=0.18, b_pillar=0.37, quad=False, paint=(0.04, 0.04, 0.045), tumble=0.26, front_panel=0.76,
         tail="corner",
     ),
+    # АЗЛК-2140 «Москвич» (traffic on the road round the square).
+    "moskvich": dict(
+        length=4.25, hw=0.775, belt=0.9, roof=1.43, sill=0.22, glass=[-0.8, -0.2, 0.64, 1.16],
+        hood=[0.8, 0.88], trunk=[0.9, 0.87], wheel_z=[-1.25, 1.15], track=1.27, tyre_r=0.295, tyre_w=0.165,
+        rim_r=0.165, b_pillar=0.31, quad=False, paint=(0.55, 0.14, 0.1), tumble=0.22, front_panel=0.77,
+        tail="wide",
+    ),
 }
 
 bpy.ops.wm.read_factory_settings(use_empty=True)

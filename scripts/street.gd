@@ -41,6 +41,10 @@ static func kiosk(parent: Node3D, pos: Vector3, yaw: float) -> void:
 	var paint := kit.b("paint", BLUE)
 	var w := 2.6
 	var d := 1.8
+	if Models.add(kit, "street", "kiosk", Transform3D.IDENTITY):
+		kit.build(root)
+		plate(root, Vector3(-w * 0.5 - 0.006, 1.2, 0.1), Vector3.LEFT, "poster_drink", Vector2(1.2, 0.6))
+		return
 	paint.box(Props.at(0, 0, 0), Vector3(w, 0.8, d))                               # plinth
 	paint.box(Props.at(0, 0.8, d * 0.5 - 0.05), Vector3(w, 1.35, 0.1))              # back wall
 	for sx: float in [-w * 0.5 + 0.05, w * 0.5 - 0.05]:
@@ -81,6 +85,12 @@ static func plate(parent: Node3D, pos: Vector3, normal: Vector3, which: String, 
 static func phone_booths(parent: Node3D, pos: Vector3, yaw: float, bare := -1) -> Node3D:
 	var root := Props.node(parent, pos, yaw)
 	var kit := MeshBuilder.Kit.new()
+	if Models.add(kit, "street", "phone_booths", Transform3D.IDENTITY):
+		for k in 2:
+			if k != bare:
+				Models.add(kit, "street", "phone_handset", Transform3D(Basis.IDENTITY, Vector3(k * 0.96, 0, 0)))
+		kit.build(root)
+		return root
 	var red := kit.b("paint", Color(0.62, 0.14, 0.1))
 	var glass := kit.b("glass", Color(0.55, 0.62, 0.62, 0.35), Color.BLACK, Mats.GLASS)
 	for k in 2:
@@ -118,13 +128,14 @@ static func phone_booths(parent: Node3D, pos: Vector3, yaw: float, bare := -1) -
 static func bus_stop(parent: Node3D, pos: Vector3, yaw: float) -> void:
 	var root := Props.node(parent, pos, yaw)
 	var kit := MeshBuilder.Kit.new()
-	var con := kit.b("concrete", CONCRETE)
 	var w := 4.2
-	con.box(Props.at(0, 0, 0.75), Vector3(w, 2.4, 0.14))
-	for sx: float in [-w * 0.5 + 0.07, w * 0.5 - 0.07]:
-		con.box(Props.at(sx, 0, 0.2), Vector3(0.14, 2.4, 1.2))
-	con.box(Props.at(0, 2.4, 0.1), Vector3(w + 0.4, 0.18, 1.8))
-	con.box(Props.at(0, -0.02, 0.2), Vector3(w, 0.06, 1.4))
+	if not Models.add(kit, "street", "bus_stop", Transform3D.IDENTITY):
+		var con := kit.b("concrete", CONCRETE)
+		con.box(Props.at(0, 0, 0.75), Vector3(w, 2.4, 0.14))
+		for sx: float in [-w * 0.5 + 0.07, w * 0.5 - 0.07]:
+			con.box(Props.at(sx, 0, 0.2), Vector3(0.14, 2.4, 1.2))
+		con.box(Props.at(0, 2.4, 0.1), Vector3(w + 0.4, 0.18, 1.8))
+		con.box(Props.at(0, -0.02, 0.2), Vector3(w, 0.06, 1.4))
 	kit.build(root)
 	plate(root, Vector3(-0.8, 1.45, 0.675), Vector3.FORWARD, "afisha", Vector2(1.6, 0.8))
 	plate(root, Vector3(0.9, 1.45, 0.675), Vector3.FORWARD, "timetable", Vector2(0.8, 0.4))
@@ -141,6 +152,11 @@ static func bus_stop(parent: Node3D, pos: Vector3, yaw: float) -> void:
 static func bench(parent: Node3D, pos: Vector3, yaw: float, length := 2.0) -> void:
 	var root := Props.node(parent, pos, yaw)
 	var kit := MeshBuilder.Kit.new()
+	var id := "bench_%d" % (2600 if length > 2.3 else 2000)
+	if Models.add(kit, "street", id, Transform3D(Basis.from_scale(Vector3(length / (2.6 if length > 2.3 else 2.0), 1, 1)),
+			Vector3.ZERO)):
+		kit.build(root)
+		return
 	var con := kit.b("concrete", Color(0.55, 0.55, 0.52))
 	for sx: float in [-length * 0.38, length * 0.38]:
 		con.box(Props.at(sx, 0, 0), Vector3(0.12, 0.42, 0.5))
@@ -156,6 +172,9 @@ static func bench(parent: Node3D, pos: Vector3, yaw: float, length := 2.0) -> vo
 ## A concrete litter urn, the classic flared vase on a foot.
 static func urn(parent: Node3D, pos: Vector3) -> void:
 	var kit := MeshBuilder.Kit.new()
+	if Models.add(kit, "street", "urn", Transform3D(Basis(Vector3.UP, pos.x * 1.7 + pos.z), pos)):
+		kit.build(parent)
+		return
 	kit.b("concrete", Color(0.68, 0.67, 0.63)).lathe(Props.at(pos.x, pos.y, pos.z), [Vector2(0.0, 0.0),
 		Vector2(0.2, 0.0), Vector2(0.17, 0.08), Vector2(0.12, 0.15), Vector2(0.16, 0.35), Vector2(0.26, 0.62),
 		Vector2(0.28, 0.66), Vector2(0.24, 0.66), Vector2(0.22, 0.5), Vector2(0.0, 0.5)], 14)
@@ -173,6 +192,9 @@ static func bins(parent: Node3D, pos: Vector3, yaw: float, count := 3) -> void:
 	var lid := kit.b("paint", Color(0.2, 0.28, 0.21))
 	for k in count:
 		var x := (k - (count - 1) * 0.5) * 1.25
+		if Models.add(kit, "street", "bin", Transform3D(Basis.IDENTITY, Vector3(x, 0, 0))):
+			Models.add(kit, "street", "bin_lid", Props.rot(Vector3.RIGHT, 0.12 * (k % 2), Vector3(x, 1.08, 0.42)))
+			continue
 		body.box(Props.at(x, 0.08, 0), Vector3(1.1, 1.0, 0.85), Color.WHITE, _cell("bin"), Vector2.ONE,
 			Props.SIDES)
 		lid.box(Props.rot(Vector3.RIGHT, 0.12 * (k % 2), Vector3(x, 1.08, 0.42)) * Props.at(0, 0, -0.42),
@@ -209,16 +231,17 @@ static func fence(parent: Node3D, a: Vector3, b: Vector3) -> void:
 static func entrance(parent: Node3D, pos: Vector3, yaw: float, night: bool, number := 1) -> void:
 	var root := Props.node(parent, pos, yaw)
 	var kit := MeshBuilder.Kit.new()
-	var con := kit.b("concrete", Color(0.58, 0.57, 0.54))
-	for k in 3:
-		con.box(Props.at(0, 0, -0.9 + k * 0.3), Vector3(2.4 - k * 0.2, 0.15 * (k + 1), 0.3))
-	con.box(Props.at(0, 0, -0.15), Vector3(2.0, 0.45, 0.3))
-	con.box(Props.at(0, 2.75, -0.7), Vector3(2.6, 0.14, 1.5))
-	for sx: float in [-1.15, 1.15]:
-		con.box(Props.at(sx, 0.45, -1.3), Vector3(0.12, 2.3, 0.12))
-	_front(kit, Props.at(0, 0.45, -0.03), Vector3(1.6, 2.2, 0.02), "door")
-	kit.b("paint", Color(0.3, 0.22, 0.16)).box(Props.at(0, 0.45, -0.02), Vector3(1.7, 2.25, 0.02), Color.WHITE,
-		Props.NO_RECT, Vector2.ONE, MeshFactory.NZ)
+	if not Models.add(kit, "street", "entrance", Transform3D.IDENTITY):
+		var con := kit.b("concrete", Color(0.58, 0.57, 0.54))
+		for k in 3:
+			con.box(Props.at(0, 0, -0.9 + k * 0.3), Vector3(2.4 - k * 0.2, 0.15 * (k + 1), 0.3))
+		con.box(Props.at(0, 0, -0.15), Vector3(2.0, 0.45, 0.3))
+		con.box(Props.at(0, 2.75, -0.7), Vector3(2.6, 0.14, 1.5))
+		for sx: float in [-1.15, 1.15]:
+			con.box(Props.at(sx, 0.45, -1.3), Vector3(0.12, 2.3, 0.12))
+		_front(kit, Props.at(0, 0.45, -0.03), Vector3(1.6, 2.2, 0.02), "door")
+		kit.b("paint", Color(0.3, 0.22, 0.16)).box(Props.at(0, 0.45, -0.02), Vector3(1.7, 2.25, 0.02), Color.WHITE,
+			Props.NO_RECT, Vector2.ONE, MeshFactory.NZ)
 	# A bulb in a wire cage over the door.
 	kit.b("white", Color.WHITE, Color(2.0, 1.6, 1.0) if night and number % 3 != 0 else Color.BLACK).cylinder(
 		Props.at(0, 2.58, -0.2), 0.07, 0.07, 0.15, 8)

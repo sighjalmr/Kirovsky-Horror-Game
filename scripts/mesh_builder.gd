@@ -18,9 +18,12 @@ const NO_RECT := Rect2()
 static var bevel := 0.0
 
 var ao_enabled := true
+var kit: Kit  # the Kit that made this builder (Models can add to its siblings)
 
 var _st := SurfaceTool.new()
 var _count := 0
+var _app: SurfaceTool  # models appended whole (Models.add), indexed
+var _app_count := 0
 var _nb_of := Basis()
 var _nb := Basis()
 
@@ -30,7 +33,15 @@ func _init() -> void:
 
 
 func is_empty() -> bool:
-	return _count == 0
+	return _count == 0 and _app_count == 0
+
+
+## Appends surface `surface` of a ready mesh (a Blender model) at `xf`.
+func append(mesh: Mesh, surface: int, xf: Transform3D) -> void:
+	if _app == null:
+		_app = SurfaceTool.new()
+	_app.append_from(mesh, surface, xf)
+	_app_count += 1
 
 
 ## Bottom-centred box, like MeshFactory.box. `step` > 0 cuts faces into
@@ -338,8 +349,14 @@ func _vertex(xf: Transform3D, p: Vector3, uv: Vector2, n: Vector3, color: Color,
 
 
 func commit() -> ArrayMesh:
-	_st.generate_tangents()
-	return _st.commit()
+	if _app_count == 0:
+		_st.generate_tangents()
+		return _st.commit()
+	if _count > 0:
+		_st.index()
+		_st.generate_tangents()
+		_app.append_from(_st.commit(), 0, Transform3D.IDENTITY)
+	return _app.commit()
 
 
 ## Several builders keyed by material, turned into one MeshInstance3D each.
@@ -352,7 +369,17 @@ class Kit:
 		if not _parts.has(key):
 			var mb := MeshBuilder.new()
 			mb.ao_enabled = ao
+			mb.kit = self
 			_parts[key] = [mb, Mats.get_mat(tex, tint, emission, kind)]
+		return _parts[key][0]
+
+	## A builder for Blender models (Models.add): band "" = always drawn,
+	## "near" = up to Models.lod_distance, "far" = beyond it.
+	func model(tex: String, tint := Color.WHITE, kind := Mats.SOLID, band := "") -> MeshBuilder:
+		var key := "model%s|%s|%s|%s" % [band, tex, tint.to_html(), kind]
+		if not _parts.has(key):
+			var mb := MeshBuilder.new()
+			_parts[key] = [mb, Mats.get_mat(tex, tint, Color.BLACK, kind)]
 		return _parts[key][0]
 
 	## Adds a builder with a material made elsewhere (one that changes at runtime).
@@ -374,6 +401,14 @@ class Kit:
 			mi.extra_cull_margin = 0.3
 			if not shadows or key.ends_with(Mats.GLASS):
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if key.begins_with("modelnear|"):
+				mi.visibility_range_end = Models.lod_distance
+				mi.visibility_range_end_margin = 0.5
+			elif key.begins_with("modelfar|"):
+				mi.visibility_range_begin = Models.lod_distance
+				mi.visibility_range_begin_margin = 0.5
 			parent.add_child(mi)
 			out.append(mi)
+		for key: String in _parts:  # break the builder -> kit cycle
+			(_parts[key][0] as MeshBuilder).kit = null
 		return out
