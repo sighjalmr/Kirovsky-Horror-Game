@@ -50,8 +50,13 @@ var _swing := 0.0
 var _swing_t := 0.0
 
 
-func _init(m: Node) -> void:
+## "night" (rain, sodium lamps) or "day" (day four: a grey noon, dry).
+var look := "night"
+
+
+func _init(m: Node, look_ := "night") -> void:
 	main = m
+	look = look_
 
 
 func _enter_tree() -> void:
@@ -64,7 +69,7 @@ func _exit_tree() -> void:
 
 
 func _ready() -> void:
-	ext = Exterior.new("night", true)
+	ext = Exterior.new(look, true)
 	ext.position = OFFSET
 	add_child(ext)
 	_walls()
@@ -113,7 +118,7 @@ func _process(delta: float) -> void:
 		var c := cam.global_position - cam.global_basis.z * 6.0
 		ext.rain.global_position = Vector3(c.x, cam.global_position.y + 9.0, minf(c.z, -16.8))
 	var open: bool = main.store.front_open
-	_rain_sound.volume_db = lerpf(-30.0 if not open else -20.0, -7.0, mix)
+	_rain_sound.volume_db = -80.0 if look != "night" else lerpf(-30.0 if not open else -20.0, -7.0, mix)
 	if handset and _swing > 0.001:
 		_swing_t += delta
 		_swing = maxf(0.0, _swing - delta * 0.012)
@@ -123,7 +128,7 @@ func _process(delta: float) -> void:
 
 ## The store's environment, blended towards the night air outside.
 func blend_env(env: Environment) -> void:
-	if mix <= 0.001:
+	if mix <= 0.001 or look != "night":
 		return
 	env.fog_light_color = env.fog_light_color.lerp(OUT_FOG, mix)
 	env.background_color = env.background_color.lerp(OUT_SKY, mix)
@@ -189,8 +194,10 @@ func _build_yard_lights() -> void:
 	bulb.position = Vector3(-23.2, GROUND + 3.4, -0.7)
 	bulb.light_color = Color(1.0, 0.8, 0.55)
 	bulb.omni_range = 11.0
-	bulb.light_energy = 1.6
+	bulb.light_energy = 1.6 if look == "night" else 0.0
 	add_child(bulb)
+	if look != "night":
+		s.light_energy = 0.0
 	var kit := MeshBuilder.Kit.new()
 	kit.b("white", Color(1, 0.9, 0.7), Color(3.0, 2.4, 1.5)).cylinder(Props.at(-23.2, GROUND + 3.35, -0.7), 0.05, 0.05, 0.1, 8)
 	kit.b("metal", Color(0.3, 0.3, 0.3)).box(Props.at(-23.2, GROUND + 3.45, -0.5), Vector3(0.04, 0.04, 0.45))

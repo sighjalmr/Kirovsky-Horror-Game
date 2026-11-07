@@ -39,6 +39,8 @@ const N5_E_1 := "Эдик: — Тише, дед. Седьмого я тут бы
 const N5_E_2 := "Эдик: — Без двадцати одиннадцать Нинка сама открыла заднее крыльцо. Участковому. Он в форме был, я его ни с кем не спутаю."
 const N5_E_3 := "Эдик: — Милиции не скажу, он меня крышует. Прокурору скажу. Только прокурору. Адрес мой ты знаешь."
 const N5_G_EDIK := "Свидетель. Первый за два года. Если доживу до утра, повезу его в городскую прокуратуру."
+## Day four frightened him into coming (Main.night_clues "edik_ready").
+const N5_E_READY := "Эдик: — Пришёл, как обещал. И слушай, дед: кнопку свою тревожную не трогай. Сегодня по району ответственный он."
 const N5_E_BUSY := "Эдик: — Всё, дед. Я ничего не говорил."
 const N5_K_LOCK := "Ковпак: — Всё, я поехал. Он сам запрёт."
 const N5_KL_GLASS := "Колесников: — Спокойной ночи, Гордеев. До шести тебе никто не откроет."
@@ -193,6 +195,8 @@ func _init(m: Node) -> void:
 	known = Main.night_clues.duplicate()
 	if known.is_empty():
 		known = {"panel": true, "wire": true, "prints": true, "box": true, "earring": true, "has_box": true}
+	if "--edikready" in OS.get_cmdline_user_args():  # dev: as if day four went well
+		known["edik_ready"] = true
 	box_at = "locker" if known.get("has_box", true) else "him"
 
 
@@ -382,7 +386,8 @@ func _prologue() -> void:
 ## 22:33: Ковпак sends Эдик out, but not while Gordeev is talking to him or
 ## on his way over to him (till 22:36, Ковпак leaves at 22:37).
 func _edik_time() -> void:
-	var near: bool = not clues.edik and main.player.global_position.distance_to(edik.global_position) < 7.0
+	var near: bool = not clues.edik and (known.get("edik_ready", false)
+		or main.player.global_position.distance_to(edik.global_position) < 7.0)
 	if (_edik_state == "talking" or near) and main.minutes < Main.clock(22, 36):
 		main.after(0.3, _edik_time)
 		return
@@ -418,6 +423,8 @@ func _talk_edik() -> void:
 	hud.say(N5_E_1, -1.0, true)
 	hud.say(N5_E_2)
 	hud.say(N5_E_3)
+	if known.get("edik_ready", false):
+		hud.say(N5_E_READY)
 	hud.say(N5_G_EDIK)
 	update_notebook()
 	await get_tree().create_timer(5.0, false).timeout

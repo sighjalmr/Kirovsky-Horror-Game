@@ -32,6 +32,12 @@ static var sub_size := 0
 static var hints := true
 ## "Следователь": no rings round clues, no clue counter, tasks in Gordeev's words.
 static var detective := false
+## «Ветеран»: he hears further and notices sooner, one валидол a shift,
+## tearing free takes more presses. Chosen with a new game, or in Settings.
+static var veteran := false
+## Index in Loc.LANGS: the language of subtitles and on-screen text (the
+## voices stay Russian). -1 until the first start picks the computer's own.
+static var language := -1
 ## Ids of the hints already shown (Main.hint).
 static var hints_seen: Array = []
 ## Chapters reached at least once: the chapter menu opens these.
@@ -50,6 +56,7 @@ static func load_all() -> void:
 	_loaded = true
 	var cf := ConfigFile.new()
 	if cf.load(PATH) != OK:
+		language = 0 if not OS.get_cmdline_user_args().is_empty() else Loc.default_language()
 		return
 	master = cf.get_value("audio", "master", master)
 	sounds = cf.get_value("audio", "sounds", sounds)
@@ -63,10 +70,12 @@ static func load_all() -> void:
 	sub_size = cf.get_value("video", "sub_size", sub_size)
 	hints = cf.get_value("game", "hints", hints)
 	detective = cf.get_value("game", "detective", detective)
+	veteran = cf.get_value("game", "veteran", veteran)
 	hints_seen = cf.get_value("game", "hints_seen", hints_seen)
 	reached = cf.get_value("game", "reached", reached)
 	endings = cf.get_value("game", "endings", endings)
 	plan_copied = cf.get_value("game", "plan_copied", plan_copied)
+	language = clampi(cf.get_value("game", "language", Loc.default_language()), 0, Loc.LANGS.size() - 1)
 
 
 static func save() -> void:
@@ -85,10 +94,12 @@ static func save() -> void:
 	cf.set_value("video", "sub_size", sub_size)
 	cf.set_value("game", "hints", hints)
 	cf.set_value("game", "detective", detective)
+	cf.set_value("game", "veteran", veteran)
 	cf.set_value("game", "hints_seen", hints_seen)
 	cf.set_value("game", "reached", reached)
 	cf.set_value("game", "endings", endings)
 	cf.set_value("game", "plan_copied", plan_copied)
+	cf.set_value("game", "language", language)
 	cf.save(PATH)
 
 

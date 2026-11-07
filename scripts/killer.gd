@@ -268,7 +268,7 @@ func _physics_process(delta: float) -> void:
 			# Standing in wait (lurk_at) he takes his time: he lets the light
 			# come to him.
 			suspicion += delta * (SUSPECT_NEAR if _dist_to_player() < 4.0 else SUSPECT_FAR) \
-				* (0.55 if is_lurking() else 1.0)
+				* (0.55 if is_lurking() else 1.0) * (1.35 if Settings.veteran else 1.0)
 			_face(player.global_position, delta * 3.0)
 			staring = suspicion > 0.12
 			if suspicion > 0.3 and not _alerted:
