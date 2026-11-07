@@ -130,6 +130,7 @@ func _ready() -> void:
 		Settings.load_all()
 		if not _dev():
 			_load_save()
+	Loc.setup()
 	_setup_input()
 	Sfx.setup_buses()
 	Settings.setup_bus()
@@ -220,6 +221,10 @@ func _ready() -> void:
 		return
 	hud.fade.color.a = 1.0
 	_title_menu()
+
+
+func _exit_tree() -> void:
+	Loc.shutdown()
 
 
 ## The title: the name over black and the menu under it. A reload that came
