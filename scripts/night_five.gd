@@ -81,6 +81,7 @@ const N5_G_GOT := "Коробку за пазуху. Пусть ищет."
 const N5_LOCKER_BROKEN := "Двенадцатая сорвана с петель. Моё пальто на полу."
 # The office and his map case.
 const N5_G_OUT := "Хлопнула дверь склада. Ушёл к «бобику», на связь. А в кабинете Ковпака осталась гореть настольная лампа."
+const N5_G_SOON := "Снаружи хлопнула дверца «бобика». Сейчас вернётся. Из кабинета надо уходить."
 const N5_G_BACK := "Опять дверь склада. Он вернулся."
 const N5_G_BACK_KNOWS := "Он вернулся в кабинет. Тихо. Потом шаги, быстрые. Он понял, что я был у планшета."
 const N5_PLANSHET_PROMPT := "Открыть планшет на столе"
@@ -306,8 +307,10 @@ func build_timeline() -> void:
 			store.switch_off(idx)
 			hud.say(ROW_LINES[idx]))
 	m.at(23, 10, func():
-		_killer_in()
-		hud.say(N5_G_DOOR, -1.0, true))
+		# The alarm button may have called him in already.
+		if killer_phase == "before":
+			_killer_in()
+			hud.say(N5_G_DOOR, -1.0, true))
 	m.at(23, 13, _to_wire)
 	for t: Array in LURKS_5:
 		m.at(t[0], t[1], _lurk)
@@ -318,6 +321,7 @@ func build_timeline() -> void:
 	m.at(0, 30, _to_lockers)
 	m.at(1, 30, _to_office)
 	m.at(1, 40, _go_out)
+	m.at(2, 33, _soon_back)
 	m.at(2, 40, _come_back)
 	m.at(4, 0, func(): hud.say(N5_G_0400))
 	m.at(5, 30, _leave_for_good)
@@ -341,11 +345,7 @@ func _prologue() -> void:
 	hud.say(N5_K_FEAR)
 	hud.say(N5_G_KOVPAK)
 	hud.say(N5_G_EDIK_SEE)
-	main.at(22, 33, func():
-		if _edik_state == "talking":
-			main.after(1.0, func(): _edik_out())
-		else:
-			_edik_out())
+	main.at(22, 33, _edik_time)
 	main.at(22, 37, func():
 		_talked["kovpak_walk"] = true
 		hud.say(N5_K_LOCK)
@@ -377,6 +377,19 @@ func _prologue() -> void:
 		koles.visible = false
 		if main.phase == Main.Phase.PLAY:
 			main.save_checkpoint())
+
+
+## 22:33: Ковпак sends Эдик out, but not while Gordeev is talking to him or
+## on his way over to him (till 22:36, Ковпак leaves at 22:37).
+func _edik_time() -> void:
+	var near: bool = not clues.edik and main.player.global_position.distance_to(edik.global_position) < 7.0
+	if (_edik_state == "talking" or near) and main.minutes < Main.clock(22, 36):
+		main.after(0.3, _edik_time)
+		return
+	if _edik_state == "talking":
+		main.after(1.0, func(): _edik_out())
+	else:
+		_edik_out()
 
 
 func _edik_out() -> void:
@@ -549,6 +562,14 @@ func _go_out() -> void:
 	update_notebook()
 
 
+## 02:33: a car door outside, so that Gordeev knows to clear the office.
+func _soon_back() -> void:
+	if killer_phase != "out":
+		return
+	Sfx.play_3d(main.store, "car_door", Vector3(-1.0, 1.0, -9.0), 2.0, 0.9)
+	main.hud.say(N5_G_SOON, -1.0, true)
+
+
 func _come_back() -> void:
 	if killer_phase != "out":
 		return
@@ -579,6 +600,18 @@ func _put_planshet_away() -> void:
 	main.store.set_interactable("planshet", false)
 
 
+## Night one's leave/return (used by restoring a save) go his night-five way.
+func _killer_leave() -> void:
+	if main.minutes >= Main.clock(5, 30):
+		_leave_for_good()
+	else:
+		_go_out()
+
+
+func _killer_return() -> void:
+	_come_back()
+
+
 func _leave_for_good() -> void:
 	var k: Killer = main.killer
 	if not k.is_active():
@@ -602,9 +635,18 @@ func _press_button() -> void:
 	if main.phase != Main.Phase.PLAY:
 		return
 	var k: Killer = main.killer
-	if killer_phase == "out":
+	# Before 23:10 he is waiting in his car; let Ковпак be gone first.
+	while killer_phase == "before" and kovpak_state != "done":
+		await get_tree().create_timer(1.0, false).timeout
+		if main.phase != Main.Phase.PLAY:
+			return
+	if killer_phase in ["before", "out", "gone"]:
+		if killer_phase == "out" and planshet_open and not he_knows:
+			he_knows = true
 		_killer_in()
 		_put_planshet_away()
+		if not wire_cut:
+			main.after(3.0, _to_wire)
 	if k.is_active() and not k.leaving:
 		hud.say(N5_G_CAME, -1.0, true)
 		k.hear(Vector3(10.0, 0, 3.0), 80.0)
@@ -654,6 +696,8 @@ func interact(id: String) -> bool:
 				hud.say(N5_G_GOT, -1.0, true)
 				store.set_interactable("locker12", false)
 				update_notebook()
+				if kovpak_state == "done" and not main.chasing:
+					main.save_checkpoint()
 			elif locker_broken:
 				hud.say(N5_LOCKER_BROKEN, -1.0, true)
 		"planshet":
@@ -719,6 +763,8 @@ func _open_planshet() -> void:
 			hud.say(N5_G_TAKE_PAGE, -1.0, true)
 		main.store.set_interactable("planshet", true, "Планшет")
 		update_notebook()
+		if not main.chasing:
+			main.save_checkpoint()
 		return
 	hud.say(N5_PLANSHET_EMPTY, -1.0, true)
 
