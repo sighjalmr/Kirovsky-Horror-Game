@@ -71,6 +71,7 @@ func _ready() -> void:
 		zhiguli.visible = true
 		zhiguli.position = ZHIGULI_SPOT
 		zhiguli.rotation.y = PI
+		CarCabin.set_driver(zhiguli, false)
 	if look == "night":
 		_build_rain()
 

@@ -109,7 +109,7 @@ func _ready() -> void:
 	_whirr.volume_db = WHIRR_DB
 	_whirr.max_distance = 6.0
 	_whirr.unit_size = 1.0
-	add_child(_whirr)
+	hand.add_child(_whirr)  # in his fist, a step from the ear, not down at his boots
 	_pant = AudioStreamPlayer.new()
 	_pant.stream = Sfx.get_stream("heartbeat")
 	_pant.volume_db = -10.0
@@ -225,7 +225,7 @@ func _set_flashlight(on: bool) -> void:
 ## The «жучок» heard (tools/make_torch_sound.py): the first squeeze from rest,
 ## then steady pumping in a loop, and on letting go the lever springing open and
 ## the flywheel running down. Quiet, close by in his right hand.
-const WHIRR_DB := -18.0
+const WHIRR_DB := -6.0
 var _torch_t := 0.0
 var _torch_start: AudioStreamPlayer3D
 var _whirr_fade: Tween

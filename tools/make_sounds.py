@@ -514,12 +514,45 @@ def lock(name):
     save(name, x, 0.85)
 
 
+def door_glass(name):
+    """The shop's front door slamming on its closer: a wooden-aluminium thud
+    in the frame, the big pane shuddering, the latch snapping home."""
+    g = Gen(name)
+    t = g.t(1.2)
+    x = np.zeros_like(t)
+    thud = band(g.noise(0.12), 60, 900) * env(g.t(0.12), 0.001, 0.03) * 2.5
+    thud += modal(g.t(0.12), [(72, 0.06, 1.2), (118, 0.04, 0.6)])
+    place(x, thud, 0.0)
+    pane = modal(t, [(310, 0.18, 0.5), (755, 0.12, 0.35), (1460, 0.09, 0.25), (2870, 0.05, 0.12)])
+    pane *= 1 + 0.6 * np.sin(2 * np.pi * 23 * t) * np.exp(-t / 0.15)  # the glass rattling in its frame
+    x += pane * 0.6
+    place(x, modal(g.t(0.06), [(2300, 0.015, 0.8), (4100, 0.01, 0.4)]), 0.035)
+    place(x, band(g.noise(0.01), 1500, 9000) * 1.2, 0.035)
+    save(name, x, 0.92)
+
+
+def door_steel(name):
+    """A heavy steel door (the storage room, the back door) slammed: a deep
+    boom of the leaf in its steel frame and the latch, ringing a while."""
+    g = Gen(name)
+    t = g.t(1.8)
+    x = np.zeros_like(t)
+    boom = band(g.noise(0.5), 40, 700) * env(g.t(0.5), 0.001, 0.05) * 3
+    boom += modal(g.t(0.5), [(55, 0.2, 1.5), (93, 0.15, 0.8), (161, 0.1, 0.4)])
+    place(x, boom, 0.0)
+    x += modal(t, [(212, 0.5, 0.35), (531, 0.35, 0.25), (1187, 0.2, 0.15), (2210, 0.1, 0.08)], 0.01)
+    place(x, modal(g.t(0.1), [(1900, 0.02, 0.6), (3500, 0.012, 0.3)]), 0.04)
+    place(x, band(g.noise(0.008), 1200, 8000), 0.04)
+    save(name, x, 0.95)
+
+
 ALL = {
     "engine": engine, "knock": knock, "cans": cans, "lock": lock, "crowd": crowd,
     "hum": hum, "click": click, "phone": phone, "compressor": compressor, "room": room,
     "cloth": cloth, "stinger": stinger, "drone": drone, "chime": chime, "breath": breath,
     "clank": clank, "keys": keys, "pickup": pickup, "attack_sting": attack_sting, "swing": swing,
     "heartbeat": heartbeat, "ringing": ringing, "killer_breath": killer_breath,
+    "door_glass": door_glass, "door_steel": door_steel,
 }
 
 

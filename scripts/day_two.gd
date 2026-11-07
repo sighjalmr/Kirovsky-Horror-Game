@@ -58,6 +58,7 @@ func _ready() -> void:
 	var store: Store = main.store
 	for it in store.interactables:
 		it.active = false
+	store.dress_for_day()
 	store._counter(COUNTER, 3.2, true)
 	var label := Label3D.new()
 	label.text = "МЯСО"

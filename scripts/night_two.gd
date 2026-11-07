@@ -151,6 +151,7 @@ func _ready() -> void:
 	super()
 	kolesnikov = _person("kolesnikov")
 	main.store.add_cellar()
+	main.store.empty_chest(Store.CLUE_CHEST)  # N2_A3: no pelmeni, no frost, washed out
 	# The seal on the storage door was found torn on Friday; no news tonight.
 	_talked["torn"] = true
 	main.store.add_interactable("talk_kolesnikov", Vector3.ZERO, "Заговорить с участковым", 1.7, false, false)

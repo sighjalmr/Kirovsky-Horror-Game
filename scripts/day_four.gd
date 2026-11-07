@@ -92,6 +92,7 @@ func _ready() -> void:
 	var store: Store = main.store
 	for it in store.interactables:
 		it.active = false
+	store.dress_for_day()
 	outdoors = Outdoors.new(main, "day")
 	main.world.add_child(outdoors)
 	store.embed_street(Outdoors.GROUND)
