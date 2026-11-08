@@ -37,6 +37,8 @@ var _tasks_text: RichTextLabel
 var _tasks_key := ""
 
 var _memo_text: Label
+## Under the paper, on the screen itself: how to put the note away.
+var _memo_hint: Label
 
 var _choice_box: VBoxContainer
 var _choice_title: Label
@@ -179,6 +181,18 @@ func _ready() -> void:
 	_memo_text.add_theme_font_size_override("font_size", 25)
 	_memo_text.add_theme_color_override("font_color", Color(0.12, 0.16, 0.38))
 	memo.add_child(_memo_text)
+	_memo_hint = Label.new()
+	_memo_hint.text = "E, клик или W — убрать записку"
+	_memo_hint.position = Vector2(0, 1046)
+	_memo_hint.size = Vector2(1920, 34)
+	_memo_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_memo_hint.add_theme_font_size_override("font_size", 24)
+	_memo_hint.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
+	_memo_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_memo_hint.add_theme_constant_override("outline_size", 8)
+	_memo_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_memo_hint.visible = false
+	add_child(_memo_hint)
 
 
 func _build_tasks() -> void:
@@ -257,17 +271,32 @@ func read_memo(text: String) -> void:
 	_memo_text.text = text
 	memo.modulate.a = 0.0
 	memo.visible = true
+	_memo_hint.visible = true
 	create_tween().tween_property(memo, "modulate:a", 1.0, 0.5)
 	var t := 0.0
 	while true:
 		await get_tree().process_frame
 		t += get_process_delta_time()
-		if t > 0.8 and (Input.is_action_just_pressed("interact") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)):
+		if t > 0.8 and (Input.is_action_just_pressed("interact") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+				or Input.is_action_just_pressed("ui_cancel") or _wants_to_walk()):
 			break
+	# The click that put the note away must not also light the torch (left button).
+	while Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		await get_tree().process_frame
 	var tw := create_tween()
 	tw.tween_property(memo, "modulate:a", 0.0, 0.4)
+	_memo_hint.visible = false
 	await tw.finished
 	memo.visible = false
+
+
+## W/A/S/D or the arrows while a note is up: he wants to get going, so the
+## note goes away (the game stands still while it is read).
+func _wants_to_walk() -> bool:
+	for a in ["move_forward", "move_back", "strafe_left", "strafe_right"]:
+		if Input.is_action_just_pressed(a):
+			return true
+	return false
 
 
 ## A list of answers to pick with the mouse or the number keys; returns the
