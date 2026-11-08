@@ -347,7 +347,7 @@ func _update_hints(delta: float) -> void:
 		hint("day", "E — поговорить. Вопрос выбирайте цифрами или мышью")
 		return
 	if not store.is_lit(player.global_position) and not player.flashlight_on and not player.hidden:
-		hint("dark", "Темно. Держите F или правую кнопку мыши — фонарик. Он жужжит: его слышно")
+		hint("dark", "Темно. Держите левую кнопку мыши (или F) — фонарик. Он жужжит: его слышно")
 	if killer.is_active() and killer.visible \
 			and player.global_position.distance_to(killer.global_position) < 16.0:
 		hint("crouch", "Он близко. C — пригнуться: шаги тише, вас хуже видно")
@@ -460,9 +460,11 @@ func _setup_input() -> void:
 		var ek := InputEventKey.new()
 		ek.physical_keycode = KEY_E
 		InputMap.action_add_event("ui_accept", ek)
+	# The torch is held on the left mouse button (and F); nothing else in
+	# play is on the left button, interaction stays on E.
 	if InputMap.action_get_events("flashlight").size() < 4:
 		var m := InputEventMouseButton.new()
-		m.button_index = MOUSE_BUTTON_RIGHT
+		m.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_add_event("flashlight", m)
 
 
