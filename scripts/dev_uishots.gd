@@ -22,6 +22,13 @@ func _ready() -> void:
 	main.menu.show_title_menu()
 	await _wait(0.5)
 	await _shot("01_title_menu")
+	# The same page with a saved shift: the longest "continue" line there is.
+	main.hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ", "Свердловск, октябрь 1988")
+	main.menu.has_progress = true
+	main.menu.continue_detail = "Ночь пятая, последняя. Среда, 26 октября, с подписи в 22:41"
+	main.menu.show_title_menu()
+	await _wait(0.3)
+	await _shot("01b_title_continue")
 	main.menu._settings()
 	await _wait(0.3)
 	await _shot("02_settings")
