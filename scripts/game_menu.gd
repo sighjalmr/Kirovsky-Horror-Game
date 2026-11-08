@@ -36,7 +36,9 @@ const KEYS := "Мышь — смотреть      W / A / S / D — идти\n" 
 ## "title" or "pause": where Back from a sub-page returns.
 var mode := "title"
 ## Lines for the title page, filled by Main before show_title_menu().
-var continue_label := ""
+var continue_label := "Продолжить"
+## The night and the journal signature, on a small line under "Продолжить".
+var continue_detail := ""
 var has_progress := false
 
 var _bg: ColorRect
@@ -84,6 +86,16 @@ func show_title_menu() -> void:
 	_page("", Vector2(560, 560))
 	if has_progress:
 		_button(continue_label, "continue")
+		if continue_detail != "":
+			var d := Label.new()
+			d.text = continue_detail
+			d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			d.add_theme_font_size_override("font_size", 22)
+			d.add_theme_color_override("font_color", DIM)
+			d.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+			d.add_theme_constant_override("outline_size", 4)
+			_panel.add_child(d)
 	if has_progress:
 		_button("Новая игра", _ask_new)
 	else:
@@ -94,6 +106,7 @@ func show_title_menu() -> void:
 	_button("Настройки", _settings)
 	_button("Управление", _keys)
 	_button("Выход", "quit")
+	_center_column()
 	_focus_first()
 
 
@@ -115,6 +128,7 @@ func _pause_page() -> void:
 	_button("Управление", _keys)
 	_button("Выйти в главное меню", _ask_title)
 	_button("Выйти из игры", _ask_quit)
+	_center_column()
 	_focus_first()
 
 
@@ -526,6 +540,17 @@ func _page(heading: String, at: Vector2) -> void:
 	_heading.size = Vector2(1000, 50)
 	_panel.position = at
 	_panel.size = Vector2(1920 - at.x * 2, 0)
+
+
+## Title and pause pages: one column on the middle of the screen. The panel
+## spans almost the whole width (so a long line cannot push it right) and each
+## button hugs its own text, so its focus frame sits on the centre line too.
+func _center_column() -> void:
+	_panel.position.x = 160
+	_panel.size.x = 1920 - 320
+	for c in _panel.get_children():
+		if c is Button:
+			c.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 
 func _button(text: String, action: Variant, dim := false) -> Button:

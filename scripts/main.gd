@@ -264,9 +264,10 @@ func _title_menu() -> void:
 		_splashed = true
 	hud.show_title("КИРОВСКИЙ: ЗАКРЫТИЕ", "Свердловск, октябрь 1988")
 	menu.has_progress = chapter != "night1" or not checkpoint.is_empty() or not night_clues.is_empty()
-	menu.continue_label = "Продолжить: " + _night_name()
+	menu.continue_label = "Продолжить"
+	menu.continue_detail = _night_name()
 	if not checkpoint.is_empty():
-		menu.continue_label += ", с подписи в %s" % _fmt(checkpoint.minutes)
+		menu.continue_detail += ", с подписи в %s" % _fmt(checkpoint.minutes)
 	menu.show_title_menu()
 
 
